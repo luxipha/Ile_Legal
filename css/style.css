@@ -101,51 +101,10 @@ header .logo {
 }
 
 .left-side {
-  background: linear-gradient(45deg, #130C31, #40284C);
-  padding: 2rem;
+  background: transparent;
 }
-
 .huge-content {
   position: relative;
-  padding-top: 2rem;
-}
-
-.logo {
-  width: 80px;
-  height: auto;
-  margin-bottom: 3rem;
-}
-
-.button-group {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.btn-primary {
-  background-color: #FDD15F;
-  color: #000;
-  border: none;
-  padding: 12px 24px;
-  font-weight: 600;
-}
-
-.btn-primary:hover {
-  background-color: #F4C23B;
-  color: #000;
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: #FDD15F;
-  border: 1px solid #FDD15F;
-  padding: 12px 24px;
-  font-weight: 600;
-}
-
-.btn-secondary:hover {
-  background-color: rgba(253, 209, 95, 0.1);
-  color: #FDD15F;
 }
 
 .background-video {
