@@ -180,10 +180,94 @@ header .logo {
   padding: 0;
 }
 
-.right-side .huge-background-img {
-  height: 100vh;
-  background: #ECF3F7;
-  position: relative;
+.right-side {
+  background: #fff;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.property-content {
+  padding: 20px;
+}
+
+.featured-title {
+  font-size: 2.5em;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.featured-subtitle {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.property-card {
+  background: #fff;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.property-image {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+}
+
+.property-details {
+  padding: 1.5rem;
+}
+
+.property-stats {
+  display: flex;
+  justify-content: space-between;
+  margin: 1rem 0;
+}
+
+.property-stats span {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.property-value {
+  margin: 1.5rem 0;
+}
+
+.trend-graph {
+  width: 100%;
+  height: auto;
+}
+
+.property-returns {
+  margin: 1.5rem 0;
+}
+
+.return-stat {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.token-availability {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.invest-btn {
+  width: 100%;
+  padding: 1rem;
+  background: #FDD15F;
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.invest-btn:hover {
+  background: #FCDD91;
 }
 
 .right-side h3 {
