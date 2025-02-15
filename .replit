@@ -1,6 +1,5 @@
-
 run = "vite"
-entrypoint = "404/index.html"
+entrypoint = "index.html"
 hidden = [".config"]
 modules = ["nodejs-18", "web"]
 
