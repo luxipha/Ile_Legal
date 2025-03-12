@@ -356,19 +356,25 @@ header {
   opacity: .8;
 }
 
+
 @media (max-width: 991.98px) {
   .left-side .huge-content h1 {
-    font-size: 2.5rem;
+    font-size: 3.2rem;
+    margin-top: 0;
   }
   
   .left-side .huge-content h2 {
     font-size: 1.2rem;
   }
+
+  .left-side .huge-content h3 {
+    font-size: 1rem;
+  }
   
-  .social-icons {
+  .left-side .social-icons {
     position: relative;
-    top: auto;
-    left: auto;
+    top: -7%;
+    left: 10%;
     display: flex;
     justify-content: center;
     margin-bottom: 1.5rem;
@@ -383,7 +389,7 @@ header {
 
 @media (max-width: 767.98px) {
   .left-side .huge-content h1 {
-    font-size: 2rem;
+    /* font-size: 2rem; */
   }
   
   .left-side .huge-content h2 {
@@ -538,9 +544,10 @@ header {
   }
   
   .left-side .huge-content h1 {
-    font-size: 1.75rem;
-    margin: 1rem 0;
-  }
+   
+    /* font-size: 1.75rem; */
+    /* margin: 1rem 0; */
+  } 
   
   .left-side .huge-content h2 {
     font-size: 1rem;
@@ -581,8 +588,8 @@ header {
 
 /* Small devices (landscape phones, 576px and up) */
 @media (min-width: 576px) and (max-width: 767.98px) {
-  .left-side .huge-content h1 {
-    font-size: 2rem;
+  /* .left-side .huge-content h1 {
+    font-size: 2rem; */
   }
   
   .left-side .huge-content h2 {
@@ -592,8 +599,8 @@ header {
 
 /* Medium devices (tablets, 768px and up) */
 @media (min-width: 768px) and (max-width: 991.98px) {
-  .left-side .huge-content h1 {
-    font-size: 2.5rem;
+  /* .left-side .huge-content h1 {
+    font-size: 2.5rem; */
   }
   
   .left-side .huge-content h2 {
