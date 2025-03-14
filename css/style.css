@@ -21,6 +21,7 @@ html, body {
   font-family: Raleway, Helvetica Neue, Helvetica, Arial, sans-serif;
   font-weight: 400;
   overflow-x: hidden;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -46,27 +47,6 @@ img {
   max-width: 100%;
   height: auto;
 }
-
-
-/* html{
-  min-height: 100%;
-  height: 100%;
-  overflow-x: hidden;
-}
-body {
-  background: linear-gradient(45deg,#130c31,#40284c);
-  margin: 0;
-  padding: 0;
-  font-family: Raleway, Helvetica Neue, Helvetica, Arial, sans-serif;
-  font-weight: 400
-}
-
-body,html {
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-
-} */
 
 
 /**********************************/
@@ -221,6 +201,14 @@ header {
   background-color: var(--primary-yellow);
 }
 
+/* Payment Modal  */
+
+.modal-header {
+  position: relative;
+  top: -50px;
+  right: -30px;
+
+}
 /* Responsive Adjustments for Investment Card */
 @media (min-width: 768px) {
   .investment-card {
@@ -243,49 +231,13 @@ header {
   }
 }
 
-/* .investment-card {
-  position: fixed; 
-  right: 0;
-  width: 50%; 
-  background: #fff;
-  padding: 20px;
-  border-top: 2px solid #ddd; 
-  box-shadow: 0px -4px 10px rgba(0, 0, 0, 0.1);
-  text-align: center;
-}
-
-.investment-option {
-  display: flex;
-  align-items: center;
-}
-
-.investment-value {
-  font-size: 24px;
-  font-weight: bold;
-  margin-right: 5px;
-}
-
-.investment-label {
-  font-size: 24px;
-  margin-right: 5px;
-}
-
-.info-icon {
-  width: 16px;
-  height: 16px;
-  background-color: #e9e9e9;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #666;
-  cursor: pointer;
-} */
-
 .huge-content a:hover {
   opacity: 0.8;
 }
+
+/* payment modal responsiveness */
+
+
 
 /**********************************/
 /******* 5.0 Left Side Styles *****/
@@ -483,23 +435,6 @@ header {
   line-height: 150%;
 }
 
-/* Navigation Style */
-/* .nav-tabs .nav-link {
-  font-family: 'Raleway', sans-serif;
-  font-size: 16px;
-  font-style: normal;
-  font-weight: 500;
-  line-height: 150%;
-  letter-spacing: 0.04px;
-  color: rgba(23, 15, 52, 0.50);
-}
-
-
-.nav-tabs .nav-link.active {
-  color: #170F34 !important; 
-} */
-
-/* Tabs Navigation */
 .nav-tabs {
   border-bottom: 1px solid rgba(23, 15, 52, 0.2);
   margin-bottom: 2rem;

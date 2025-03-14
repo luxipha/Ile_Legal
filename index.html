@@ -71,7 +71,7 @@
                 liquidity and flexibility to real estate like never before.
               </h2>
               <div class="d-flex">
-                <a class="btn btn-outline-dark" href="#">Go to Data Room</a>
+                <a class="btn btn-outline-dark" href="#featured-property">Buy Property</a>
                 <button class="btn btn-link">Partner with Ile.</button>
               </div>
               <footer class="partner-logo d-flex">
@@ -106,7 +106,7 @@
           <div class="featured-property p-3">
             <!-- Feature property heading  -->
             <div class="property-heading mb-4">
-              <h2>Featured Property</h2>
+              <h2 id="featured-property">Featured Property</h2>
               <p>Exclusive Properties Tokenized For Secure Ownership</p>
             </div>
             <div id="propertyCarousel" class="carousel slide mb-4" data-bs-ride="carousel">
@@ -386,6 +386,118 @@
                   <div class="investment-value">10%</div>
                   <div class="investment-label">RY</div>
                   <i class="fa fa-exclamation-circle"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="This is an important warning!"></i>
+                </div>
+                <div class="investment-option">
+                  <div class="me-1">↗</div>
+                  <div class="investment-value">10%</div>
+                  <div class="investment-label">PAR</div>
+                  <i class="fa fa-exclamation-circle"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="This is an important warning!"></i>    
+                </div>
+              </div>
+              <div class="progress" style="height: 12px; border-radius: 6px;">
+                <div class="progress-bar" role="progressbar" style="width: 80%; background-color: #FDD15F;" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            
+              <div class="d-flex justify-content-between my-3">
+                <div>80%</div>
+                <div>Available: 40 Tokens</div>
+              </div>
+              <button class="btn btn-warning btn-lg w-100" data-bs-toggle="modal" data-bs-target="#tokenModal">Buy Property</button>
+            </div>
+            
+            <!-- Token Purchase Modal -->
+            <div class="modal fade" id="tokenModal" tabindex="-1" aria-labelledby="tokenModalLabel" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header border-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body px-4 pb-4 pt-0">
+                    <!-- Token Purchase Progress -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <div class="d-flex align-items-center">
+                        <i class="bi bi-arrow-up me-2 text-muted"></i>
+                        <span class="fw-semibold">10%</span>
+                        <span class="ms-1 text-muted">RY</span>
+                        <button class="btn btn-link p-0 ms-1 text-muted">
+                          <i class="bi bi-info-circle small"></i>
+                        </button>
+                      </div>
+                      
+                      <div class="d-flex align-items-center">
+                        <i class="bi bi-arrow-up me-2 text-muted"></i>
+                        <span class="fw-semibold">10%</span>
+                        <span class="ms-1 text-muted">PAR</span>
+                        <button class="btn btn-link p-0 ms-1 text-muted">
+                          <i class="bi bi-info-circle small"></i>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress mb-2" style="height: 6px;">
+                      <div 
+                        class="progress-bar bg-warning" 
+                        role="progressbar" 
+                        style="width: 80%;" 
+                        aria-valuenow="80" 
+                        aria-valuemin="0" 
+                        aria-valuemax="100"
+                      ></div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between small mb-4">
+                      <span>80%</span>
+                      <span>Available: <strong>40 Tokens</strong></span>
+                    </div>
+                    
+                    <!-- Form -->
+                    <form id="tokenPurchaseForm">
+                      <div class="mb-3">
+                        <input
+                          type="number"
+                          placeholder="Enter Token Amount (e.g., 10)"
+                          class="form-control form-control-lg bg-light"
+                          id="tokenAmount"
+                          required
+                        />
+                        <div class="form-text mt-2" id="priceCalculation"></div>
+                      </div>
+                      
+                      <div class="mb-3">
+                        <input
+                          type="email"
+                          placeholder="Enter email address"
+                          class="form-control form-control-lg bg-light"
+                          id="email"
+                          required
+                        />
+                      </div>
+                      
+                      <button
+                        type="submit"
+                        class="btn btn-warning w-100 py-3 fw-medium"
+                      >
+                        Confirm Payment
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- <div class="investment-card px-5">
+              <div class="d-flex justify-content-between mb-3">
+                <div class="investment-option">
+                  <div class="me-1">↗</div>
+                  <div class="investment-value">10%</div>
+                  <div class="investment-label">RY</div>
+                  <i class="fa fa-exclamation-circle"
                   data-bs-toggle="tooltip"
                   data-bs-placement="top"
                   title="This is an important warning!"></i>
@@ -408,8 +520,10 @@
                 <div>80%</div>
                 <div>Available: 40 Tokens</div>
               </div>
-              <button class="btn btn-warning btn-lg w-100" disabled>Invest</button>
-            </div>
+              <button class="btn btn-warning btn-lg w-100" data-bs-toggle="modal" 
+              data-bs-target="#tokenModal" >Buy Property</button>
+              
+            </div> -->
           </div>
         </div>
       </div>
@@ -422,6 +536,44 @@
           return new bootstrap.Tooltip(tooltipTriggerEl);
         });
       });
+
+      document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    const tokenAmountInput = document.getElementById('tokenAmount');
+    const priceCalculation = document.getElementById('priceCalculation');
+    const form = document.getElementById('tokenPurchaseForm');
+    
+    // Calculate price based on token amount
+    tokenAmountInput.addEventListener('input', function() {
+      const amount = this.value;
+      if (amount) {
+        const price = Number(amount) * 5;
+        priceCalculation.textContent = `${amount} ILE Tokens = $${price}`;
+      } else {
+        priceCalculation.textContent = '';
+      }
+    });
+    
+    // Handle form submission
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const tokenAmount = document.getElementById('tokenAmount').value;
+      const email = document.getElementById('email').value;
+      const price = Number(tokenAmount) * 5;
+      
+      console.log('Submitted:', { tokenAmount, email, price });
+      // send the data to your backend
+      
+      // Close the modal
+      const modal = bootstrap.Modal.getInstance(document.getElementById('tokenModal'));
+      if (modal) modal.hide();
+    });
+  });
     </script>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
