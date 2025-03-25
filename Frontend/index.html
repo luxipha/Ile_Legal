@@ -479,8 +479,8 @@
                       <button
                         type="submit"
                         class="btn btn-warning w-100 py-3 fw-medium"
-                     disabled >
-                        Check Later
+                    >
+                       Buy Now
                       </button>
                     </form>
                   </div>
@@ -494,140 +494,80 @@
     </section>
   
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-          return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-      });
       document.addEventListener('DOMContentLoaded', function() {
     // Initialize Bootstrap tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-    
+    const tooltips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        .map(el => new bootstrap.Tooltip(el));
+
+    // Token price calculator
     const tokenAmountInput = document.getElementById('tokenAmount');
     const priceCalculation = document.getElementById('priceCalculation');
-    const form = document.getElementById('tokenPurchaseForm');
     
-    // Calculate price based on token amount
     tokenAmountInput.addEventListener('input', function() {
-      const amount = this.value;
-      if (amount) {
-        const priceUSD = Number(amount) * 5;
-        const exchangeRate = 1500; // 1 USD = 1500 Naira
-        const priceNaira = priceUSD * exchangeRate;
-        
-        // Format with Naira symbol
-        const formattedPrice = new Intl.NumberFormat('en-NG', { 
-          style: 'currency', 
-          currency: 'NGN' 
-        }).format(priceNaira);
-        
-        priceCalculation.textContent = `${amount} ILE Tokens = ${formattedPrice}`;
-      } else {
-        priceCalculation.textContent = '';
-      }
-    });
-    
-    // Handle form submission with Paystack
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const tokenAmount = document.getElementById('tokenAmount').value;
-      const email = document.getElementById('email').value;
-      const priceUSD = Number(tokenAmount) * 5;
-      const exchangeRate = 1500; // 1 USD = 1500 Naira
-      const priceNaira = priceUSD * exchangeRate;
-      
-      // Make sure we have valid input
-      if (!tokenAmount || !email) {
-        alert('Please enter both token amount and email address');
-        return;
-      }
-      
-      // Initialize Paystack payment
-      payWithPaystack(email, priceNaira, tokenAmount);
-    });
-    
-    // Paystack payment function
-    function payWithPaystack(email, amount, tokens) {
-      let handler = PaystackPop.setup({
-        key: 'pk_test_db277b9186e8877f562b8f1cb8e1e4879716e9fd', // Replace with your public key
-        email: email,
-        amount: amount * 100, // Paystack expects amount in kobo (multiply by 100)
-        currency: 'NGN',
-        ref: 'ILE_TOKENS_' + Math.floor((Math.random() * 1000000000) + 1), // Generate unique reference
-        metadata: {
-          custom_fields: [
-            {
-              display_name: "Token Amount",
-              variable_name: "token_amount",
-              value: tokens
-            }
-          ]
-        },
-        callback: function(response) {
-          // Handle successful payment
-          console.log('Payment successful. Reference: ' + response.reference);
-          
-          // Here you would typically verify the transaction on your server
-          // and then credit the user's token balance
-          
-          // Close the modal after successful payment
-          const modal = bootstrap.Modal.getInstance(document.getElementById('tokenModal'));
-          if (modal) modal.hide();
-          
-          // Show success message to user
-          alert('Payment successful! Your tokens will be credited to your account.');
-        },
-        onClose: function() {
-          // Handle case when user closes payment modal
-          alert('Transaction was not completed, window closed.');
+        const amount = this.value;
+        if (amount) {
+            const priceUSD = amount * 5;
+            const priceNGN = priceUSD * 1500; // 1 USD = 1500 Naira
+            priceCalculation.textContent = `${amount} Tokens = ₦${priceNGN.toLocaleString()}`;
+        } else {
+            priceCalculation.textContent = '';
         }
-      });
-      
-      handler.openIframe();
-    }
-  });
-      // document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Bootstrap tooltips
-    // var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    // var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-    //   return new bootstrap.Tooltip(tooltipTriggerEl);
-    // });
-    
-    // const tokenAmountInput = document.getElementById('tokenAmount');
-    // const priceCalculation = document.getElementById('priceCalculation');
-    // const form = document.getElementById('tokenPurchaseForm');
-    
-    // Calculate price based on token amount
-    // tokenAmountInput.addEventListener('input', function() {
-    //   const amount = this.value;
-    //   if (amount) {
-    //     const price = Number(amount) * 5;
-    //     priceCalculation.textContent = `${amount} ILE Tokens = $${price}`;
-    //   } else {
-    //     priceCalculation.textContent = '';
-    //   }
-    // });
-    
-    // Handle form submission
-    // form.addEventListener('submit', function(e) {
-    //   e.preventDefault();
-    //   const tokenAmount = document.getElementById('tokenAmount').value;
-    //   const email = document.getElementById('email').value;
-    //   const price = Number(tokenAmount) * 5;
-      
-    //   console.log('Submitted:', { tokenAmount, email, price });
-      // send the data to your backend
-      
-      // Close the modal
-  //     const modal = bootstrap.Modal.getInstance(document.getElementById('tokenModal'));
-  //     if (modal) modal.hide();
-  //   });
-  // });
+    });
+
+    // Payment form submission
+    const form = document.getElementById('tokenPurchaseForm');
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const tokenAmount = tokenAmountInput.value;
+        const email = document.getElementById('email').value;
+        const submitBtn = form.querySelector('button[type="submit"]');
+
+        // Validate input
+        if (!tokenAmount || !email) {
+            alert('Please enter token amount and email');
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+
+        try {
+            // Call YOUR BACKEND (/buy endpoint)
+            const response = await fetch('http://localhost:3000/buy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email,
+                    tokenAmount,
+                    currency: 'NGN' // or 'USD'
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Payment failed');
+            }
+
+            // Redirect to Paystack checkout (URL provided by backend)
+            if (data.checkoutUrl) {
+                window.location.href = data.checkoutUrl;
+            } else {
+                throw new Error('No checkout URL received');
+            }
+        } catch (error) {
+            console.error('Payment error:', error);
+            alert(`Error: ${error.message}`);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Buy Property';
+        }
+    });
+});
     </script>
+     <script src="https://js.paystack.co/v1/inline.js"></script>
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
