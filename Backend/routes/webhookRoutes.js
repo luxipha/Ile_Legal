@@ -6,7 +6,16 @@ const verifyPaystackWebhook = require('../middlewares/verifyWebhook');
 router.post('/', verifyPaystackWebhook, async (req, res) => {
     try {
         await processWebhook(req.body);
-        res.sendStatus(200);
+
+        // Get updated supply after purchase
+        const supply = await TokenSupply.findOne();
+
+        res.json({
+            success: true,
+            totalSupply: supply.totalSupply,
+            remainingSupply: supply.totalSupply
+        });
+
     } catch (error) {
         console.error('Webhook Error:', error);
         res.status(500).json({ error: 'Webhook processing failed' });

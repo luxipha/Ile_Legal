@@ -401,8 +401,8 @@
               </div>
             
               <div class="d-flex justify-content-between my-3">
-                <div>80%</div>
-                <div>Available: 40 Tokens</div>
+                <div id="progressPercentage">80%</div>
+                <div id="availableTokens">Available: 40 Tokens</div>
               </div>
               <button class="btn btn-warning btn-lg w-100" data-bs-toggle="modal" data-bs-target="#tokenModal">Buy Property</button>
             </div>
@@ -449,8 +449,8 @@
                     </div>
                     
                     <div class="d-flex justify-content-between small mb-4">
-                      <span>80%</span>
-                      <span>Available: <strong>40 Tokens</strong></span>
+                      <span id="progressPercentage">80%</span>
+                      <span id="availableTokens">Available: <strong>40 Tokens</strong></span>
                     </div>
                     
                     <!-- Form -->
@@ -494,6 +494,36 @@
     </section>
   
     <script>
+   document.addEventListener('DOMContentLoaded', async function () {
+    const progressBar = document.querySelector('.progress-bar');
+    const progressText = document.getElementById('progressPercentage');
+    const availableTokensText = document.getElementById('availableTokens');
+    const propertyValueText = document.getElementById('propertyValue');
+
+    try {
+        // Fetch token supply from backend
+        const response = await fetch('http://localhost:3000/supply');
+        const data = await response.json();
+
+        const totalTokens = data.totalSupply;
+        let remainingTokens = data.remainingSupply;
+        const totalPropertyValue = data.totalPropertyValue;
+
+        // Calculate percentage remaining
+        let percentageRemaining = (remainingTokens / totalTokens) * 100;
+
+        // Update UI
+        progressBar.style.width = `${percentageRemaining}%`;
+        progressText.textContent = `${percentageRemaining.toFixed(2)}%`;
+        availableTokensText.textContent = `Available: ${remainingTokens} Tokens`;
+        propertyValueText.textContent = `₦${totalPropertyValue.toLocaleString()}`;
+
+    } catch (error) {
+        console.error('Error fetching token supply:', error);
+    }
+});
+
+
      document.addEventListener('DOMContentLoaded', function() {
     // Initialize Bootstrap tooltips
     const tooltips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
@@ -507,7 +537,7 @@
     tokenAmountInput.addEventListener('input', function() {
         const amount = this.value;
         if (amount) {
-            const priceUSD = amount * 5;
+            const priceUSD = amount * 1;
             priceNGN = priceUSD * 1500; // Store it once
             priceCalculation.textContent = `${amount} Tokens = ₦${priceNGN.toLocaleString()}`;
         } else {
@@ -568,6 +598,51 @@
             submitBtn.textContent = 'Buy Property';
         }
     });
+});
+
+// Update progress bar & token count after purchase
+document.getElementById('tokenPurchaseForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const tokenAmount = document.getElementById('tokenAmount').value;
+    const email = document.getElementById('email').value;
+
+    if (!tokenAmount || !email) {
+        alert('Please enter token amount and email');
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:3000/buy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, tokenAmount, currency: 'NGN' })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Purchase failed');
+
+        // Redirect to payment
+        window.location.href = data.checkoutUrl;
+
+        // Wait for webhook update
+        setTimeout(async () => {
+            const updatedResponse = await fetch('http://localhost:3000/supply');
+            const updatedData = await updatedResponse.json();
+
+            const newRemaining = updatedData.remainingSupply;
+            const newPercentage = (newRemaining / updatedData.totalSupply) * 100;
+
+            // Update UI
+            progressBar.style.width = `${newPercentage}%`;
+            progressText.textContent = `${newPercentage.toFixed(2)}%`;
+            availableTokensText.textContent = `Available: ${newRemaining} Tokens`;
+        }, 5000); // Wait for webhook to process transaction
+
+    } catch (error) {
+        console.error('Purchase Error:', error);
+        alert(`Error: ${error.message}`);
+    }
 });
     </script>
      <script src="https://js.paystack.co/v1/inline.js"></script>

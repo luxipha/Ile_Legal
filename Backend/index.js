@@ -25,7 +25,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/buy', buyRoutes);
-app.use('/balance', balanceRoutes);
+app.use('/', balanceRoutes);
 app.use('/webhook', webhookRoutes);
 
 // Global error handler
