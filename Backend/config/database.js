@@ -10,13 +10,14 @@ const connectDB = async () => {
             serverSelectionTimeoutMS: 5000
         });
         console.log('MongoDB connected successfully');
+        return mongoose.connection;
     } catch (error) {
         console.error('MongoDB connection error:', error.message);
-        process.exit(1);
+        throw error; // Propagate error to caller
     }
 };
 
-// Call the function
-connectDB();
+// Don't call the function here, let index.js handle it
+// connectDB();
 
-module.exports = mongoose;
+module.exports = connectDB;

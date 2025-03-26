@@ -3,28 +3,11 @@ const User = require('../models/User');
 const TokenSupply = require('../models/TokenSupply');
 const sendTelegramMessage = require('../services/telegram');
 
-const initiatePayment = async (email, tokenAmount, currency) => {
-    // Fetch current token supply
-    const supply = await TokenSupply.findOne();
-
-    if (!supply || supply.remainingSupply < tokenAmount) {
-        throw new Error('Not enough tokens available.');
-    }
-
-    const response = await axios.post('https://api.paystack.co/transaction/initialize', {
-        email,
-        amount: tokenAmount * 100,
-        currency,
-        metadata: { tokenAmount }
-    }, {
-        headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
-    });
-
-    return { success: true, checkoutUrl: response.data.data.authorization_url };
-};
-
 const processWebhook = async (data) => {
-    if (data.event !== 'charge.success') return;
+    if (data.event !== 'charge.success') {
+        console.log(`Skipping webhook event: ${data.event} (not charge.success)`);
+        return false; // Return false to indicate this wasn't processed
+    }
 
     const { email, amount, metadata, reference } = data.data;
     const tokenAmount = metadata?.tokenAmount || amount / 100;
@@ -33,7 +16,7 @@ const processWebhook = async (data) => {
 
     if (!supply || supply.remainingSupply < tokenAmount) {
         console.error('Token depletion error: Not enough tokens available.');
-        return;
+        throw new Error('Not enough tokens available in supply');
     }
 
     // Deduct tokens from supply
@@ -50,7 +33,16 @@ const processWebhook = async (data) => {
         { upsert: true, new: true }
     );
 
-    await sendTelegramMessage(user.telegramChatId || email, `Token Purchase Confirmed: ${tokenAmount} tokens added.`);
+    try {
+        if (user.telegramChatId) {
+            await sendTelegramMessage(user.telegramChatId, `Token Purchase Confirmed: ${tokenAmount} tokens added.`);
+        } else {
+            console.log(`No Telegram chat ID for user ${email}, skipping notification`);
+        }
+    } catch (error) {
+        console.error('Error sending Telegram notification:', error.message);
+        // Continue processing even if Telegram notification fails
+    }
+    
+    return { success: true, user, supply }; // Return success result
 };
-
-module.exports = { initiatePayment, processWebhook };
