@@ -494,7 +494,7 @@
     </section>
   
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
+     document.addEventListener('DOMContentLoaded', function() {
     // Initialize Bootstrap tooltips
     const tooltips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         .map(el => new bootstrap.Tooltip(el));
@@ -502,15 +502,17 @@
     // Token price calculator
     const tokenAmountInput = document.getElementById('tokenAmount');
     const priceCalculation = document.getElementById('priceCalculation');
-    
+    let priceNGN = 0; // Declare outside to reuse later
+
     tokenAmountInput.addEventListener('input', function() {
         const amount = this.value;
         if (amount) {
             const priceUSD = amount * 5;
-            const priceNGN = priceUSD * 1500; // 1 USD = 1500 Naira
+            priceNGN = priceUSD * 1500; // Store it once
             priceCalculation.textContent = `${amount} Tokens = ₦${priceNGN.toLocaleString()}`;
         } else {
             priceCalculation.textContent = '';
+            priceNGN = 0; // Reset price if input is cleared
         }
     });
 
@@ -541,7 +543,8 @@
                 body: JSON.stringify({
                     email,
                     tokenAmount,
-                    currency: 'NGN' // or 'USD'
+                    currency: 'NGN', // or 'USD'
+                    totalAmount: priceNGN // Reuse the calculated value
                 })
             });
 

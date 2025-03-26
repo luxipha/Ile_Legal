@@ -11,13 +11,6 @@ const cors = require('cors');
 
 
 const app = express();
-// app.use(cors({
-//     origin: 'http://localhost:5500', // Frontend URL
-//     methods: ['GET', 'POST', 'OPTIONS'],
-//     credentials: true,
-//     allowedHeaders: ['Content-Type', 'Authorization'] // Explicitly allow headers
-
-//   }));
 
 app.use(bodyParser.json()); 
 
