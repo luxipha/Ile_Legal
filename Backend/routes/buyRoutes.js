@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const TokenSupply = require("../models/TokenSupply");
+const User = require("../models/User");
 
 require("dotenv").config(); // Load environment variables
 
@@ -47,7 +48,7 @@ router.post("/verify", async (req, res) => {
     const { reference } = req.body;
 
     try {
-        // 🟢 Verify transaction with Paystack
+        // Verify transaction with Paystack
         const verifyResponse = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
             headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
         });
@@ -58,20 +59,39 @@ router.post("/verify", async (req, res) => {
         }
 
         const tokenAmount = parseInt(transaction.metadata.tokenAmount, 10);
+        const email = transaction.customer.email;
 
-        // 🔥 Deduct tokens from supply
-        const supply = await TokenSupply.findOne();
-        if (!supply || supply.remainingSupply < tokenAmount) {
+        console.log(`Verifying payment for ${email}, token amount: ${tokenAmount}, reference: ${reference}`);
+
+        // Deduct tokens from supply using atomic operation
+        const supplyResult = await TokenSupply.findOneAndUpdate(
+            { remainingSupply: { $gte: tokenAmount } }, // Only update if enough tokens available
+            { $inc: { remainingSupply: -tokenAmount } }, // Atomic decrement
+            { new: true } // Return updated document
+        );
+
+        if (!supplyResult) {
             return res.status(400).json({ success: false, message: "Not enough tokens available" });
         }
 
-        supply.remainingSupply -= tokenAmount;
-        await supply.save();
+        // Update user balance
+        const user = await User.findOneAndUpdate(
+            { email },
+            { 
+                $inc: { balance: tokenAmount },
+                $push: { purchaseHistory: { tokenAmount, paymentReference: reference, currency: transaction.currency } }
+            },
+            { upsert: true, new: true }
+        );
+
+        console.log(`User ${email} balance updated to ${user.balance}`);
+        console.log(`Tokens deducted. Remaining supply: ${supplyResult.remainingSupply}`);
 
         res.json({
             success: true,
             message: `Successfully purchased ${tokenAmount} tokens!`,
-            remainingSupply: supply.remainingSupply
+            remainingSupply: supplyResult.remainingSupply,
+            userBalance: user.balance
         });
 
     } catch (error) {

@@ -12,16 +12,21 @@ const processWebhook = async (data) => {
     const { email, amount, metadata, reference } = data.data;
     const tokenAmount = metadata?.tokenAmount || amount / 100;
 
-    const supply = await TokenSupply.findOne();
+    console.log(`Processing payment for ${email}, token amount: ${tokenAmount}, reference: ${reference}`);
 
-    if (!supply || supply.remainingSupply < tokenAmount) {
+    // Use findOneAndUpdate for atomic operation to prevent race conditions
+    const supplyResult = await TokenSupply.findOneAndUpdate(
+        { remainingSupply: { $gte: tokenAmount } }, // Only update if enough tokens available
+        { $inc: { remainingSupply: -tokenAmount } }, // Atomic decrement
+        { new: true } // Return updated document
+    );
+
+    if (!supplyResult) {
         console.error('Token depletion error: Not enough tokens available.');
         throw new Error('Not enough tokens available in supply');
     }
 
-    // Deduct tokens from supply
-    supply.remainingSupply -= tokenAmount;
-    await supply.save();
+    console.log(`Tokens deducted. Remaining supply: ${supplyResult.remainingSupply}`);
 
     // Update user balance
     const user = await User.findOneAndUpdate(
@@ -32,6 +37,8 @@ const processWebhook = async (data) => {
         },
         { upsert: true, new: true }
     );
+
+    console.log(`User ${email} balance updated to ${user.balance}`);
 
     try {
         if (user.telegramChatId) {
@@ -44,5 +51,7 @@ const processWebhook = async (data) => {
         // Continue processing even if Telegram notification fails
     }
     
-    return { success: true, user, supply }; // Return success result
+    return { success: true, user, supply: supplyResult }; // Return success result
 };
+
+module.exports = { processWebhook };

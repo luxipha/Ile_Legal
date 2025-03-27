@@ -8,6 +8,7 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const cors = require('cors');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json()); 
 
@@ -17,6 +18,12 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-paystack-signature');
     next();
 });
+
+app.use(cors({
+    origin: process.env.FRONTEND_URL,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-paystack-signature']
+  }));
 
 // Connect to database before setting up routes
 connectDB()
