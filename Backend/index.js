@@ -12,18 +12,28 @@ const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json()); 
 
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-paystack-signature');
-    next();
-});
+// Enhanced CORS configuration to allow both local development and production
+const allowedOrigins = [
+  'http://127.0.0.1:5500',      // VS Code Live Server
+  'http://localhost:5500',      // Alternative local address
+  process.env.FRONTEND_URL      // From environment variable
+];
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL,
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-paystack-signature']
-  }));
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(null, false);
+    }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-paystack-signature']
+}));
 
 // Connect to database before setting up routes
 connectDB()
