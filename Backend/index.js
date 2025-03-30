@@ -1,3 +1,7 @@
+// Setup module aliases for path resolution
+require('module-alias/register');
+require('./config/aliases');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 require('./config/dotenv');// Load environment variables

@@ -1,5 +1,5 @@
-const Property = require('../../../models/property');
-const User = require('../../../models/User');
+const Property = require('@models/property');
+const User = require('@models/User');
 const { Markup } = require('telegraf');
 
 module.exports = (bot) => {
@@ -8,7 +8,15 @@ module.exports = (bot) => {
     try {
       // Verify admin
       const user = await User.findOne({ telegramChatId: ctx.from.id });
-      if (!user?.isAdmin) return ctx.reply('Admin access required.');
+      
+      // If user doesn't exist or is not an admin
+      if (!user) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
+      
+      if (!user.isAdmin) {
+        return ctx.reply('Admin access required.');
+      }
 
       const pending = await Property.find({ status: 'pending' }).sort({ submitted_at: 1 });
       
@@ -50,7 +58,15 @@ module.exports = (bot) => {
     try {
       // Verify admin
       const user = await User.findOne({ telegramChatId: ctx.from.id });
-      if (!user?.isAdmin) return ctx.reply('Admin access required.');
+      
+      // If user doesn't exist or is not an admin
+      if (!user) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
+      
+      if (!user.isAdmin) {
+        return ctx.reply('Admin access required.');
+      }
       
       const propertyId = ctx.match[1];
       
@@ -96,7 +112,15 @@ module.exports = (bot) => {
     try {
       // Verify admin
       const user = await User.findOne({ telegramChatId: ctx.from.id });
-      if (!user?.isAdmin) return ctx.reply('Admin access required.');
+      
+      // If user doesn't exist or is not an admin
+      if (!user) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
+      
+      if (!user.isAdmin) {
+        return ctx.reply('Admin access required.');
+      }
       
       const propertyId = ctx.match[1];
       
@@ -142,7 +166,15 @@ module.exports = (bot) => {
     try {
       // Verify admin
       const user = await User.findOne({ telegramChatId: ctx.from.id });
-      if (!user?.isAdmin) return ctx.reply('Admin access required.');
+      
+      // If user doesn't exist or is not an admin
+      if (!user) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
+      
+      if (!user.isAdmin) {
+        return ctx.reply('Admin access required.');
+      }
 
       const properties = await Property.find().sort({ submitted_at: -1 }).limit(10);
       
@@ -169,7 +201,15 @@ module.exports = (bot) => {
     try {
       // Verify admin
       const admin = await User.findOne({ telegramChatId: ctx.from.id });
-      if (!admin?.isAdmin) return ctx.reply('Admin access required.');
+      
+      // If user doesn't exist or is not an admin
+      if (!admin) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
+      
+      if (!admin.isAdmin) {
+        return ctx.reply('Admin access required.');
+      }
 
       // Get user ID from command arguments
       const args = ctx.message.text.split(' ');
@@ -202,7 +242,15 @@ module.exports = (bot) => {
     try {
       // Verify admin
       const admin = await User.findOne({ telegramChatId: ctx.from.id });
-      if (!admin?.isAdmin) return ctx.reply('Admin access required.');
+      
+      // If user doesn't exist or is not an admin
+      if (!admin) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
+      
+      if (!admin.isAdmin) {
+        return ctx.reply('Admin access required.');
+      }
 
       // Get user ID from command arguments
       const args = ctx.message.text.split(' ');

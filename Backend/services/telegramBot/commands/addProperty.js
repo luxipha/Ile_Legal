@@ -1,14 +1,7 @@
-const Property = require('../../../models/property');
-const User = require('../../../models/User');
-const cloudinary = require('cloudinary').v2;
-const { Scenes, session, Markup } = require('telegraf');
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+const Property = require('@models/property');
+const User = require('@models/User');
+const cloudinary = require('@config/cloudinaryConfig');
+const { Markup } = require('telegraf');
 
 // Property submission state
 const userStates = {};
@@ -17,15 +10,24 @@ const userStates = {};
 const propertyTypes = ['Apartment', 'House', 'Land', 'Commercial'];
 
 module.exports = (bot) => {
-  // Register session middleware
-  bot.use(session());
-
   // Handle /add_property command
   bot.command('add_property', async (ctx) => {
     try {
       // Check if user is banned
       const user = await User.findOne({ telegramChatId: ctx.from.id });
-      if (user?.isBanned) {
+      
+      // If user doesn't exist yet, create them
+      if (!user) {
+        const newUser = new User({
+          telegramChatId: ctx.from.id,
+          email: `telegram_${ctx.from.id}@placeholder.com`, // Placeholder email
+          isAdmin: false,
+          isBanned: false
+        });
+        
+        await newUser.save();
+        console.log(`New user registered with Telegram ID: ${ctx.from.id}`);
+      } else if (user.isBanned) {
         return ctx.reply('You are banned from submitting properties.');
       }
 
@@ -61,6 +63,61 @@ module.exports = (bot) => {
     }
   });
 
+  // Function to handle property submission completion
+  const handleDoneCommand = async (ctx) => {
+    const userId = ctx.from.id;
+    const state = userStates[userId];
+
+    // If no active submission, ignore
+    if (!state) return;
+
+    // If not in image upload step, ignore
+    if (state.step !== 'images') {
+      return ctx.reply('Please complete the current step first.');
+    }
+
+    try {
+      // Check if at least one image was uploaded
+      if (state.property.images.length === 0) {
+        return ctx.reply('Please upload at least one image of the property.');
+      }
+
+      // Set submission timestamp
+      state.property.submitted_at = new Date();
+      
+      // Create new property in database
+      const newProperty = new Property(state.property);
+      await newProperty.save();
+      
+      // Update user's last submission time
+      await User.findOneAndUpdate(
+        { telegramChatId: userId },
+        { last_submission: new Date() }
+      );
+      
+      // Clear user state
+      delete userStates[userId];
+      
+      ctx.reply('Your property has been submitted successfully! It will be reviewed by our team.');
+    } catch (error) {
+      console.error('Error saving property:', error);
+      ctx.reply('An error occurred while saving your property. Please try again later or contact support.');
+    }
+  };
+
+  // Handle /done command to finish image upload
+  bot.command('done', handleDoneCommand);
+  
+  // Also handle "done" as text for users who type it without the slash
+  bot.hears(/^done$/i, (ctx) => {
+    const userId = ctx.from.id;
+    const state = userStates[userId];
+    
+    if (state && state.step === 'images') {
+      handleDoneCommand(ctx);
+    }
+  });
+
   // Handle text messages for property submission
   bot.on('text', async (ctx) => {
     const userId = ctx.from.id;
@@ -70,6 +127,11 @@ module.exports = (bot) => {
     if (!state) return;
 
     const text = ctx.message.text;
+    
+    // Check if the text is "done" for the images step
+    if (state.step === 'images' && text.toLowerCase() === 'done') {
+      return handleDoneCommand(ctx);
+    }
 
     try {
       switch (state.step) {
@@ -162,48 +224,6 @@ module.exports = (bot) => {
     } catch (error) {
       console.error('Error uploading image:', error);
       ctx.reply('Failed to upload image. Please try again or type /done to continue without this image.');
-    }
-  });
-
-  // Handle /done command to finish image upload
-  bot.command('done', async (ctx) => {
-    const userId = ctx.from.id;
-    const state = userStates[userId];
-
-    // If no active submission, ignore
-    if (!state) return;
-
-    // If not in image upload step, ignore
-    if (state.step !== 'images') {
-      return ctx.reply('Please complete the current step first.');
-    }
-
-    try {
-      // Check if at least one image was uploaded
-      if (state.property.images.length === 0) {
-        return ctx.reply('Please upload at least one image of the property.');
-      }
-
-      // Set submission timestamp
-      state.property.submitted_at = new Date();
-      
-      // Create new property in database
-      const newProperty = new Property(state.property);
-      await newProperty.save();
-      
-      // Update user's last submission time
-      await User.findOneAndUpdate(
-        { telegramChatId: userId },
-        { last_submission: new Date() }
-      );
-      
-      // Clear user state
-      delete userStates[userId];
-      
-      ctx.reply('Your property has been submitted successfully! It will be reviewed by our team.');
-    } catch (error) {
-      console.error('Error saving property:', error);
-      ctx.reply('An error occurred while saving your property. Please try again later or contact support.');
     }
   });
 };

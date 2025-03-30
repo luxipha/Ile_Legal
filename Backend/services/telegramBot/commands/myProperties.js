@@ -1,11 +1,19 @@
-const Property = require('../../../../models/property');
-const User = require('../../../../models/User');
+const Property = require('@models/property');
+const User = require('@models/User');
 
 module.exports = (bot) => {
   // Command to view user's own properties
   bot.command('my_properties', async (ctx) => {
     try {
       const userId = ctx.from.id.toString();
+      
+      // Check if user exists in the database
+      const user = await User.findOne({ telegramChatId: userId });
+      
+      // If user doesn't exist, prompt them to register
+      if (!user) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
       
       // Find properties submitted by this user
       const properties = await Property.find({ developer_id: userId }).sort({ submitted_at: -1 });
@@ -36,6 +44,14 @@ module.exports = (bot) => {
   bot.command('property_details', async (ctx) => {
     try {
       const userId = ctx.from.id.toString();
+      
+      // Check if user exists in the database
+      const user = await User.findOne({ telegramChatId: userId });
+      
+      // If user doesn't exist, prompt them to register
+      if (!user) {
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
       
       // Parse property index from command
       const args = ctx.message.text.split(' ');
