@@ -9,7 +9,29 @@ const userStates = {};
 // Property types for selection
 const propertyTypes = ['Apartment', 'House', 'Land', 'Commercial'];
 
+// List of commands that should reset the property submission state
+const commandsToResetState = [
+  'start', 'help', 'my_properties', 'pending_properties', 
+  'all_properties', 'ban_user', 'unban_user'
+];
+
 module.exports = (bot) => {
+  // Add middleware to check for commands that should reset state
+  bot.use((ctx, next) => {
+    // Only process text messages that are commands
+    if (ctx.message && ctx.message.text && ctx.message.text.startsWith('/')) {
+      const command = ctx.message.text.split(' ')[0].substring(1); // Remove the leading slash
+      
+      // If this is a command that should reset state and user has an active state
+      if (commandsToResetState.includes(command) && userStates[ctx.from.id]) {
+        console.log(`Resetting property submission state for user ${ctx.from.id} due to /${command} command`);
+        delete userStates[ctx.from.id];
+      }
+    }
+    
+    return next();
+  });
+
   // Handle /add_property command
   bot.command('add_property', async (ctx) => {
     try {

@@ -38,6 +38,24 @@ bot.use((ctx, next) => {
   return next();
 });
 
+// Global state management middleware
+bot.use((ctx, next) => {
+  // Only process text messages that are commands
+  if (ctx.message && ctx.message.text && ctx.message.text.startsWith('/')) {
+    const command = ctx.message.text.split(' ')[0].substring(1); // Remove the leading slash
+    
+    // Reset any active state when switching between major commands
+    if (['start', 'help', 'add_property', 'my_properties', 'pending_properties', 
+         'all_properties', 'ban_user', 'unban_user'].includes(command)) {
+      // This will be accessible to all command handlers
+      ctx.state.resetActiveFlows = true;
+      console.log(`Command switch detected: /${command}`);
+    }
+  }
+  
+  return next();
+});
+
 // Register session middleware
 bot.use(session());
 
@@ -72,6 +90,23 @@ This bot helps you submit your property for tokenization and manage tokenized pr
 • Get updates on tokenization status
 
 Type /help to see all available commands.`;
+
+    // Set up web app menu button
+    try {
+      await ctx.telegram.setChatMenuButton({
+        chat_id: ctx.chat.id,
+        menu_button: {
+          type: 'web_app',
+          text: 'Ile Properties',
+          web_app: {
+            url: 'https://ile-properties.com' // Replace with your actual web app URL
+          }
+        }
+      });
+      console.log('Web app menu button set successfully');
+    } catch (menuError) {
+      console.error('Error setting web app menu button:', menuError);
+    }
 
     // Send welcome message with keyboard
     await ctx.reply(welcomeMessage, Markup.keyboard([
@@ -159,6 +194,38 @@ bot.command('my_properties', async (ctx) => {
     ctx.reply('Use /property_details [number] to view more details about a specific property.');
   } catch (error) {
     console.error('Error in my_properties command:', error);
+    ctx.reply('An error occurred. Please try again later.');
+  }
+});
+
+// Command to make a user an admin (protected with a secret code)
+bot.command('makeAdmin', async (ctx) => {
+  console.log('makeAdmin command received');
+  try {
+    const args = ctx.message.text.split(' ');
+    
+    // Check for secret code
+    if (args.length < 2 || args[1] !== process.env.ADMIN_SECRET_CODE) {
+      return ctx.reply('Invalid or missing secret code.');
+    }
+    
+    const userId = ctx.from.id;
+    
+    // Update user to be an admin
+    const result = await User.findOneAndUpdate(
+      { telegramChatId: userId },
+      { isAdmin: true },
+      { new: true }
+    );
+    
+    if (result) {
+      console.log(`User ${userId} granted admin privileges`);
+      ctx.reply('You have been granted admin privileges. You can now use admin commands like /pending_properties, /all_properties, /ban_user, and /unban_user.');
+    } else {
+      ctx.reply('User not found. Please use /start to register first.');
+    }
+  } catch (error) {
+    console.error('Error in makeAdmin command:', error);
     ctx.reply('An error occurred. Please try again later.');
   }
 });
