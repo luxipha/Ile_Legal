@@ -86,39 +86,105 @@ Type /help to see all available commands.`;
 });
 
 // Help command - improved with detailed instructions
-bot.command('help', (ctx) => {
+bot.command('help', async (ctx) => {
   console.log('Help command received');
-  let message = `📚 *Ile Properties Bot Commands*\n\n`;
-  message += `*Basic Commands:*\n`;
-  message += `• /start - Start the bot and see welcome message\n`;
-  message += `• /help - Show this help message\n\n`;
-  
-  message += `*Property Management:*\n`;
-  message += `• /add_property - Submit a new property listing\n`;
-  message += `• /my_properties - View your submitted properties\n`;
-  message += `• /cancel - Cancel current property submission\n\n`;
-  
-  // Admin commands
-  message += `*Admin Commands:*\n`;
-  message += `• /pending_properties - View properties pending approval\n`;
-  message += `• /all_properties - View all properties\n`;
-  message += `• /ban_user [id] - Ban a user\n`;
-  message += `• /unban_user [id] - Unban a user\n\n`;
-  
-  message += `To get started, try the /add_property command to submit your first property!`;
-  
-  ctx.replyWithMarkdown(message);
+  try {
+    let message = `📚 *Ile Properties Bot Commands*\n\n`;
+    message += `*Basic Commands:*\n`;
+    message += `• /start - Start the bot and see welcome message\n`;
+    message += `• /help - Show this help message\n\n`;
+    
+    message += `*Property Management:*\n`;
+    message += `• /add_property - Submit a new property listing\n`;
+    message += `• /my_properties - View your submitted properties\n`;
+    message += `• /cancel - Cancel current property submission\n\n`;
+    
+    // Admin commands
+    message += `*Admin Commands:*\n`;
+    message += `• /pending_properties - View properties pending approval\n`;
+    message += `• /all_properties - View all properties\n`;
+    message += `• /ban_user [id] - Ban a user\n`;
+    message += `• /unban_user [id] - Unban a user\n\n`;
+    
+    message += `To get started, try the /add_property command to submit your first property!`;
+    
+    // Try with HTML formatting instead of Markdown
+    await ctx.reply(message.replace(/\*/g, '').replace(/•/g, '- '));
+    console.log('Help message sent successfully');
+  } catch (error) {
+    console.error('Error sending help message:', error);
+    ctx.reply('An error occurred while showing help. Please try again later.');
+  }
+});
+
+// Direct handler for my_properties command
+bot.command('my_properties', async (ctx) => {
+  console.log('Direct my_properties command handler triggered');
+  try {
+    await ctx.reply('Checking your properties...');
+    const userId = ctx.from.id.toString();
+    console.log('User ID:', userId);
+    
+    // Check if user exists in the database
+    const user = await User.findOne({ telegramChatId: userId });
+    console.log('User found:', !!user);
+    
+    // If user doesn't exist, prompt them to register
+    if (!user) {
+      return ctx.reply('You need to be registered in our system. Please use /start to register.');
+    }
+    
+    // Find properties submitted by this user
+    const properties = await Property.find({ developer_id: userId }).sort({ submitted_at: -1 });
+    console.log('Properties found:', properties ? properties.length : 0);
+    
+    if (!properties || properties.length === 0) {
+      console.log('No properties found for user');
+      await ctx.reply('You have not submitted any properties yet. Use /add_property to submit one.');
+      return;
+    }
+    
+    // Display properties
+    let message = 'Your Properties:\n\n';
+    properties.forEach((prop, index) => {
+      message += `${index + 1}. ${prop.property_name} - ${prop.location}\n`;
+      message += `   Status: ${prop.status || 'pending'}, Price: ₦${prop.price.toLocaleString()}\n`;
+      message += `   Submitted: ${prop.submitted_at.toDateString()}\n\n`;
+    });
+    
+    await ctx.reply(message);
+    console.log('Properties list sent successfully');
+    
+    // Provide additional instructions
+    ctx.reply('Use /property_details [number] to view more details about a specific property.');
+  } catch (error) {
+    console.error('Error in my_properties command:', error);
+    ctx.reply('An error occurred. Please try again later.');
+  }
+});
+
+// Test command to verify command registration
+bot.command('test_command', async (ctx) => {
+  console.log('Test command triggered');
+  await ctx.reply('Test command works!');
 });
 
 // Import command handlers
-const addPropertyCommand = require('./services/telegramBot/commands/addProperty');
-const myPropertiesCommand = require('./services/telegramBot/commands/myProperties');
-const adminActionsCommand = require('./services/telegramBot/commands/adminActions');
+console.log('Importing command handlers...');
+const addPropertyCommand = require('@services/telegramBot/commands/addProperty');
+// Temporarily comment out myProperties to avoid conflicts with direct handler
+// const myPropertiesCommand = require('@services/telegramBot/commands/myProperties');
+const adminActionsCommand = require('@services/telegramBot/commands/adminActions');
+console.log('Command handlers imported successfully');
 
 // Register command handlers
+console.log('Registering command handlers...');
 addPropertyCommand(bot);
-myPropertiesCommand(bot);
+console.log('addProperty handler registered');
+// myPropertiesCommand(bot);
+// console.log('myProperties handler registered');
 adminActionsCommand(bot);
+console.log('adminActions handler registered');
 
 // Add a fallback handler for text messages not handled by other commands
 // This should be AFTER all other command handlers
