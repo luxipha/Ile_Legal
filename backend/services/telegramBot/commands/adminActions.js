@@ -6,8 +6,10 @@ module.exports = (bot) => {
   // Command to view pending properties
   bot.command('pending_properties', async (ctx) => {
     try {
+      console.log('pending_properties command received');
       // Verify admin
       const user = await User.findOne({ telegramChatId: ctx.from.id });
+      console.log('User found:', !!user, 'isAdmin:', user?.isAdmin);
       
       // If user doesn't exist or is not an admin
       if (!user) {
@@ -19,14 +21,15 @@ module.exports = (bot) => {
       }
 
       const pending = await Property.find({ status: 'pending' }).sort({ submitted_at: 1 });
+      console.log('Pending properties found:', pending.length);
       
       if (pending.length === 0) {
-        return ctx.reply('No pending properties found.');
+        return ctx.reply('No pending properties found. When users submit properties, they will appear here for your approval.');
       }
       
       // Display properties with inline buttons for each
       for (const property of pending) {
-        let message = `📍 *${property.property_name}*\n`;
+        let message = `📍 ${property.property_name}\n`;
         message += `📌 Location: ${property.location}\n`;
         message += `💰 Price: ₦${property.price.toLocaleString()}\n`;
         message += `🏷️ Type: ${property.property_type}\n`;
@@ -35,7 +38,7 @@ module.exports = (bot) => {
         message += `📅 Submitted: ${property.submitted_at.toDateString()}\n`;
         
         // Send property details with approve/reject buttons
-        await ctx.replyWithMarkdown(message, 
+        await ctx.reply(message, 
           Markup.inlineKeyboard([
             Markup.button.callback('✅ Approve', `approve_${property._id}`),
             Markup.button.callback('❌ Reject', `reject_${property._id}`)
@@ -86,7 +89,7 @@ module.exports = (bot) => {
       
       // Notify admin of successful approval
       await ctx.editMessageText(
-        `✅ Property "${property.property_name}" has been approved.`,
+        `Property "${property.property_name}" has been approved.`,
         Markup.inlineKeyboard([])
       );
       
@@ -95,7 +98,7 @@ module.exports = (bot) => {
         try {
           await ctx.telegram.sendMessage(
             developer.telegramChatId,
-            `✅ Your property "${property.property_name}" has been approved and is now listed!`
+            `Your property "${property.property_name}" has been approved and is now listed!`
           );
         } catch (error) {
           console.error('Error notifying developer:', error);
@@ -140,7 +143,7 @@ module.exports = (bot) => {
       
       // Notify admin of successful rejection
       await ctx.editMessageText(
-        `❌ Property "${property.property_name}" has been rejected.`,
+        `Property "${property.property_name}" has been rejected.`,
         Markup.inlineKeyboard([])
       );
       
@@ -149,7 +152,7 @@ module.exports = (bot) => {
         try {
           await ctx.telegram.sendMessage(
             developer.telegramChatId,
-            `❌ Your property "${property.property_name}" has been rejected. Please contact support for more information.`
+            `Your property "${property.property_name}" has been rejected. Please contact support for more information.`
           );
         } catch (error) {
           console.error('Error notifying developer:', error);
@@ -164,8 +167,10 @@ module.exports = (bot) => {
   // Command to view all properties
   bot.command('all_properties', async (ctx) => {
     try {
+      console.log('all_properties command received');
       // Verify admin
       const user = await User.findOne({ telegramChatId: ctx.from.id });
+      console.log('User found:', !!user, 'isAdmin:', user?.isAdmin);
       
       // If user doesn't exist or is not an admin
       if (!user) {
@@ -177,19 +182,20 @@ module.exports = (bot) => {
       }
 
       const properties = await Property.find().sort({ submitted_at: -1 }).limit(10);
+      console.log('Properties found:', properties.length);
       
       if (properties.length === 0) {
-        return ctx.reply('No properties found in the database.');
+        return ctx.reply('No properties found in the database. When users submit properties, they will appear here.');
       }
       
       // Display properties summary
-      let message = '*Recent Properties:*\n\n';
+      let message = 'Recent Properties:\n\n';
       properties.forEach((prop, index) => {
-        message += `${index + 1}. *${prop.property_name}* - ${prop.location}\n`;
+        message += `${index + 1}. ${prop.property_name} - ${prop.location}\n`;
         message += `   Status: ${prop.status}, Price: ₦${prop.price.toLocaleString()}\n\n`;
       });
       
-      ctx.replyWithMarkdown(message);
+      await ctx.reply(message);
     } catch (error) {
       console.error('Error in all_properties command:', error);
       ctx.reply('An error occurred. Please try again later.');
@@ -199,8 +205,10 @@ module.exports = (bot) => {
   // Command to ban a user
   bot.command('ban_user', async (ctx) => {
     try {
+      console.log('ban_user command received');
       // Verify admin
       const admin = await User.findOne({ telegramChatId: ctx.from.id });
+      console.log('Admin found:', !!admin, 'isAdmin:', admin?.isAdmin);
       
       // If user doesn't exist or is not an admin
       if (!admin) {
@@ -214,7 +222,7 @@ module.exports = (bot) => {
       // Get user ID from command arguments
       const args = ctx.message.text.split(' ');
       if (args.length < 2) {
-        return ctx.reply('Usage: /ban_user <telegram_id>');
+        return ctx.reply('Usage: /ban_user <telegram_id>\n\nExample: /ban_user 123456789');
       }
       
       const targetUserId = args[1];
@@ -240,8 +248,10 @@ module.exports = (bot) => {
   // Command to unban a user
   bot.command('unban_user', async (ctx) => {
     try {
+      console.log('unban_user command received');
       // Verify admin
       const admin = await User.findOne({ telegramChatId: ctx.from.id });
+      console.log('Admin found:', !!admin, 'isAdmin:', admin?.isAdmin);
       
       // If user doesn't exist or is not an admin
       if (!admin) {
@@ -255,7 +265,7 @@ module.exports = (bot) => {
       // Get user ID from command arguments
       const args = ctx.message.text.split(' ');
       if (args.length < 2) {
-        return ctx.reply('Usage: /unban_user <telegram_id>');
+        return ctx.reply('Usage: /unban_user <telegram_id>\n\nExample: /unban_user 123456789');
       }
       
       const targetUserId = args[1];
