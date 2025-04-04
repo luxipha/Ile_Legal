@@ -1,4 +1,4 @@
-const cloudinary = require('@node_modules/cloudinary').v2;
+const cloudinary = require('@config/cloudinaryConfig');
 
 // Configure Cloudinary
 cloudinary.config({

@@ -239,7 +239,6 @@ bot.command('test_command', async (ctx) => {
 // Import command handlers
 console.log('Importing command handlers...');
 const addPropertyCommand = require('@services/telegramBot/commands/addProperty');
-// Temporarily comment out myProperties to avoid conflicts with direct handler
 // const myPropertiesCommand = require('@services/telegramBot/commands/myProperties');
 const adminActionsCommand = require('@services/telegramBot/commands/adminActions');
 console.log('Command handlers imported successfully');
