@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const UserSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     name: { type: String, trim: true },
     balance: { type: Number, default: 0, min: 0 },
@@ -16,4 +16,4 @@ const UserSchema = new mongoose.Schema({
     telegramChatId: String
 }, { timestamps: true });
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('User', userSchema);

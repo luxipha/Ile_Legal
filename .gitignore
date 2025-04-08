@@ -10,11 +10,9 @@ lerna-debug.log*
 
 
 # backend
-Backend/node_modules/
-backend/.env
+backend/node_modules/
+# backend/.env
 
-/Backend/node_modules/
-/Backend/.env
 
 
 

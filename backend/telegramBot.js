@@ -20,11 +20,11 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Import models - using consistent casing
-const Property = require('@models/property');
-const User = require('@models/User');
+const Property = require('./models/property');
+const User = require('./models/User');
 
 // Import centralized Cloudinary config
-const cloudinary = require('@config/cloudinaryConfig');
+const cloudinary = require('./config/cloudinaryConfig');
 
 // Create bot instance
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
@@ -238,9 +238,9 @@ bot.command('test_command', async (ctx) => {
 
 // Import command handlers
 console.log('Importing command handlers...');
-const addPropertyCommand = require('@services/telegramBot/commands/addProperty');
-// const myPropertiesCommand = require('@services/telegramBot/commands/myProperties');
-const adminActionsCommand = require('@services/telegramBot/commands/adminActions');
+const addPropertyCommand = require('./services/telegramBot/commands/addProperty');
+// const myPropertiesCommand = require('./services/telegramBot/commands/myProperties');
+const adminActionsCommand = require('./services/telegramBot/commands/adminActions');
 console.log('Command handlers imported successfully');
 
 // Register command handlers

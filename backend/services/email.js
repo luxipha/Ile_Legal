@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { paymentConfirmationEmail, paymentConfirmationText } = require('./emailTemplates');
 require('dotenv').config();
 
 // Validate SMTP configuration
