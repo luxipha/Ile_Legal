@@ -1,0 +1,255 @@
+:root {
+  --navy: #0A1929;
+  --darkNavy: #071422;
+  --beige: #F5F5DC;
+  --gold: #FFD700;
+  --amber: #FFBF00;
+  
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: var(--beige);
+  background-color: var(--navy);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--darkNavy), var(--navy));
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Background effects */
+.background-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-image: 
+    radial-gradient(rgba(255, 215, 0, 0.03) 1px, transparent 1px),
+    radial-gradient(rgba(255, 215, 0, 0.02) 1px, transparent 1px);
+  background-size: 50px 50px, 100px 100px;
+  background-position: 0 0, 25px 25px;
+}
+
+.background-blur {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  z-index: -1;
+  filter: blur(50px);
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.15) 0%, rgba(10, 25, 41, 0) 70%);
+}
+
+.blur-1 {
+  top: -100px;
+  right: -50px;
+}
+
+.blur-2 {
+  bottom: -150px;
+  left: -80px;
+  width: 400px;
+  height: 400px;
+  opacity: 0.7;
+}
+
+/* Card styles */
+.card-glass {
+  background-color: rgba(15, 30, 50, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 245, 220, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: 32px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Text styles */
+.gradient-text {
+  background: linear-gradient(to right, var(--beige), white);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: bold;
+}
+
+/* Form styles */
+.input-container {
+  position: relative;
+}
+
+.form-input-glow {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(245, 245, 220, 0.1);
+  color: var(--beige);
+  border-radius: 12px;
+  height: 60px;
+  font-size: 18px;
+  padding: 0 16px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  padding-top: 20px;
+  padding-bottom: 8px;
+}
+
+.form-input-glow:focus {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.6), 0 0 15px rgba(255, 215, 0, 0.6);
+  outline: none;
+}
+
+.form-input-glow::placeholder {
+  color: transparent;
+}
+
+.form-input-glow:focus + label,
+.form-input-glow:not(:placeholder-shown) + label {
+  transform: translateY(-12px) scale(0.75);
+  color: var(--gold);
+}
+
+/* Button styles */
+.btn-gold {
+  background: linear-gradient(to right, var(--gold), var(--amber));
+  color: var(--navy);
+  font-weight: 600;
+  font-size: 18px;
+  padding: 12px;
+  border-radius: 12px;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.btn-gold:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(to right, #FFDD33, var(--gold));
+  box-shadow: 0 6px 18px rgba(255, 215, 0, 0.4);
+}
+
+.btn-gold:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Shine effect */
+.shine-effect:before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(45deg);
+  transition: all 0.5s ease;
+  opacity: 0;
+}
+
+.shine-effect:hover:before {
+  animation: shine 1.5s ease-in-out;
+}
+
+@keyframes shine {
+  0% {
+    left: -50%;
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    left: 150%;
+    opacity: 0;
+  }
+}
+
+/* Logo animation */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+  }
+}
+
+.logo-container {
+  animation: pulse 2s infinite;
+}
+
+/* Telegram WebApp specific styles */
+#root {
+  max-width: 100%;
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  padding: 16px;
+}
+
+a {
+  font-weight: 500;
+  color: var(--gold);
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: var(--amber);
+}
+
+h1 {
+  font-size: 2.4em;
+  line-height: 1.1;
+  margin: 0 0 16px 0;
+}
+
+h2 {
+  font-size: 1.6em;
+  margin: 0 0 12px 0;
+}
+
+p {
+  margin: 0 0 16px 0;
+}
+
+button {
+  border: none;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}

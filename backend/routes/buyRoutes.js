@@ -3,6 +3,8 @@ const router = express.Router();
 const axios = require("axios");
 const tokenSupply = require("@models/TokenSupply");
 const user = require("@models/User");
+const sendEmail = require("@services/email");
+const { paymentConfirmationEmail, paymentConfirmationText } = require("@services/emailTemplates");
 
 require("dotenv").config(); // Load environment variables
 
@@ -53,37 +55,89 @@ router.post("/verify", async (req, res) => {
     const { reference } = req.body;
 
     try {
+        console.log(`Verifying payment with reference: ${reference}`);
+        
         // Verify transaction with Paystack
         const verifyResponse = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
             headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
         });
 
         const transaction = verifyResponse.data.data;
+        
+        // Enhanced logging to debug transaction data
+        console.log("Transaction data:", JSON.stringify(transaction, null, 2));
+        
         if (transaction.status !== "success") {
             return res.status(400).json({ success: false, message: "Payment verification failed" });
         }
 
-        const tokenAmount = parseInt(transaction.metadata.tokenAmount, 10);
-        const email = transaction.customer.email;
+        // Get token amount and email from transaction data
+        const tokenAmount = transaction.metadata?.tokenAmount 
+            ? parseInt(transaction.metadata.tokenAmount, 10) 
+            : Math.floor(transaction.amount / 100 / 1500);
+            
+        const email = transaction.customer?.email;
 
-        // Enhanced logging to debug email issues
-        console.log("Transaction data:", {
-            status: transaction.status,
-            reference,
-            tokenAmount,
-            email,
-            customer: transaction.customer,
-            metadata: transaction.metadata
-        });
+        console.log(`Verifying payment for ${email}, token amount: ${tokenAmount}, reference: ${reference}`);
 
         if (!email) {
             console.error("Error: No email found in transaction data");
             return res.status(400).json({ success: false, message: "No email associated with transaction" });
         }
 
-        console.log(`Verifying payment for ${email}, token amount: ${tokenAmount}, reference: ${reference}`);
+        // Check if user exists
+        console.log(`Looking for user with email: ${email}`);
+        let userDoc = await user.findOne({ email: { $eq: email } });
+        console.log(`User found in verification: ${!!userDoc}`);
+        
+        if (!userDoc) {
+            console.log(`User with email ${email} not found during verification. Creating new user...`);
+            try {
+                // Create new user with default values
+                userDoc = await user.create({
+                    email: email,
+                    balance: tokenAmount, // Set initial balance to token amount
+                    purchaseHistory: [{
+                        tokenAmount: tokenAmount,
+                        paymentReference: reference,
+                        currency: transaction.currency,
+                        purchaseDate: new Date()
+                    }]
+                });
+                console.log(`New user created during verification with ID: ${userDoc._id}, email: ${userDoc.email}`);
+            } catch (error) {
+                console.error(`Error creating user during verification: ${error.message}`);
+                if (error.code === 11000) {
+                    // Try to find the user again in case of race condition
+                    userDoc = await user.findOne({ email: { $eq: email } });
+                    if (!userDoc) {
+                        return res.status(500).json({
+                            success: false,
+                            message: `Failed to create or find user with email: ${email}`
+                        });
+                    }
+                    console.log(`Found user on second attempt during verification: ${userDoc._id}`);
+                } else {
+                    return res.status(500).json({
+                        success: false,
+                        message: `Error creating user: ${error.message}`
+                    });
+                }
+            }
+        } else {
+            // Update existing user's balance and purchase history
+            userDoc.balance += tokenAmount;
+            userDoc.purchaseHistory.push({
+                tokenAmount: tokenAmount,
+                paymentReference: reference,
+                currency: transaction.currency,
+                purchaseDate: new Date()
+            });
+            await userDoc.save();
+            console.log(`Existing user ${email} balance updated to ${userDoc.balance}`);
+        }
 
-        // Deduct tokens from supply using atomic operation
+        // Deduct tokens from supply
         const supplyResult = await tokenSupply.findOneAndUpdate(
             { remainingSupply: { $gte: tokenAmount } }, // Only update if enough tokens available
             { $inc: { remainingSupply: -tokenAmount } }, // Atomic decrement
@@ -91,50 +145,62 @@ router.post("/verify", async (req, res) => {
         );
 
         if (!supplyResult) {
+            console.error('Token depletion error: Not enough tokens available.');
             return res.status(400).json({ success: false, message: "Not enough tokens available" });
         }
 
-        // Update user balance - with improved query to ensure email matching works
-        const userQuery = { email: { $eq: email } }; // Explicit equality check
-        console.log("User query:", userQuery);
-        
-        const userResult = await user.findOneAndUpdate(
-            userQuery,
-            { 
-                $set: { 
-                    email, // Explicitly set email to ensure it's never null
-                    updatedAt: new Date() // Update the timestamp
-                },
-                $inc: { balance: tokenAmount },
-                $push: { purchaseHistory: { tokenAmount, paymentReference: reference, currency: transaction.currency } }
-            },
-            { 
-                upsert: true, 
-                new: true,
-                // Add runValidators to ensure schema validation runs on update
-                runValidators: true 
-            }
-        );
-
-        console.log(`User updated/created:`, {
-            id: userResult._id,
-            email: userResult.email,
-            newBalance: userResult.balance,
-            purchaseHistoryCount: userResult.purchaseHistory.length
-        });
-
         console.log(`Tokens deducted. Remaining supply: ${supplyResult.remainingSupply}`);
 
-        res.json({
+        // Prepare response first
+        const responseData = {
             success: true,
-            message: `Successfully purchased ${tokenAmount} tokens!`,
-            remainingSupply: supplyResult.remainingSupply,
-            userBalance: userResult.balance
-        });
+            message: 'Payment verified successfully',
+            tokenAmount: tokenAmount,
+            newBalance: userDoc.balance,
+            userCreated: !userDoc
+        };
 
+        // Send the response immediately
+        res.json(responseData);
+
+        // Attempt to send email notification AFTER sending the response (non-blocking)
+        try {
+            const emailParams = {
+                name: userDoc.name || email.split('@')[0], // Use name if available, otherwise use email username
+                tokenAmount: tokenAmount,
+                balance: userDoc.balance,
+                reference: reference,
+                currency: transaction.currency,
+                amount: transaction.amount
+            };
+            
+            // Send email asynchronously without awaiting
+            sendEmail(
+                email,
+                "Payment Confirmation - Ile Properties",
+                paymentConfirmationText(emailParams),
+                paymentConfirmationEmail(emailParams)
+            ).then(success => {
+                if (success) {
+                    console.log(`Email notification sent to ${email} for payment verification`);
+                } else {
+                    console.error(`Failed to send email notification to ${email}`);
+                }
+            }).catch(error => {
+                console.error(`Error sending email notification: ${error.message}`);
+            });
+        } catch (error) {
+            console.error(`Error preparing email notification: ${error.message}`);
+        }
+
+        // Return here is not needed as we've already sent the response
+        return;
     } catch (error) {
-        console.error("Error verifying payment:", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
+        console.error('Error verifying payment:', error.response?.data || error.message);
+        return res.status(500).json({
+            success: false,
+            message: error.response?.data?.message || 'Error verifying payment'
+        });
     }
 });
 

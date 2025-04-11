@@ -20,8 +20,8 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Import models - using consistent casing
-const Property = require('./models/property');
-const User = require('./models/User');
+const Property = require('@models/Property');
+const User = require('@models/User');
 
 // Import centralized Cloudinary config
 const cloudinary = require('./config/cloudinaryConfig');
@@ -64,10 +64,10 @@ bot.command('start', async (ctx) => {
   try {
     console.log('Start command received');
     // Check if user exists in database
-    let user = await User.findOne({ telegramChatId: ctx.from.id });
+    let userDoc = await User.findOne({ telegramChatId: ctx.from.id });
     
     // If user doesn't exist, create a new one
-    if (!user) {
+    if (!userDoc) {
       const newUser = new User({
         telegramChatId: ctx.from.id,
         name: ctx.from.first_name || 'User',
@@ -76,12 +76,12 @@ bot.command('start', async (ctx) => {
         isBanned: false
       });
       
-      user = await newUser.save();
+      userDoc = await newUser.save();
       console.log(`New user registered with Telegram ID: ${ctx.from.id}`);
     }
     
     // Welcome message with instructions
-    const welcomeMessage = `👋 Welcome to Ile Properties Bot, ${user.name || ctx.from.first_name || 'there'}!
+    const welcomeMessage = `👋 Welcome to Ile Properties Bot, ${userDoc.name || ctx.from.first_name || 'there'}!
 
 This bot helps you submit your property for tokenization and manage tokenized property. Here's what you can do:
 
@@ -152,20 +152,19 @@ bot.command('help', async (ctx) => {
   }
 });
 
-// Direct handler for my_properties command
+// My properties command
 bot.command('my_properties', async (ctx) => {
-  console.log('Direct my_properties command handler triggered');
   try {
-    await ctx.reply('Checking your properties...');
+    console.log('my_properties command received');
     const userId = ctx.from.id.toString();
     console.log('User ID:', userId);
     
     // Check if user exists in the database
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('User found:', !!user);
+    const userDoc = await User.findOne({ telegramChatId: userId });
+    console.log('User found:', !!userDoc);
     
     // If user doesn't exist, prompt them to register
-    if (!user) {
+    if (!userDoc) {
       return ctx.reply('You need to be registered in our system. Please use /start to register.');
     }
     
@@ -174,27 +173,20 @@ bot.command('my_properties', async (ctx) => {
     console.log('Properties found:', properties ? properties.length : 0);
     
     if (!properties || properties.length === 0) {
-      console.log('No properties found for user');
-      await ctx.reply('You have not submitted any properties yet. Use /add_property to submit one.');
-      return;
+      return ctx.reply('You have not submitted any properties yet. Use /add_property to submit a new property.');
     }
     
     // Display properties
     let message = 'Your Properties:\n\n';
-    properties.forEach((prop, index) => {
-      message += `${index + 1}. ${prop.property_name} - ${prop.location}\n`;
-      message += `   Status: ${prop.status || 'pending'}, Price: ₦${prop.price.toLocaleString()}\n`;
-      message += `   Submitted: ${prop.submitted_at.toDateString()}\n\n`;
+    properties.forEach((property, index) => {
+      message += `${index + 1}. ${property.property_name} - ${property.location}\n`;
+      message += `   Status: ${property.status}, Price: ₦${property.price.toLocaleString()}\n\n`;
     });
     
     await ctx.reply(message);
-    console.log('Properties list sent successfully');
-    
-    // Provide additional instructions
-    ctx.reply('Use /property_details [number] to view more details about a specific property.');
   } catch (error) {
     console.error('Error in my_properties command:', error);
-    ctx.reply('An error occurred. Please try again later.');
+    ctx.reply('An error occurred while fetching your properties. Please try again later.');
   }
 });
 

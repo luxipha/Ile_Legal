@@ -49,6 +49,15 @@ connectDB()
     app.use('/', balanceRoutes);
     app.use('/webhook', webhookRoutes);
     
+    // Root route for testing
+    app.get('/', (req, res) => {
+        res.json({
+            message: 'Ile API is running',
+            env: process.env.NODE_ENV,
+            frontendUrl: process.env.FRONTEND_URL
+        });
+    });
+    
     // Global error handler
     app.use((err, req, res, next) => {
         console.error(err.stack);
@@ -58,7 +67,6 @@ connectDB()
         });
     });
     
-    const PORT = process.env.PORT || 3000;
     const server = app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
     });

@@ -29,11 +29,19 @@ const processWebhook = async (data) => {
     console.log(`Tokens deducted. Remaining supply: ${supplyResult.remainingSupply}`);
 
     // Check if user exists first
+    console.log(`Looking for user with email: ${email}`);
     let userDoc = await user.findOne({ email: { $eq: email } });
+    console.log(`User found: ${!!userDoc}`);
     
     if (!userDoc) {
         console.log(`User with email ${email} not found. Creating new user...`);
         try {
+            // Validate email format
+            if (!email || !email.includes('@')) {
+                console.error(`Invalid email format: ${email}`);
+                throw new Error(`Invalid email format: ${email}`);
+            }
+            
             // Create new user with default values
             userDoc = await user.create({
                 email: email, // Ensure email is set correctly
@@ -45,12 +53,16 @@ const processWebhook = async (data) => {
             console.error(`Error creating new user: ${error.message}`);
             // If there's an error creating the user, check if it's a duplicate key error
             if (error.code === 11000) {
+                console.log('Duplicate key error detected, trying to find user again');
                 // Try to find the user again in case of race condition
                 userDoc = await user.findOne({ email: { $eq: email } });
                 if (!userDoc) {
+                    console.error(`Failed to create or find user with email: ${email}`);
                     throw new Error(`Failed to create or find user with email: ${email}`);
                 }
+                console.log(`Found user on second attempt: ${userDoc._id}`);
             } else {
+                console.error(`Non-duplicate error creating user: ${error.message}`);
                 throw error; // Re-throw other errors
             }
         }

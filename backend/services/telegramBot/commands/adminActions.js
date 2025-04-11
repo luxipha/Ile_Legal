@@ -1,4 +1,4 @@
-const Property = require('../../../models/property');
+const Property = require('@models/Property');
 const User = require('@models/User');
 const { Markup } = require('telegraf');
 
@@ -8,8 +8,9 @@ console.log('User model imported:', !!User);
 
 module.exports = (bot) => {
   // Command to make a user an admin
-  bot.command('make_admin', async (ctx) => {
+  bot.command('makeadmin', async (ctx) => {
     try {
+      console.log('makeadmin command received');
       const secretCode = ctx.message.text.split(' ')[1];
       const adminSecretCode = process.env.ADMIN_SECRET_CODE;
       
@@ -18,14 +19,19 @@ module.exports = (bot) => {
       
       if (secretCode === adminSecretCode) {
         const userId = ctx.from.id.toString();
-        const user = await User.findOne({ telegramChatId: userId });
+        console.log('Checking for user with telegramChatId:', userId);
         
-        if (user) {
-          user.isAdmin = true;
-          await user.save();
+        const userFound = await User.findOne({ telegramChatId: userId });
+        console.log('User found:', !!userFound);
+        
+        if (userFound) {
+          console.log('Updating existing user to admin');
+          userFound.isAdmin = true;
+          await userFound.save();
           return ctx.reply('You are now an admin! You can use admin commands like /pending_properties');
         } else {
           // Create new user with admin privileges
+          console.log('Creating new user with admin privileges');
           await User.create({
             telegramChatId: userId,
             email: `admin_${userId}@ile.app`,
@@ -34,10 +40,11 @@ module.exports = (bot) => {
           return ctx.reply('You have been registered as an admin! You can use admin commands like /pending_properties');
         }
       } else {
+        console.log('Invalid admin secret code provided');
         return ctx.reply('Invalid admin secret code.');
       }
     } catch (error) {
-      console.error('Error in make_admin command:', error);
+      console.error('Error in makeadmin command:', error);
       ctx.reply('An error occurred while processing your request.');
     }
   });
@@ -49,13 +56,19 @@ module.exports = (bot) => {
       const userId = ctx.from.id.toString();
       console.log('User ID:', userId);
       
-      // DEBUG: Print environment variables
-      console.log('ADMIN_IDS env var:', process.env.ADMIN_IDS);
-      console.log('ADMIN_SECRET_CODE env var exists:', !!process.env.ADMIN_SECRET_CODE);
+      // Check if user is an admin
+      const userFound = await User.findOne({ telegramChatId: userId });
+      console.log('User found:', !!userFound, 'isAdmin:', userFound?.isAdmin);
       
-      // Force admin access for testing
-      const isAdmin = true; // Temporarily bypass admin check for testing
-      console.log('Admin check bypassed for testing');
+      if (!userFound) {
+        console.log('User not found in database');
+        return ctx.reply('You need to be registered in our system. Please use /start to register.');
+      }
+      
+      if (!userFound.isAdmin) {
+        console.log('User is not an admin');
+        return ctx.reply('Admin access required. Use /makeadmin with the secret code to become an admin.');
+      }
       
       // If we get here, user is an admin
       console.log('Admin access confirmed, fetching pending properties...');
@@ -82,31 +95,34 @@ module.exports = (bot) => {
         console.log('Pending properties found:', pending.length, pending.map(p => p._id.toString()));
         
         if (pending.length === 0) {
+          console.log('No pending properties found');
           return ctx.reply('No pending properties found. When users submit properties, they will appear here for your approval.');
         }
         
         // Send the first pending property
-        const property = pending[0];
-        console.log('Sending property details:', property);
+        const prop = pending[0];
+        console.log('Sending property details for ID:', prop._id.toString());
         
-        let message = `📝 *Pending Property #${property._id}*\n\n`;
-        message += `*Name:* ${property.property_name}\n`;
-        message += `*Location:* ${property.location}\n`;
-        message += `*Price:* ₦${property.price.toLocaleString()}\n`;
-        message += `*Tokens Required:* ${property.tokens}\n`;
-        message += `*Type:* ${property.property_type}\n`;
-        message += `*Description:* ${property.description}\n`;
-        message += `*Submitted By:* ${property.developer_id}\n`;
-        message += `*Submitted At:* ${new Date(property.submitted_at).toLocaleString()}\n`;
+        let message = `📝 *Pending Property #${prop._id}*\n\n`;
+        message += `*Name:* ${prop.property_name}\n`;
+        message += `*Location:* ${prop.location}\n`;
+        message += `*Price:* ₦${prop.price.toLocaleString()}\n`;
+        message += `*Tokens Required:* ${prop.tokens}\n`;
+        message += `*Type:* ${prop.property_type}\n`;
+        message += `*Description:* ${prop.description}\n`;
+        message += `*Submitted By:* ${prop.developer_id}\n`;
+        message += `*Submitted At:* ${new Date(prop.submitted_at).toLocaleString()}\n`;
         
         // Create inline keyboard for approve/reject actions
         const keyboard = Markup.inlineKeyboard([
           [
-            Markup.button.callback('✅ Approve', `approve_property:${property._id}`),
-            Markup.button.callback('❌ Reject', `reject_property:${property._id}`)
+            Markup.button.callback('✅ Approve', `approve_property:${prop._id}`),
+            Markup.button.callback('❌ Reject', `reject_property:${prop._id}`)
           ],
           [Markup.button.callback('⏭️ Next Property', 'next_property')]
         ]);
+        
+        console.log('Sending message with property details and inline keyboard');
         
         // Send property details with inline keyboard
         return ctx.reply(message, {
@@ -129,14 +145,35 @@ module.exports = (bot) => {
       const propertyId = ctx.match[1];
       console.log(`Approving property ${propertyId}`);
       
+      // Verify admin status
+      const userId = ctx.from.id.toString();
+      console.log('User ID for approval:', userId);
+      const userFound = await User.findOne({ telegramChatId: userId });
+      console.log('User found for approval:', !!userFound, 'isAdmin:', userFound?.isAdmin);
+      
+      if (!userFound || !userFound.isAdmin) {
+        console.log('Non-admin tried to approve property');
+        await ctx.answerCbQuery('Admin access required');
+        return;
+      }
+      
       // Update property status to approved
-      await Property.findByIdAndUpdate(propertyId, { status: 'approved' });
+      console.log('Updating property status to approved');
+      const updatedProperty = await Property.findByIdAndUpdate(
+        propertyId, 
+        { status: 'approved' },
+        { new: true }
+      );
+      
+      console.log('Property update result:', !!updatedProperty);
       
       await ctx.answerCbQuery('Property approved!');
       await ctx.editMessageText('✅ Property approved successfully!');
       
       // Check if there are more pending properties
       const pending = await Property.find({ status: 'pending' }).sort({ submitted_at: 1 });
+      console.log('Remaining pending properties:', pending.length);
+      
       if (pending.length > 0) {
         await ctx.reply('There are more pending properties. Use /pending_properties to view the next one.');
       }
@@ -151,14 +188,35 @@ module.exports = (bot) => {
       const propertyId = ctx.match[1];
       console.log(`Rejecting property ${propertyId}`);
       
+      // Verify admin status
+      const userId = ctx.from.id.toString();
+      console.log('User ID for rejection:', userId);
+      const userFound = await User.findOne({ telegramChatId: userId });
+      console.log('User found for rejection:', !!userFound, 'isAdmin:', userFound?.isAdmin);
+      
+      if (!userFound || !userFound.isAdmin) {
+        console.log('Non-admin tried to reject property');
+        await ctx.answerCbQuery('Admin access required');
+        return;
+      }
+      
       // Update property status to rejected
-      await Property.findByIdAndUpdate(propertyId, { status: 'rejected' });
+      console.log('Updating property status to rejected');
+      const updatedProperty = await Property.findByIdAndUpdate(
+        propertyId, 
+        { status: 'rejected' },
+        { new: true }
+      );
+      
+      console.log('Property update result:', !!updatedProperty);
       
       await ctx.answerCbQuery('Property rejected!');
       await ctx.editMessageText('❌ Property rejected.');
       
       // Check if there are more pending properties
       const pending = await Property.find({ status: 'pending' }).sort({ submitted_at: 1 });
+      console.log('Remaining pending properties:', pending.length);
+      
       if (pending.length > 0) {
         await ctx.reply('There are more pending properties. Use /pending_properties to view the next one.');
       }
@@ -167,7 +225,7 @@ module.exports = (bot) => {
       ctx.answerCbQuery('Error: ' + error.message);
     }
   });
-  
+
   bot.action('next_property', async (ctx) => {
     await ctx.answerCbQuery('Loading next property...');
     await ctx.deleteMessage();
@@ -179,15 +237,15 @@ module.exports = (bot) => {
     try {
       console.log('all_properties command received');
       // Verify admin
-      const user = await User.findOne({ telegramChatId: ctx.from.id });
-      console.log('User found:', !!user, 'isAdmin:', user?.isAdmin);
+      const userFound = await User.findOne({ telegramChatId: ctx.from.id });
+      console.log('User found:', !!userFound, 'isAdmin:', userFound?.isAdmin);
       
       // If user doesn't exist or is not an admin
-      if (!user) {
+      if (!userFound) {
         return ctx.reply('You need to be registered in our system. Please use /start to register.');
       }
       
-      if (!user.isAdmin) {
+      if (!userFound.isAdmin) {
         return ctx.reply('Admin access required.');
       }
 
@@ -238,13 +296,13 @@ module.exports = (bot) => {
       const targetUserId = args[1];
       
       // Update user status
-      const user = await User.findOneAndUpdate(
+      const userFound = await User.findOneAndUpdate(
         { telegramChatId: targetUserId },
         { isBanned: true },
         { new: true }
       );
       
-      if (!user) {
+      if (!userFound) {
         return ctx.reply('User not found.');
       }
       
@@ -281,13 +339,13 @@ module.exports = (bot) => {
       const targetUserId = args[1];
       
       // Update user status
-      const user = await User.findOneAndUpdate(
+      const userFound = await User.findOneAndUpdate(
         { telegramChatId: targetUserId },
         { isBanned: false },
         { new: true }
       );
       
-      if (!user) {
+      if (!userFound) {
         return ctx.reply('User not found.');
       }
       
@@ -295,114 +353,6 @@ module.exports = (bot) => {
     } catch (error) {
       console.error('Error unbanning user:', error);
       ctx.reply('An error occurred while unbanning the user.');
-    }
-  });
-
-  // Handle property approval
-  bot.action(/approve_(.*)/, async (ctx) => {
-    try {
-      // Verify admin
-      const user = await User.findOne({ telegramChatId: ctx.from.id });
-      
-      // If user doesn't exist or is not an admin
-      if (!user) {
-        return ctx.reply('You need to be registered in our system. Please use /start to register.');
-      }
-      
-      if (!user.isAdmin) {
-        return ctx.reply('Admin access required.');
-      }
-      
-      const propertyId = ctx.match[1];
-      
-      // Update property status
-      const property = await Property.findByIdAndUpdate(
-        propertyId,
-        { status: 'approved' },
-        { new: true }
-      );
-      
-      if (!property) {
-        return ctx.reply('Property not found or already processed.');
-      }
-      
-      // Get developer information
-      const developer = await User.findOne({ telegramChatId: property.developer_id });
-      
-      // Notify admin of successful approval
-      await ctx.editMessageText(
-        `Property "${property.property_name}" has been approved.`,
-        Markup.inlineKeyboard([])
-      );
-      
-      // Notify developer if they have a Telegram ID
-      if (developer && developer.telegramChatId) {
-        try {
-          await ctx.telegram.sendMessage(
-            developer.telegramChatId,
-            `Your property "${property.property_name}" has been approved and is now listed!`
-          );
-        } catch (error) {
-          console.error('Error notifying developer:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Error approving property:', error);
-      ctx.reply('An error occurred while approving the property.');
-    }
-  });
-
-  // Handle property rejection
-  bot.action(/reject_(.*)/, async (ctx) => {
-    try {
-      // Verify admin
-      const user = await User.findOne({ telegramChatId: ctx.from.id });
-      
-      // If user doesn't exist or is not an admin
-      if (!user) {
-        return ctx.reply('You need to be registered in our system. Please use /start to register.');
-      }
-      
-      if (!user.isAdmin) {
-        return ctx.reply('Admin access required.');
-      }
-      
-      const propertyId = ctx.match[1];
-      
-      // Update property status
-      const property = await Property.findByIdAndUpdate(
-        propertyId,
-        { status: 'rejected' },
-        { new: true }
-      );
-      
-      if (!property) {
-        return ctx.reply('Property not found or already processed.');
-      }
-      
-      // Get developer information
-      const developer = await User.findOne({ telegramChatId: property.developer_id });
-      
-      // Notify admin of successful rejection
-      await ctx.editMessageText(
-        `Property "${property.property_name}" has been rejected.`,
-        Markup.inlineKeyboard([])
-      );
-      
-      // Notify developer if they have a Telegram ID
-      if (developer && developer.telegramChatId) {
-        try {
-          await ctx.telegram.sendMessage(
-            developer.telegramChatId,
-            `Your property "${property.property_name}" has been rejected. Please contact support for more information.`
-          );
-        } catch (error) {
-          console.error('Error notifying developer:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Error rejecting property:', error);
-      ctx.reply('An error occurred while rejecting the property.');
     }
   });
 };
