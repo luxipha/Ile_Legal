@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import WebApp from '@twa-dev/sdk';
-import './App.css';
 
 // Import components
 import IleLogo from './component/IleLogo';
 import Properties from './pages/Properties';
+import Task from './pages/Task';
+import Fire from './pages/Fire';
+// Add to imports
+import Holder from './pages/Holder';
 
 function App() {
   const [email, setEmail] = useState('');
@@ -40,55 +43,53 @@ function App() {
       <Routes>
         <Route path="/properties" element={<Properties />} />
         <Route path="/direct-properties" element={<Properties />} />
+        <Route path="/tasks" element={<Task />} />
+        <Route path="/fire" element={<Fire />} />
         <Route path="/" element={
           isVerified ? 
           <Navigate to="/properties" /> : 
           (
             <>
-              <div className="background-grid"></div>
-              <div className="background-blur blur-1"></div>
-              <div className="background-blur blur-2"></div>
+              <div className="absolute inset-0 z-[-1] bg-primary">
+                {/* Background grid effect */}
+                <div className="absolute inset-0 bg-[radial-gradient(rgba(255,215,0,0.03)_1px,transparent_1px),radial-gradient(rgba(255,215,0,0.02)_1px,transparent_1px)] bg-[length:50px_50px,100px_100px] bg-[0_0,25px_25px]"></div>
+                
+                {/* Background blur effects */}
+                <div className="absolute top-[-100px] right-[-50px] w-[300px] h-[300px] rounded-full filter blur-[50px] bg-[radial-gradient(circle,rgba(255,215,0,0.15)_0%,rgba(10,25,41,0)_70%)]"></div>
+                <div className="absolute bottom-[-150px] left-[-80px] w-[400px] h-[400px] rounded-full filter blur-[50px] bg-[radial-gradient(circle,rgba(255,215,0,0.15)_0%,rgba(10,25,41,0)_70%)] opacity-70"></div>
+              </div>
               
-              <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-                <div className="card-glass" style={{ width: '100%', maxWidth: '360px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
-                    <div style={{ marginBottom: '24px' }}>
+              <div className="min-h-screen flex items-center justify-center p-4">
+                <div className="w-full max-w-[360px] bg-primary/70 backdrop-blur-xl border border-text-primary/10 rounded-2xl shadow-lg p-8">
+                  <div className="flex flex-col items-center mb-6">
+                    <div className="mb-6">
                       <IleLogo size="lg" />
                     </div>
-                    <h1 className="gradient-text" style={{ fontWeight: 'bold', fontSize: '24px', marginBottom: '8px' }}>
-                      <span style={{ marginRight: '8px' }}>👋</span>Welcome to Ile Wallet
+                    <h1 className="font-bold text-2xl mb-2 bg-gradient-to-r from-text-primary to-white bg-clip-text text-transparent">
+                      <span className="mr-2">👋</span>Welcome to Ile Wallet
                     </h1>
-                    <p style={{ color: 'var(--beige)', opacity: 0.7, textAlign: 'center', maxWidth: '280px', fontSize: '16px' }}>
+                    <p className="text-text-primary/70 text-center max-w-[280px] text-base">
                       Link your email to view your token holdings
                     </p>
                   </div>
                   
-                  <div style={{ width: '100%' }}>
+                  <div className="w-full">
                     <form onSubmit={handleSubmit}>
-                      <div className="input-container" style={{ position: 'relative', marginBottom: '24px' }}>
+                      <div className="relative mb-6">
                         <input
                           type="email"
-                          className="form-input-glow"
                           id="emailInput"
                           placeholder=" "
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           disabled={isSubmitting}
-                          style={{ width: '100%', boxSizing: 'border-box' }}
+                          className="w-full bg-white/5 border border-text-primary/10 text-text-primary rounded-xl h-[60px] text-lg px-4 pt-5 pb-2 transition-all duration-300 focus:bg-white/10 focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(255,215,0,0.6),0_0_15px_rgba(255,215,0,0.6)] placeholder:text-transparent"
                         />
                         <label 
                           htmlFor="emailInput"
-                          style={{
-                            position: 'absolute',
-                            top: '20px',
-                            left: '16px',
-                            pointerEvents: 'none',
-                            transition: 'all 0.2s ease-in-out',
-                            color: 'var(--beige)',
-                            opacity: '0.6',
-                            transform: email ? 'translateY(-12px) scale(0.75)' : 'translateY(0) scale(1)',
-                            transformOrigin: 'left top'
-                          }}
+                          className={`absolute top-5 left-4 pointer-events-none transition-all duration-200 text-text-primary/60 origin-left ${
+                            email ? 'transform -translate-y-3 scale-75 text-accent' : ''
+                          }`}
                         >
                           Your Email Address
                         </label>
@@ -96,19 +97,19 @@ function App() {
                       
                       <button 
                         type="submit"
-                        className="btn-gold shine-effect"
                         disabled={isSubmitting}
+                        className="w-full bg-gradient-to-r from-accent to-amber-500 text-primary font-semibold text-lg py-3 rounded-xl border-none cursor-pointer relative overflow-hidden shadow-[0_4px_12px_rgba(255,215,0,0.3)] transition-all duration-300 hover:translate-y-[-2px] hover:shadow-[0_6px_18px_rgba(255,215,0,0.4)] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
                       >
                         {isSubmitting ? 'Sending...' : 'Continue'}
                       </button>
                     </form>
                     
-                    <p style={{ textAlign: 'center', color: 'var(--beige)', opacity: 0.5, fontSize: '14px', marginTop: '24px' }}>
+                    <p className="text-center text-text-primary/50 text-sm mt-6">
                       We only use your email to match previous token purchases
                     </p>
                     
-                    <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                      <a href="/properties" style={{ color: 'var(--gold)', textDecoration: 'underline', fontSize: '14px' }}>
+                    <div className="mt-5 text-center">
+                      <a href="/properties" className="text-accent underline text-sm">
                         Direct access to Properties page (for testing)
                       </a>
                     </div>
@@ -118,6 +119,8 @@ function App() {
             </>
           )
         } />
+        // Add in the Routes section
+        <Route path="/holdings" element={<Holder />} />
       </Routes>
     </Router>
   );
