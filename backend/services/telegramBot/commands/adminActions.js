@@ -1,6 +1,7 @@
 const Property = require('@models/Property');
 const User = require('@models/User');
 const { Markup } = require('telegraf');
+const isAdmin = require('@middlewares/adminMiddleware');
 
 // Debug imports
 console.log('Property model imported:', !!Property);
@@ -10,21 +11,28 @@ module.exports = (bot) => {
   // Command to make a user an admin
   bot.command('makeadmin', async (ctx) => {
     try {
-      console.log('makeadmin command received');
+      console.log('makeadmin command received with full text:', ctx.message.text);
       const secretCode = ctx.message.text.split(' ')[1];
       const adminSecretCode = process.env.ADMIN_SECRET_CODE;
       
       console.log('Secret code received:', secretCode);
       console.log('Expected admin secret code:', adminSecretCode);
+      console.log('Do they match?', secretCode === adminSecretCode);
       
       if (secretCode === adminSecretCode) {
         const userId = ctx.from.id.toString();
         console.log('Checking for user with telegramChatId:', userId);
         
         const userFound = await User.findOne({ telegramChatId: userId });
-        console.log('User found:', !!userFound);
+        console.log('User found:', !!userFound, userFound ? `isAdmin: ${userFound.isAdmin}` : '');
         
         if (userFound) {
+          // Check if user is already an admin
+          if (userFound.isAdmin) {
+            console.log('User is already an admin');
+            return ctx.reply('You are already an admin! You can use admin commands like /pending_properties');
+          }
+          
           console.log('Updating existing user to admin');
           userFound.isAdmin = true;
           await userFound.save();
@@ -50,27 +58,9 @@ module.exports = (bot) => {
   });
 
   // Command to view pending properties
-  bot.command('pending_properties', async (ctx) => {
+  bot.command('pending_properties', isAdmin, async (ctx) => {
     try {
       console.log('pending_properties command received');
-      const userId = ctx.from.id.toString();
-      console.log('User ID:', userId);
-      
-      // Check if user is an admin
-      const userFound = await User.findOne({ telegramChatId: userId });
-      console.log('User found:', !!userFound, 'isAdmin:', userFound?.isAdmin);
-      
-      if (!userFound) {
-        console.log('User not found in database');
-        return ctx.reply('You need to be registered in our system. Please use /start to register.');
-      }
-      
-      if (!userFound.isAdmin) {
-        console.log('User is not an admin');
-        return ctx.reply('Admin access required. Use /makeadmin with the secret code to become an admin.');
-      }
-      
-      // If we get here, user is an admin
       console.log('Admin access confirmed, fetching pending properties...');
       
       // Query for pending properties
@@ -140,28 +130,16 @@ module.exports = (bot) => {
   });
 
   // Handle inline keyboard callbacks
-  bot.action(/approve_property:(.+)/, async (ctx) => {
+  bot.action(/approve_property:(.+)/, isAdmin, async (ctx) => {
     try {
       const propertyId = ctx.match[1];
       console.log(`Approving property ${propertyId}`);
-      
-      // Verify admin status
-      const userId = ctx.from.id.toString();
-      console.log('User ID for approval:', userId);
-      const userFound = await User.findOne({ telegramChatId: userId });
-      console.log('User found for approval:', !!userFound, 'isAdmin:', userFound?.isAdmin);
-      
-      if (!userFound || !userFound.isAdmin) {
-        console.log('Non-admin tried to approve property');
-        await ctx.answerCbQuery('Admin access required');
-        return;
-      }
       
       // Update property status to approved
       console.log('Updating property status to approved');
       const updatedProperty = await Property.findByIdAndUpdate(
         propertyId, 
-        { status: 'approved' },
+        { status: 'approved', isLive: true },
         { new: true }
       );
       
@@ -183,28 +161,16 @@ module.exports = (bot) => {
     }
   });
   
-  bot.action(/reject_property:(.+)/, async (ctx) => {
+  bot.action(/reject_property:(.+)/, isAdmin, async (ctx) => {
     try {
       const propertyId = ctx.match[1];
       console.log(`Rejecting property ${propertyId}`);
-      
-      // Verify admin status
-      const userId = ctx.from.id.toString();
-      console.log('User ID for rejection:', userId);
-      const userFound = await User.findOne({ telegramChatId: userId });
-      console.log('User found for rejection:', !!userFound, 'isAdmin:', userFound?.isAdmin);
-      
-      if (!userFound || !userFound.isAdmin) {
-        console.log('Non-admin tried to reject property');
-        await ctx.answerCbQuery('Admin access required');
-        return;
-      }
       
       // Update property status to rejected
       console.log('Updating property status to rejected');
       const updatedProperty = await Property.findByIdAndUpdate(
         propertyId, 
-        { status: 'rejected' },
+        { status: 'rejected', isLive: false },
         { new: true }
       );
       
@@ -226,29 +192,17 @@ module.exports = (bot) => {
     }
   });
 
-  bot.action('next_property', async (ctx) => {
+  bot.action('next_property', isAdmin, async (ctx) => {
     await ctx.answerCbQuery('Loading next property...');
     await ctx.deleteMessage();
     await ctx.reply('Use /pending_properties to view the next pending property.');
   });
 
   // Command to view all properties
-  bot.command('all_properties', async (ctx) => {
+  bot.command('all_properties', isAdmin, async (ctx) => {
     try {
       console.log('all_properties command received');
-      // Verify admin
-      const userFound = await User.findOne({ telegramChatId: ctx.from.id });
-      console.log('User found:', !!userFound, 'isAdmin:', userFound?.isAdmin);
       
-      // If user doesn't exist or is not an admin
-      if (!userFound) {
-        return ctx.reply('You need to be registered in our system. Please use /start to register.');
-      }
-      
-      if (!userFound.isAdmin) {
-        return ctx.reply('Admin access required.');
-      }
-
       const properties = await Property.find().sort({ submitted_at: -1 }).limit(10);
       console.log('Properties found:', properties.length);
       
@@ -271,21 +225,9 @@ module.exports = (bot) => {
   });
 
   // Command to ban a user
-  bot.command('ban_user', async (ctx) => {
+  bot.command('ban_user', isAdmin, async (ctx) => {
     try {
       console.log('ban_user command received');
-      // Verify admin
-      const admin = await User.findOne({ telegramChatId: ctx.from.id });
-      console.log('Admin found:', !!admin, 'isAdmin:', admin?.isAdmin);
-      
-      // If user doesn't exist or is not an admin
-      if (!admin) {
-        return ctx.reply('You need to be registered in our system. Please use /start to register.');
-      }
-      
-      if (!admin.isAdmin) {
-        return ctx.reply('Admin access required.');
-      }
 
       // Get user ID from command arguments
       const args = ctx.message.text.split(' ');
@@ -314,22 +256,10 @@ module.exports = (bot) => {
   });
 
   // Command to unban a user
-  bot.command('unban_user', async (ctx) => {
+  bot.command('unban_user', isAdmin, async (ctx) => {
     try {
       console.log('unban_user command received');
-      // Verify admin
-      const admin = await User.findOne({ telegramChatId: ctx.from.id });
-      console.log('Admin found:', !!admin, 'isAdmin:', admin?.isAdmin);
       
-      // If user doesn't exist or is not an admin
-      if (!admin) {
-        return ctx.reply('You need to be registered in our system. Please use /start to register.');
-      }
-      
-      if (!admin.isAdmin) {
-        return ctx.reply('Admin access required.');
-      }
-
       // Get user ID from command arguments
       const args = ctx.message.text.split(' ');
       if (args.length < 2) {

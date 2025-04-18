@@ -1,4 +1,4 @@
-const Property = require('@models/property');
+const Property = require('@models/Property');
 const User = require('@models/User');
 
 console.log('myProperties.js module loaded');
@@ -9,7 +9,7 @@ module.exports = (bot) => {
   // Simple test command to verify the handler is working
   bot.command('test_properties', async (ctx) => {
     console.log('test_properties command triggered');
-    awgir ait ctx.reply('Test properties command works!');
+    await ctx.reply('Test properties command works!');
   });
   
   // Command to view user's own properties

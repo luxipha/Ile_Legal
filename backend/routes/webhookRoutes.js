@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { processWebhook } = require("../services/paystack");
-const verifyPaystackWebhook = require("../middlewares/verifyWebhook");
-const TokenSupply = require("../models/TokenSupply");
-const User = require("../models/User"); // Add User model import
+const { processWebhook } = require("@services/paystack");
+const verifyPaystackWebhook = require("@middlewares/verifyWebhook");
+const TokenSupply = require("@models/TokenSupply");
+const User = require("@models/User"); // Add User model import
 
 // Test endpoint to verify webhook is accessible
 router.get("/test", (req, res) => {

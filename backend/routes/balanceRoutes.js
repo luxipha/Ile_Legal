@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
-const TokenSupply = require('../models/TokenSupply');
+const User = require('@models/User');
+const TokenSupply = require('@models/TokenSupply');
 
 router.get('/', async (req, res) => {
     const { email } = req.query;
