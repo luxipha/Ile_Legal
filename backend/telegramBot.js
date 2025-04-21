@@ -67,93 +67,105 @@ bot.use(session());
 // Start command - improved with welcome message and keyboard
 bot.command('start', async (ctx) => {
   try {
-    console.log('Start command received');
-    // Check if user exists in database
-    let userDoc = await User.findOne({ telegramChatId: ctx.from.id });
+    console.log('start command received');
+    const userId = ctx.from.id;
     
-    // If user doesn't exist, create a new one
-    if (!userDoc) {
-      const newUser = new User({
-        telegramChatId: ctx.from.id,
+    // Check if user already exists
+    let user = await User.findOne({ telegramChatId: userId });
+    
+    if (!user) {
+      // Create a new user
+      user = new User({
+        telegramChatId: userId,
         name: ctx.from.first_name || 'User',
-        email: `telegram_${ctx.from.id}@placeholder.com`, // Placeholder email
+        email: `telegram_${userId}@placeholder.com`, // Placeholder email
         isAdmin: false,
         isBanned: false
       });
       
-      userDoc = await newUser.save();
-      console.log(`New user registered with Telegram ID: ${ctx.from.id}`);
+      await user.save();
+      console.log(`New user registered with Telegram ID: ${userId}`);
     }
     
-    // Welcome message with instructions
-    const welcomeMessage = `👋 Welcome to Ile Properties Bot, ${userDoc.name || ctx.from.first_name || 'there'}!
-
-This bot helps you submit your property for tokenization and manage tokenized property. Here's what you can do:
-
-• Submit new properties for tokenization
-• View your submitted properties
-• Get updates on tokenization status
-
-Type /help to see all available commands.`;
-
-    // Set up web app menu button
-    try {
-      await ctx.telegram.setChatMenuButton({
-        chat_id: ctx.chat.id,
-        menu_button: {
-          type: 'web_app',
-          text: 'Ile Properties',
-          web_app: {
-            url: 'https://ile-properties.com' // Replace with your actual web app URL
-          }
-        }
-      });
-      console.log('Web app menu button set successfully');
-    } catch (menuError) {
-      console.error('Error setting web app menu button:', menuError);
-    }
-
-    // Send welcome message with keyboard
-    await ctx.reply(welcomeMessage, Markup.keyboard([
+    // Check if user is an admin
+    const isUserAdmin = user.isAdmin;
+    
+    // Create custom keyboard based on user role
+    let buttons = [
       ['/add_property', '/my_properties'],
       ['/help']
-    ]).resize());
+    ];
     
+    // Add admin commands only for admins
+    if (isUserAdmin) {
+      buttons.push(['/pending_properties', '/all_properties']);
+      buttons.push(['/ban_user', '/unban_user']);
+    }
+    
+    const keyboard = Markup.keyboard(buttons).resize();
+    
+    // Welcome message
+    let welcomeMessage = `Welcome ${ctx.from.first_name || 'User'} to the Ile Property Bot! 🏠\n\n`;
+    welcomeMessage += 'This bot helps you submit and manage properties.\n\n';
+    welcomeMessage += 'Available commands:\n';
+    welcomeMessage += '• /add_property - Submit a new property\n';
+    welcomeMessage += '• /my_properties - View your submitted properties\n';
+    welcomeMessage += '• /help - Show help information\n';
+    
+    // Add admin commands info only for admins
+    if (isUserAdmin) {
+      welcomeMessage += '\nAdmin commands:\n';
+      welcomeMessage += '• /pending_properties - View properties pending approval\n';
+      welcomeMessage += '• /all_properties - View all properties\n';
+      welcomeMessage += '• /ban_user - Ban a user\n';
+      welcomeMessage += '• /unban_user - Unban a user\n';
+    }
+    
+    await ctx.reply(welcomeMessage, keyboard);
   } catch (error) {
     console.error('Error in start command:', error);
-    ctx.reply('An error occurred. Please try again later.');
+    ctx.reply('An error occurred while starting the bot. Please try again.');
   }
 });
 
-// Help command - improved with detailed instructions
+// Help command
 bot.command('help', async (ctx) => {
-  console.log('Help command received');
   try {
-    let message = `📚 *Ile Properties Bot Commands*\n\n`;
-    message += `*Basic Commands:*\n`;
-    message += `• /start - Start the bot and see welcome message\n`;
-    message += `• /help - Show this help message\n\n`;
+    console.log('help command received');
     
-    message += `*Property Management:*\n`;
-    message += `• /add_property - Submit a new property listing\n`;
-    message += `• /my_properties - View your submitted properties\n`;
-    message += `• /cancel - Cancel current property submission\n\n`;
+    // Check if user is an admin
+    const userId = ctx.from.id;
+    const user = await User.findOne({ telegramChatId: userId });
+    const isUserAdmin = user && user.isAdmin;
     
-    // Admin commands
-    message += `*Admin Commands:*\n`;
-    message += `• /pending_properties - View properties pending approval\n`;
-    message += `• /all_properties - View all properties\n`;
-    message += `• /ban_user [id] - Ban a user\n`;
-    message += `• /unban_user [id] - Unban a user\n\n`;
+    let helpMessage = '📋 *Available Commands*\n\n';
+    helpMessage += '• /start - Start the bot and see available commands\n';
+    helpMessage += '• /add_property - Submit a new property\n';
+    helpMessage += '• /my_properties - View your submitted properties\n';
+    helpMessage += '• /cancel - Cancel current property submission\n\n';
     
-    message += `To get started, try the /add_property command to submit your first property!`;
+    helpMessage += '*Property Submission*\n';
+    helpMessage += 'When adding a property, you will be asked to provide:\n';
+    helpMessage += '• Property name\n';
+    helpMessage += '• Location\n';
+    helpMessage += '• Price\n';
+    helpMessage += '• Property type\n';
+    helpMessage += '• Description\n';
+    helpMessage += '• Images (up to 5)\n\n';
     
-    // Try with HTML formatting instead of Markdown
-    await ctx.reply(message.replace(/\*/g, '').replace(/•/g, '- '));
-    console.log('Help message sent successfully');
+    // Add admin commands info only for admins
+    if (isUserAdmin) {
+      helpMessage += '*Admin Commands*\n';
+      helpMessage += '• /pending_properties - View properties pending approval\n';
+      helpMessage += '• /all_properties - View all properties\n';
+      helpMessage += '• /ban_user - Ban a user\n';
+      helpMessage += '• /unban_user - Unban a user\n';
+    }
+    
+    await ctx.reply(helpMessage, { parse_mode: 'Markdown' });
   } catch (error) {
-    console.error('Error sending help message:', error);
-    ctx.reply('An error occurred while showing help. Please try again later.');
+    console.error('Error in help command:', error);
+    ctx.reply('An error occurred while showing help. Please try again.');
   }
 });
 
@@ -636,6 +648,11 @@ bot.on('photo', async (ctx) => {
     console.log('Processing image upload for property submission');
     const state = userStates[ctx.from.id];
     
+    // Check if user has already uploaded 5 images
+    if (state.property.images.length >= 5) {
+      return ctx.reply('You have already uploaded the maximum of 5 images. Type /done to proceed.');
+    }
+    
     // Get the largest photo (best quality)
     const photoSizes = ctx.message.photo;
     const photo = photoSizes[photoSizes.length - 1];
@@ -655,16 +672,41 @@ bot.on('photo', async (ctx) => {
     // Add image URL to property
     state.property.images.push(result.secure_url);
     
+    // Calculate remaining image slots
+    const remainingSlots = 5 - state.property.images.length;
+    
     // If this is the first image, move to next step
     if (state.property.images.length === 1) {
-      ctx.reply('Image uploaded successfully! You can send more images or type /done to finish adding images.');
+      ctx.reply(`Image uploaded successfully! You can send ${remainingSlots} more image${remainingSlots !== 1 ? 's' : ''} or type /done to finish.`);
+    } else if (state.property.images.length < 5) {
+      ctx.reply(`Image ${state.property.images.length} uploaded successfully! You can send ${remainingSlots} more image${remainingSlots !== 1 ? 's' : ''} or type /done to finish.`);
     } else {
-      ctx.reply(`Image ${state.property.images.length} uploaded successfully! You can send more images or type /done to finish adding images.`);
+      ctx.reply('You have uploaded the maximum of 5 images. Type /done to proceed.');
     }
   } catch (error) {
     console.error('Error processing image upload:', error);
     ctx.reply('An error occurred while uploading the image. Please try again or use /cancel to start over.');
   }
+});
+
+// Handle video uploads (reject them)
+bot.on('video', async (ctx) => {
+  // Skip if user doesn't have an active property submission or not in image step
+  if (!userStates[ctx.from.id] || userStates[ctx.from.id].step !== 'images') {
+    return;
+  }
+  
+  ctx.reply('Videos are not accepted. Please upload only images (photos) of the property.');
+});
+
+// Handle document uploads (reject them)
+bot.on('document', async (ctx) => {
+  // Skip if user doesn't have an active property submission or not in image step
+  if (!userStates[ctx.from.id] || userStates[ctx.from.id].step !== 'images') {
+    return;
+  }
+  
+  ctx.reply('Document files are not accepted. Please upload only images (photos) of the property.');
 });
 
 // Done command for completing image uploads
