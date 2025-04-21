@@ -277,25 +277,9 @@ bot.command('makeadmin', async (ctx) => {
 });
 
 // Command to view pending properties
-bot.command('pending_properties', async (ctx) => {
+bot.command('pending_properties', isAdmin, async (ctx) => {
   try {
-    console.log('🔍 pending_properties command received, applying admin check');
-    const userId = ctx.from.id.toString();
-    console.log('🔍 Checking admin status for user:', userId);
-    
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('🔍 User found:', !!user, user ? `isAdmin: ${user.isAdmin}` : 'No user');
-    
-    if (!user) {
-      console.log('❌ User not found in database');
-      return ctx.reply('⛔ You need to be registered. Use /start to register first.');
-    }
-    
-    if (!user.isAdmin) {
-      console.log('❌ User is not an admin');
-      return ctx.reply('⛔ You do not have admin privileges to use this command.');
-    }
-    
+    console.log('🔍 pending_properties command received');
     console.log('✅ Admin access confirmed, fetching pending properties...');
     
     // Query for pending properties
@@ -343,25 +327,9 @@ bot.command('pending_properties', async (ctx) => {
 });
 
 // Command to view all properties
-bot.command('all_properties', async (ctx) => {
+bot.command('all_properties', isAdmin, async (ctx) => {
   try {
-    console.log('🔍 all_properties command received, applying admin check');
-    const userId = ctx.from.id.toString();
-    console.log('🔍 Checking admin status for user:', userId);
-    
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('🔍 User found:', !!user, user ? `isAdmin: ${user.isAdmin}` : 'No user');
-    
-    if (!user) {
-      console.log('❌ User not found in database');
-      return ctx.reply('⛔ You need to be registered. Use /start to register first.');
-    }
-    
-    if (!user.isAdmin) {
-      console.log('❌ User is not an admin');
-      return ctx.reply('⛔ You do not have admin privileges to use this command.');
-    }
-    
+    console.log('🔍 all_properties command received');
     console.log('✅ Admin access confirmed, fetching all properties...');
     
     const properties = await Property.find().sort({ submitted_at: -1 }).limit(10);
@@ -387,21 +355,11 @@ bot.command('all_properties', async (ctx) => {
 });
 
 // Action for approving a property
-bot.action(/approve_property:(.+)/, async (ctx) => {
+bot.action(/approve_property:(.+)/, isAdmin, async (ctx) => {
   try {
     console.log('🔍 approve_property action received');
-    const userId = ctx.from.id.toString();
     const propertyId = ctx.match[1];
     console.log('🔍 Property ID:', propertyId);
-    
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('🔍 User found:', !!user, user ? `isAdmin: ${user.isAdmin}` : 'No user');
-    
-    if (!user || !user.isAdmin) {
-      console.log('❌ User is not an admin');
-      await ctx.answerCbQuery('⛔ You do not have admin privileges');
-      return;
-    }
     
     // Update property status
     const property = await Property.findById(propertyId);
@@ -455,21 +413,11 @@ bot.action(/approve_property:(.+)/, async (ctx) => {
 });
 
 // Action for rejecting a property
-bot.action(/reject_property:(.+)/, async (ctx) => {
+bot.action(/reject_property:(.+)/, isAdmin, async (ctx) => {
   try {
     console.log('🔍 reject_property action received');
-    const userId = ctx.from.id.toString();
     const propertyId = ctx.match[1];
     console.log('🔍 Property ID:', propertyId);
-    
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('🔍 User found:', !!user, user ? `isAdmin: ${user.isAdmin}` : 'No user');
-    
-    if (!user || !user.isAdmin) {
-      console.log('❌ User is not an admin');
-      await ctx.answerCbQuery('⛔ You do not have admin privileges');
-      return;
-    }
     
     // Update property status
     const property = await Property.findById(propertyId);
@@ -523,19 +471,9 @@ bot.action(/reject_property:(.+)/, async (ctx) => {
 });
 
 // Action for showing next pending property
-bot.action('next_property', async (ctx) => {
+bot.action('next_property', isAdmin, async (ctx) => {
   try {
     console.log('🔍 next_property action received');
-    const userId = ctx.from.id.toString();
-    
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('🔍 User found:', !!user, user ? `isAdmin: ${user.isAdmin}` : 'No user');
-    
-    if (!user || !user.isAdmin) {
-      console.log('❌ User is not an admin');
-      await ctx.answerCbQuery('⛔ You do not have admin privileges');
-      return;
-    }
     
     // Find next pending property
     const pending = await Property.find({ status: 'pending' }).sort({ submitted_at: 1 });
@@ -580,19 +518,9 @@ bot.action('next_property', async (ctx) => {
 });
 
 // Command to ban a user
-bot.command('ban_user', async (ctx) => {
+bot.command('ban_user', isAdmin, async (ctx) => {
   try {
     console.log('ban_user command received');
-    const userId = ctx.from.id.toString();
-    console.log('🔍 Checking admin status for user:', userId);
-    
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('🔍 User found:', !!user, user ? `isAdmin: ${user.isAdmin}` : 'No user');
-    
-    if (!user || !user.isAdmin) {
-      console.log('❌ User is not an admin');
-      return ctx.reply('⛔ You do not have admin privileges to use this command.');
-    }
     
     // Get user ID from command arguments
     const args = ctx.message.text.split(' ');
@@ -621,19 +549,9 @@ bot.command('ban_user', async (ctx) => {
 });
 
 // Command to unban a user
-bot.command('unban_user', async (ctx) => {
+bot.command('unban_user', isAdmin, async (ctx) => {
   try {
     console.log('unban_user command received');
-    const userId = ctx.from.id.toString();
-    console.log('🔍 Checking admin status for user:', userId);
-    
-    const user = await User.findOne({ telegramChatId: userId });
-    console.log('🔍 User found:', !!user, user ? `isAdmin: ${user.isAdmin}` : 'No user');
-    
-    if (!user || !user.isAdmin) {
-      console.log('❌ User is not an admin');
-      return ctx.reply('⛔ You do not have admin privileges to use this command.');
-    }
     
     // Get user ID from command arguments
     const args = ctx.message.text.split(' ');
@@ -658,6 +576,170 @@ bot.command('unban_user', async (ctx) => {
   } catch (error) {
     console.error('Error unbanning user:', error);
     ctx.reply('An error occurred while unbanning the user.');
+  }
+});
+
+// Property submission state
+const userStates = {};
+
+// Property types for selection
+const propertyTypes = ['Apartment', 'House', 'Land', 'Commercial'];
+
+// Handle /add_property command
+bot.command('add_property', async (ctx) => {
+  try {
+    console.log('add_property command received');
+    // Check if user is banned
+    const user = await User.findOne({ telegramChatId: ctx.from.id });
+    
+    // If user doesn't exist yet, create them
+    if (!user) {
+      const newUser = new User({
+        telegramChatId: ctx.from.id,
+        name: ctx.from.first_name || 'User',
+        email: `telegram_${ctx.from.id}@placeholder.com`, // Placeholder email
+        isAdmin: false,
+        isBanned: false
+      });
+      
+      await newUser.save();
+      console.log(`New user registered with Telegram ID: ${ctx.from.id}`);
+    } else if (user.isBanned) {
+      return ctx.reply('You are banned from submitting properties.');
+    }
+
+    // Initialize user state for property submission
+    userStates[ctx.from.id] = {
+      step: 'property_name',
+      property: {
+        developer_id: ctx.from.id.toString(),
+        images: []
+      }
+    };
+
+    // Start property submission flow
+    ctx.reply('Let\'s add a new property. Please enter the property name:');
+  } catch (error) {
+    console.error('Error in add_property command:', error);
+    ctx.reply('An error occurred. Please try again later.');
+  }
+});
+
+// Handle text messages for property submission steps
+bot.on('text', async (ctx) => {
+  // Skip if it's a command or user doesn't have an active property submission
+  if (ctx.message.text.startsWith('/') || !userStates[ctx.from.id]) {
+    return;
+  }
+  
+  console.log('Processing property submission step for user:', ctx.from.id);
+  const state = userStates[ctx.from.id];
+  const text = ctx.message.text;
+  
+  try {
+    switch (state.step) {
+      case 'property_name':
+        console.log('Processing property_name step:', text);
+        state.property.property_name = text;
+        state.step = 'location';
+        ctx.reply('Great! Now enter the property location:');
+        break;
+        
+      case 'location':
+        console.log('Processing location step:', text);
+        state.property.location = text;
+        state.step = 'price';
+        ctx.reply('What is the price of the property in Naira? (numbers only, e.g. 5000000)');
+        break;
+        
+      case 'price':
+        console.log('Processing price step:', text);
+        const price = parseFloat(text.replace(/,/g, ''));
+        if (isNaN(price) || price <= 0) {
+          return ctx.reply('Please enter a valid price (numbers only).');
+        }
+        state.property.price = price;
+        state.step = 'tokens';
+        ctx.reply('How many tokens should this property be divided into? (e.g. 100)');
+        break;
+        
+      case 'tokens':
+        console.log('Processing tokens step:', text);
+        const tokens = parseInt(text);
+        if (isNaN(tokens) || tokens <= 0) {
+          return ctx.reply('Please enter a valid number of tokens.');
+        }
+        state.property.tokens = tokens;
+        state.step = 'property_type';
+        
+        // Show property type options
+        const keyboard = Markup.keyboard(propertyTypes.map(type => [type]))
+          .oneTime()
+          .resize();
+        
+        ctx.reply('Select the property type:', keyboard);
+        break;
+        
+      case 'property_type':
+        console.log('Processing property_type step:', text);
+        if (!propertyTypes.includes(text)) {
+          return ctx.reply('Please select a valid property type from the keyboard.');
+        }
+        state.property.property_type = text;
+        state.step = 'description';
+        
+        // Remove keyboard
+        ctx.reply('Please provide a description of the property:', Markup.removeKeyboard());
+        break;
+        
+      case 'description':
+        console.log('Processing description step:', text);
+        state.property.description = text;
+        state.step = 'done';
+        
+        // Save the property to the database
+        const newProperty = new Property({
+          property_name: state.property.property_name,
+          location: state.property.location,
+          price: state.property.price,
+          tokens: state.property.tokens,
+          property_type: state.property.property_type,
+          description: state.property.description,
+          developer_id: state.property.developer_id,
+          status: 'pending',
+          isLive: false,
+          submitted_at: new Date()
+        });
+        
+        console.log('Saving new property to database:', newProperty);
+        await newProperty.save();
+        console.log('Property saved successfully with ID:', newProperty._id);
+        
+        // Update user's last submission time
+        await User.findOneAndUpdate(
+          { telegramChatId: ctx.from.id },
+          { last_submission: Date.now() }
+        );
+        
+        // Clear user state
+        delete userStates[ctx.from.id];
+        
+        ctx.reply('Thank you! Your property has been submitted for review. You will be notified once it is approved.');
+        break;
+    }
+  } catch (error) {
+    console.error('Error processing property submission step:', error);
+    ctx.reply('An error occurred. Please try again or use /cancel to start over.');
+  }
+});
+
+// Cancel command
+bot.command('cancel', (ctx) => {
+  if (userStates[ctx.from.id]) {
+    delete userStates[ctx.from.id];
+    ctx.reply('Property submission cancelled.', Markup.removeKeyboard());
+  } else {
+    ctx.reply('You don\'t have an active property submission to cancel.');
   }
 });
 
