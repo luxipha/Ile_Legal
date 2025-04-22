@@ -9,6 +9,7 @@ const connectDB = require('./config/database'); // MongoDB connection
 const buyRoutes = require('./routes/buyRoutes');
 const balanceRoutes = require('./routes/balanceRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const authRoutes = require('./routes/authRoutes');
 const cors = require('cors');
 
 const app = express();
@@ -48,6 +49,7 @@ connectDB()
     app.use('/buy', buyRoutes);
     app.use('/', balanceRoutes);
     app.use('/webhook', webhookRoutes);
+    app.use('/auth', authRoutes);
     
     // Root route for testing
     app.get('/', (req, res) => {
