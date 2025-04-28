@@ -10,6 +10,10 @@ const buyRoutes = require('./routes/buyRoutes');
 const balanceRoutes = require('./routes/balanceRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const authRoutes = require('./routes/authRoutes');
+const propertyRoutes = require('./routes/propertyRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const rewardRoutes = require('./routes/rewardRoutes');
+const botIntegrationRoutes = require('./routes/botIntegrationRoutes');
 const cors = require('cors');
 
 const app = express();
@@ -21,6 +25,10 @@ app.use(bodyParser.json());
 const allowedOrigins = [
   'http://127.0.0.1:5500',      // VS Code Live Server
   'http://localhost:5500',      // Alternative local address
+  'http://localhost:5173',      // Vite dev server (HTTP)
+  'https://localhost:5173',     // Vite dev server (HTTPS)
+  'https://miniapp-m3yxspnui-aisolaes-projects-2f81d181.vercel.app', // Previous Vercel deployment
+  'https://miniapp-kappa-bay.vercel.app', // New Vercel deployment
   process.env.FRONTEND_URL      // From environment variable
 ];
 
@@ -45,11 +53,25 @@ connectDB()
   .then(() => {
     console.log('Database connected successfully, setting up routes');
     
+    // Health check endpoint for monitoring
+    app.get('/api/health', (req, res) => {
+      res.status(200).json({ 
+        status: 'ok',
+        service: 'Ilé-MVP Backend',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+      });
+    });
+
     // Routes
     app.use('/buy', buyRoutes);
     app.use('/', balanceRoutes);
     app.use('/webhook', webhookRoutes);
     app.use('/auth', authRoutes);
+    app.use('/properties', propertyRoutes);
+    app.use('/dashboard', dashboardRoutes);
+    app.use('/rewards', rewardRoutes);
+    app.use('/bot-integration', botIntegrationRoutes);
     
     // Root route for testing
     app.get('/', (req, res) => {

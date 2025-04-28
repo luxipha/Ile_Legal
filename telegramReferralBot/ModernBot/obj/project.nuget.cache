@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "/y0SxwTok6g=",
+  "success": true,
+  "projectFilePath": "/Users/abisoye/Projects/Ile-MVP/telegramReferralBot/ModernBot/TelegramReferralBot.csproj",
+  "expectedPackageFiles": [
+    "/Users/abisoye/.nuget/packages/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg.sha512",
+    "/Users/abisoye/.nuget/packages/polly/8.2.0/polly.8.2.0.nupkg.sha512",
+    "/Users/abisoye/.nuget/packages/polly.core/8.2.0/polly.core.8.2.0.nupkg.sha512",
+    "/Users/abisoye/.nuget/packages/polly.extensions.http/3.0.0/polly.extensions.http.3.0.0.nupkg.sha512",
+    "/Users/abisoye/.nuget/packages/telegram.bot/19.0.0/telegram.bot.19.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
