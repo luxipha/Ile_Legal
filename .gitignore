@@ -14,7 +14,8 @@ backend/node_modules/
  backend/.env
  /backend/.env
 
-
+# Telegram Referral Bot
+telegramReferralBot/ModernBot/config.conf
 
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
