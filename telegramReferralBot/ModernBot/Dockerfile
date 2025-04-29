@@ -20,8 +20,8 @@ RUN mkdir -p /app/data
 # Environment variables
 ENV BACKEND_URL=https://ile-backend.onrender.com
 
+# Copy config file from secrets
+CMD cp /etc/secrets/config.conf /app/config.conf && dotnet TelegramReferralBot.dll
+
 # Expose port for health check
 EXPOSE 5000
-
-# Set the entry point
-ENTRYPOINT ["dotnet", "TelegramReferralBot.dll"]
