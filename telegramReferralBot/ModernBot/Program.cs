@@ -4,6 +4,7 @@ using System.Text;
 using System.Timers;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
+using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -14,7 +15,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Host;
 
 namespace TelegramReferralBot;
 
@@ -47,6 +48,7 @@ public class Program
     private static int _networkErrorRetryCount = 0;
     private static readonly HashSet<int> _recentlyProcessedMessageIds = new HashSet<int>();
     private static readonly object _messageIdsLock = new object();
+    private static DateTime _lastUpdateTime = DateTime.MinValue;
 
     public static async Task Main(string[] args)
     {
@@ -56,7 +58,7 @@ public class Program
             Logging.AddToLog("Bot starting...");
             
             // Load configuration
-            Config.LoadConfig();
+            LoadData.LoadConf();
             
             string path = Directory.GetCurrentDirectory();
             Console.WriteLine($"Found path: {path}");
@@ -384,6 +386,7 @@ public class Program
             
             // Process the message
             await ProcessMessageAsync(message, cancellationToken);
+            _lastUpdateTime = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
@@ -756,77 +759,6 @@ public class Program
     /// List of users awaiting a reply (for password verification)
     /// </summary>
     public static List<string> AwaitingReply => _awaitingReply;
-    
-    private static async void WatchdogTimer_Elapsed(object? sender, ElapsedEventArgs e)
-    {
-        try
-        {
-            // Check if the bot is still connected to Telegram
-            bool isConnected = false;
-            try
-            {
-                var me = await BotClient.GetMeAsync();
-                isConnected = me != null;
-            }
-            catch
-            {
-                isConnected = false;
-            }
-            
-            if (!isConnected)
-            {
-                Console.WriteLine("Watchdog detected bot disconnection. Attempting to reconnect...");
-                Logging.AddToLog("Watchdog detected bot disconnection. Attempting to reconnect...");
-                
-                try
-                {
-                    // Recreate the HTTP client
-                    var httpClientHandler = new HttpClientHandler
-                    {
-                        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-                        AutomaticDecompression = System.Net.DecompressionMethods.All,
-                        MaxConnectionsPerServer = 20
-                    };
-                    
-                    var httpClient = new HttpClient(new SuperRetryHandler(httpClientHandler))
-                    {
-                        Timeout = TimeSpan.FromMinutes(2)
-                    };
-                    
-                    // Create a new bot client
-                    BotClient = new TelegramBotClient(Config.BotAccessToken, httpClient);
-                    
-                    // Restart receiving updates
-                    var receiverOptions = new ReceiverOptions
-                    {
-                        AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
-                        ThrowPendingUpdates = true,
-                        Limit = 100
-                    };
-                    
-                    BotClient.StartReceiving(
-                        updateHandler: HandleUpdateAsync,
-                        pollingErrorHandler: HandlePollingErrorAsync,
-                        receiverOptions: receiverOptions,
-                        cancellationToken: _cts.Token
-                    );
-                    
-                    Console.WriteLine("Watchdog successfully reconnected the bot.");
-                    Logging.AddToLog("Watchdog successfully reconnected the bot.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Watchdog failed to reconnect: {ex.Message}");
-                    Logging.AddToLog($"Watchdog failed to reconnect: {ex.Message}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error in watchdog timer: {ex.Message}");
-            Logging.AddToLog($"Error in watchdog timer: {ex.Message}");
-        }
-    }
     
     private static void StartApiSyncTimer()
     {
