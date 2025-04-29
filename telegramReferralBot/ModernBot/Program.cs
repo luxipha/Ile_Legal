@@ -382,6 +382,7 @@ class Program
         if (RefLinks.ContainsKey(userId))
         {
             Logging.AddToLog("Reflink already exists for " + userId);
+            // Ensure we're using the correct link format from config
             string link = Config.LinkToBot + "?start=" + RefLinks[userId];
             return "Exists?" + link;
         }
@@ -427,7 +428,13 @@ class Program
                 Console.WriteLine(message);
             }
             
+            // Ensure we're using the correct link format from config
             string link = Config.LinkToBot + "?start=" + base64String;
+            
+            // Log the link for debugging
+            Logging.AddToLog($"Generated referral link: {link}");
+            Console.WriteLine($"Generated referral link: {link}");
+            
             return link;
         }
     }
