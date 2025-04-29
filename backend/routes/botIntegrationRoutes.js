@@ -15,6 +15,41 @@ const validateBotRequest = (req, res, next) => {
 };
 
 /**
+ * Test endpoint for bot authentication
+ * This endpoint allows the bot to test if its API key is valid
+ */
+router.get('/test-auth', validateBotRequest, (req, res) => {
+  // Log the received API key (masked for security)
+  const receivedKey = req.headers['x-api-key'];
+  const maskedKey = receivedKey ? 
+    `${receivedKey.substring(0, 4)}...${receivedKey.substring(receivedKey.length - 4)}` : 
+    'none';
+  
+  console.log(`Bot auth test received. API key: ${maskedKey}`);
+  console.log(`Expected API key: ${BOT_API_KEY.substring(0, 4)}...${BOT_API_KEY.substring(BOT_API_KEY.length - 4)}`);
+  
+  // Return success if we got here (middleware would have blocked unauthorized requests)
+  return res.json({ 
+    success: true, 
+    message: 'Authentication successful',
+    received: maskedKey,
+    matches: receivedKey === BOT_API_KEY
+  });
+});
+
+/**
+ * Health check endpoint for bot integration
+ * This endpoint doesn't require authentication
+ */
+router.get('/health', (req, res) => {
+  return res.json({ 
+    success: true, 
+    message: 'Bot integration API is healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
  * Sync referral data from the C# bot
  * This endpoint allows the C# bot to push referral data to our main system
  */

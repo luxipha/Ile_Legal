@@ -8,6 +8,7 @@ using Polly.Retry;
 using Polly.Extensions.Http;
 using System.Net;
 using System.Security.Authentication;
+using System.IO;
 
 namespace TelegramReferralBot;
 
@@ -18,11 +19,15 @@ public static class ApiIntegration
 {
     private static readonly HttpClient _httpClient;
     private static readonly string _apiBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL") ?? "http://localhost:3000"; // Use environment variable with fallback
-    private static readonly string _apiKey = Environment.GetEnvironmentVariable("BOT_API_KEY") ?? "your-secure-api-key-here"; // Use environment variable with fallback
+    private static readonly string _apiKey;
     private static readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     
     static ApiIntegration()
     {
+        // Load API key from config.conf if available
+        string configApiKey = LoadApiKeyFromConfig();
+        _apiKey = Environment.GetEnvironmentVariable("BOT_API_KEY") ?? configApiKey ?? "your-secure-api-key-here";
+        
         // Create a retry policy with exponential backoff
         _retryPolicy = Policy
             .Handle<HttpRequestException>()
@@ -51,13 +56,9 @@ public static class ApiIntegration
         // Create HTTP client with increased timeout and modern TLS settings
         var handler = new HttpClientHandler
         {
-            SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-            // In production, this should be set to true
-            ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => 
+            // For production, this should be set to true for proper certificate validation
+            ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) =>
             {
-                // For production, use this:
-                // return sslPolicyErrors == SslPolicyErrors.None;
-                
                 // For development, we're allowing self-signed certificates:
                 return true;
             }
@@ -68,8 +69,23 @@ public static class ApiIntegration
             Timeout = TimeSpan.FromSeconds(30) // Increase timeout to 30 seconds
         };
         
+        // Debug: Log the API key being used (mask most of it for security)
+        string maskedApiKey = _apiKey.Length > 8 
+            ? _apiKey.Substring(0, 4) + "..." + _apiKey.Substring(_apiKey.Length - 4) 
+            : "Invalid API Key";
+        Logging.AddToLog($"Using API key: {maskedApiKey}");
+        Console.WriteLine($"Using API key: {maskedApiKey}");
+        
         // Set up the HTTP client with the API key
         _httpClient.DefaultRequestHeaders.Add("x-api-key", _apiKey);
+        
+        // Debug: Log all headers being sent
+        Logging.AddToLog("HTTP Headers being sent:");
+        foreach (var header in _httpClient.DefaultRequestHeaders)
+        {
+            Logging.AddToLog($"  {header.Key}: {string.Join(", ", header.Value)}");
+            Console.WriteLine($"  {header.Key}: {string.Join(", ", header.Value)}");
+        }
     }
     
     /// <summary>
@@ -79,6 +95,26 @@ public static class ApiIntegration
     {
         try
         {
+            // Debug: Log the base URL being used
+            Logging.AddToLog($"Using API base URL: {_apiBaseUrl}");
+            Console.WriteLine($"Using API base URL: {_apiBaseUrl}");
+            
+            // Ensure the base URL is properly formatted
+            if (!_apiBaseUrl.StartsWith("http://") && !_apiBaseUrl.StartsWith("https://"))
+            {
+                Logging.AddToLog($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                Console.WriteLine($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                return;
+            }
+            
+            // Remove any trailing slash to avoid double slashes in the URL
+            string baseUrl = _apiBaseUrl.TrimEnd('/');
+            string fullUrl = $"{baseUrl}/bot-integration/sync-referrals";
+            
+            // Debug: Log the full URL being used
+            Logging.AddToLog($"Making API request to: {fullUrl}");
+            Console.WriteLine($"Making API request to: {fullUrl}");
+            
             // Prepare data to send
             var referrals = new List<object>();
             
@@ -156,7 +192,7 @@ public static class ApiIntegration
             
             // Send to main system with retry policy
             var response = await _retryPolicy.ExecuteAsync(async () => 
-                await _httpClient.PostAsync($"{_apiBaseUrl}/bot-integration/sync-referrals", content)
+                await _httpClient.PostAsync(fullUrl, content)
             );
             
             // Log result
@@ -187,9 +223,29 @@ public static class ApiIntegration
     {
         try
         {
+            // Debug: Log the base URL being used
+            Logging.AddToLog($"Using API base URL: {_apiBaseUrl}");
+            Console.WriteLine($"Using API base URL: {_apiBaseUrl}");
+            
+            // Ensure the base URL is properly formatted
+            if (!_apiBaseUrl.StartsWith("http://") && !_apiBaseUrl.StartsWith("https://"))
+            {
+                Logging.AddToLog($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                Console.WriteLine($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                return null;
+            }
+            
+            // Remove any trailing slash to avoid double slashes in the URL
+            string baseUrl = _apiBaseUrl.TrimEnd('/');
+            string fullUrl = $"{baseUrl}/bot-integration/users/{telegramId}";
+            
+            // Debug: Log the full URL being used
+            Logging.AddToLog($"Making API request to: {fullUrl}");
+            Console.WriteLine($"Making API request to: {fullUrl}");
+            
             // Use retry policy for the API call
             var response = await _retryPolicy.ExecuteAsync(async () =>
-                await _httpClient.GetAsync($"{_apiBaseUrl}/bot-integration/users/{telegramId}")
+                await _httpClient.GetAsync(fullUrl)
             );
             
             if (response.IsSuccessStatusCode)
@@ -220,9 +276,29 @@ public static class ApiIntegration
     {
         try
         {
+            // Debug: Log the base URL being used
+            Logging.AddToLog($"Using API base URL: {_apiBaseUrl}");
+            Console.WriteLine($"Using API base URL: {_apiBaseUrl}");
+            
+            // Ensure the base URL is properly formatted
+            if (!_apiBaseUrl.StartsWith("http://") && !_apiBaseUrl.StartsWith("https://"))
+            {
+                Logging.AddToLog($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                Console.WriteLine($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                return null;
+            }
+            
+            // Remove any trailing slash to avoid double slashes in the URL
+            string baseUrl = _apiBaseUrl.TrimEnd('/');
+            string fullUrl = $"{baseUrl}/bot-integration/points/{telegramId}";
+            
+            // Debug: Log the full URL being used
+            Logging.AddToLog($"Making API request to: {fullUrl}");
+            Console.WriteLine($"Making API request to: {fullUrl}");
+            
             // Use retry policy for the API call
             var response = await _retryPolicy.ExecuteAsync(async () =>
-                await _httpClient.GetAsync($"{_apiBaseUrl}/bot-integration/points/{telegramId}")
+                await _httpClient.GetAsync(fullUrl)
             );
             
             if (response.IsSuccessStatusCode)
@@ -244,6 +320,131 @@ public static class ApiIntegration
             Console.WriteLine("Error getting user points: " + ex.Message);
             return null;
         }
+    }
+    
+    /// <summary>
+    /// Test the API connection and authentication
+    /// </summary>
+    public static async Task TestApiConnectionAsync()
+    {
+        try
+        {
+            // Debug: Log the base URL being used
+            Logging.AddToLog($"TEST: Using API base URL: {_apiBaseUrl}");
+            Console.WriteLine($"TEST: Using API base URL: {_apiBaseUrl}");
+            
+            // Debug: Log the API key being used (mask most of it for security)
+            string maskedApiKey = _apiKey.Length > 8 
+                ? _apiKey.Substring(0, 4) + "..." + _apiKey.Substring(_apiKey.Length - 4) 
+                : "Invalid API Key";
+            Logging.AddToLog($"TEST: Using API key: {maskedApiKey}");
+            Console.WriteLine($"TEST: Using API key: {maskedApiKey}");
+            
+            // Ensure the base URL is properly formatted
+            if (!_apiBaseUrl.StartsWith("http://") && !_apiBaseUrl.StartsWith("https://"))
+            {
+                Logging.AddToLog($"TEST: Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                Console.WriteLine($"TEST: Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                return;
+            }
+            
+            // Remove any trailing slash to avoid double slashes in the URL
+            string baseUrl = _apiBaseUrl.TrimEnd('/');
+            
+            // Try different endpoints to see which one works
+            string[] testEndpoints = {
+                "/bot-integration/health",
+                "/health",
+                "/",
+                "/bot-integration"
+            };
+            
+            foreach (var endpoint in testEndpoints)
+            {
+                string fullUrl = $"{baseUrl}{endpoint}";
+                
+                // Debug: Log the full URL being used
+                Logging.AddToLog($"TEST: Making API request to: {fullUrl}");
+                Console.WriteLine($"TEST: Making API request to: {fullUrl}");
+                
+                try
+                {
+                    // Make a simple GET request
+                    var response = await _httpClient.GetAsync(fullUrl);
+                    
+                    // Log the result
+                    Logging.AddToLog($"TEST: Response status: {response.StatusCode}");
+                    Console.WriteLine($"TEST: Response status: {response.StatusCode}");
+                    
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    Logging.AddToLog($"TEST: Response content: {responseContent}");
+                    Console.WriteLine($"TEST: Response content: {responseContent}");
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Logging.AddToLog($"TEST: Successfully connected to endpoint: {endpoint}");
+                        Console.WriteLine($"TEST: Successfully connected to endpoint: {endpoint}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logging.AddToLog($"TEST: Error connecting to {endpoint}: {ex.Message}");
+                    Console.WriteLine($"TEST: Error connecting to {endpoint}: {ex.Message}");
+                }
+            }
+            
+            // Now try a direct test of the auth middleware
+            string authTestUrl = $"{baseUrl}/bot-integration/test-auth";
+            Logging.AddToLog($"TEST: Testing authentication at: {authTestUrl}");
+            Console.WriteLine($"TEST: Testing authentication at: {authTestUrl}");
+            
+            try
+            {
+                var response = await _httpClient.GetAsync(authTestUrl);
+                
+                Logging.AddToLog($"TEST: Auth test response: {response.StatusCode}");
+                Console.WriteLine($"TEST: Auth test response: {response.StatusCode}");
+                
+                string responseContent = await response.Content.ReadAsStringAsync();
+                Logging.AddToLog($"TEST: Auth test content: {responseContent}");
+                Console.WriteLine($"TEST: Auth test content: {responseContent}");
+            }
+            catch (Exception ex)
+            {
+                Logging.AddToLog($"TEST: Auth test error: {ex.Message}");
+                Console.WriteLine($"TEST: Auth test error: {ex.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"TEST: General error: {ex.Message}");
+            Console.WriteLine($"TEST: General error: {ex.Message}");
+        }
+    }
+    
+    private static string LoadApiKeyFromConfig()
+    {
+        try
+        {
+            string configPath = "config.conf";
+            if (System.IO.File.Exists(configPath))
+            {
+                string[] lines = System.IO.File.ReadAllLines(configPath);
+                foreach (string line in lines)
+                {
+                    if (line.StartsWith("apiKey="))
+                    {
+                        return line.Substring(7).Trim();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog("Error loading API key from config: " + ex.Message);
+            Console.WriteLine("Error loading API key from config: " + ex.Message);
+        }
+        return null;
     }
 }
 

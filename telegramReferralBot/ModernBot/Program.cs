@@ -76,6 +76,11 @@ class Program
             Console.WriteLine($"Bot successfully connected to Telegram API.");
             Logging.AddToLog($"Bot successfully connected to Telegram API. Username: {me.Username}");
 
+            // Test API connection to backend
+            Console.WriteLine("Testing connection to backend API...");
+            Logging.AddToLog("Testing connection to backend API...");
+            await ApiIntegration.TestApiConnectionAsync();
+            
             // Start API sync timer
             StartApiSyncTimer();
             
