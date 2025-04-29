@@ -75,6 +75,10 @@ public static class MessageProcessor
             {
                 await HandleHelpCallback(callbackQuery, cancellationToken);
             }
+            else if (callbackQuery.Data.StartsWith("getreferral"))
+            {
+                await HandleGetReferralCallback(callbackQuery, cancellationToken);
+            }
         }
         catch (Exception ex)
         {
@@ -175,6 +179,28 @@ public static class MessageProcessor
         catch (Exception ex)
         {
             Logging.AddToLog($"Error in HandleHelpCallback: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles the getreferral callback
+    /// </summary>
+    private static async Task HandleGetReferralCallback(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chatId = callbackQuery.Message?.Chat.Id;
+            var userId = callbackQuery.From.Id.ToString();
+            var user = callbackQuery.From;
+            
+            if (chatId == null)
+                return;
+            
+            await SendReferralLinkAsync(chatId.Value, userId, user, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error in HandleGetReferralCallback: {ex.Message}");
         }
     }
 
@@ -437,22 +463,42 @@ public static class MessageProcessor
     private static async Task SendReferralLinkAsync(long chatId, string userId, User user, CancellationToken cancellationToken)
     {
         string result = Program.GetRefLink(user);
+        string referralLink;
         
         if (result.StartsWith("Exists?"))
         {
-            string link = result.Substring(7);
-            await Program.BotClient.SendTextMessageAsync(
-                chatId: chatId,
-                text: $"Your referral link is:\n{link}\n\nShare this link with your friends to earn Bricks!",
-                cancellationToken: cancellationToken);
+            referralLink = result.Substring(7);
         }
         else
         {
-            await Program.BotClient.SendTextMessageAsync(
-                chatId: chatId,
-                text: $"Your referral link is:\n{result}\n\nShare this link with your friends to earn Bricks!",
-                cancellationToken: cancellationToken);
+            referralLink = result;
         }
+        
+        // Create a share button
+        var shareButton = new InlineKeyboardMarkup(new[]
+        {
+            new[]
+            {
+                InlineKeyboardButton.WithSwitchInlineQueryCurrentChat("📲 Share with Friends", "Join Ile to earn tokens and invest in property! Use my referral link:")
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📊 View My Referrals", "viewreferrals"),
+                InlineKeyboardButton.WithCallbackData("🏆 View My Bricks", "viewpoints")
+            }
+        });
+        
+        await Program.BotClient.SendTextMessageAsync(
+            chatId: chatId,
+            text: $"🔗 *Your Ile Referral Link*\n\n`{referralLink}`\n\n" +
+                  $"*Share this link to earn Bricks!*\n\n" +
+                  $"• You earn *1 Brick* for each new user who joins\n" +
+                  $"• Earn *additional Bricks* when your referrals are active\n" +
+                  $"• Compete on the leaderboard for special rewards\n\n" +
+                  $"Click the button below to share your link with friends!",
+            parseMode: ParseMode.Markdown,
+            replyMarkup: shareButton,
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -569,12 +615,29 @@ public static class MessageProcessor
         // Update points
         Program.UpdatePointTotals();
         
-        // Send welcome message
+        var groupButton = new InlineKeyboardMarkup(new[]
+        {
+            new[]
+            {
+                InlineKeyboardButton.WithUrl("🏢 Join Ile Community", Config.LinkToGroup)
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("🔗 Get My Referral Link", "getreferral"),
+                InlineKeyboardButton.WithCallbackData("❓ How It Works", "help")
+            }
+        });
+
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
-            text: $"Welcome! You have been referred by a user.\n\n" +
-                  $"Join our group: {Config.LinkToGroup}\n\n" +
-                  $"Use /getRefLink to get your own referral link.",
+            text: $"🎉 *Welcome to Ile!* You've been referred by a community member.\n\n" +
+                  $"*Join our Telegram group* to:\n" +
+                  $"• Discuss property investment opportunities\n" +
+                  $"• Earn Ile Tokens for participation\n" +
+                  $"• Connect with like-minded investors\n\n" +
+                  $"After joining, you can get your own referral link to invite others and earn more tokens!",
+            parseMode: ParseMode.Markdown,
+            replyMarkup: groupButton,
             cancellationToken: cancellationToken);
         
         // Notify referrer
