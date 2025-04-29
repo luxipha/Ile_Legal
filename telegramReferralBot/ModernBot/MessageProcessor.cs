@@ -483,43 +483,54 @@ public static class MessageProcessor
     /// </summary>
     private static async Task SendReferralLinkAsync(long chatId, string userId, User user, CancellationToken cancellationToken)
     {
-        string result = Program.GetRefLink(user);
-        string referralLink;
-        
-        if (result.StartsWith("Exists?"))
+        try
         {
-            referralLink = result.Substring(7);
-        }
-        else
-        {
-            referralLink = result;
-        }
-        
-        // Create a share button
-        var shareButton = new InlineKeyboardMarkup(new[]
-        {
-            new[]
+            string result = Program.GetRefLink(user);
+            string referralLink;
+            
+            if (result.StartsWith("Exists?"))
             {
-                InlineKeyboardButton.WithSwitchInlineQueryCurrentChat("📲 Share with Friends", "Join Ile to earn tokens and invest in property! Use my referral link:")
-            },
-            new[]
-            {
-                InlineKeyboardButton.WithCallbackData("📊 View My Referrals", "viewreferrals"),
-                InlineKeyboardButton.WithCallbackData("🏆 View My Bricks", "viewpoints")
+                referralLink = result.Substring(7);
             }
-        });
-        
-        await Program.BotClient.SendTextMessageAsync(
-            chatId: chatId,
-            text: $"🔗 *Your Ile Referral Link*\n\n`{referralLink}`\n\n" +
-                  $"*Share this link to earn Bricks!*\n\n" +
-                  $"• You earn *1 Brick* for each new user who joins\n" +
-                  $"• Earn *additional Bricks* when your referrals are active\n" +
-                  $"• Compete on the leaderboard for special rewards\n\n" +
-                  $"Click the button below to share your link with friends!",
-            parseMode: ParseMode.Markdown,
-            replyMarkup: shareButton,
-            cancellationToken: cancellationToken);
+            else
+            {
+                referralLink = result;
+            }
+            
+            // Create a share button
+            var shareButton = new InlineKeyboardMarkup(new[]
+            {
+                new[]
+                {
+                    InlineKeyboardButton.WithSwitchInlineQueryCurrentChat("📲 Share with Friends", "Join Ile to earn tokens and invest in property! Use my referral link:")
+                },
+                new[]
+                {
+                    InlineKeyboardButton.WithCallbackData("📊 View My Referrals", "viewreferrals"),
+                    InlineKeyboardButton.WithCallbackData("🏆 View My Bricks", "viewpoints")
+                }
+            });
+            
+            await Program.BotClient.SendTextMessageAsync(
+                chatId: chatId,
+                text: $"🔗 *Your IleReferBot Referral Link*\n\n`{referralLink}`\n\n" +
+                      $"*Share this link to earn Bricks!*\n\n" +
+                      $"• You earn *{Config.ReferralReward} Bricks* for each new user who joins\n" +
+                      $"• Earn *additional Bricks* when your referrals are active\n" +
+                      $"• Compete on the leaderboard for special rewards\n\n" +
+                      $"Click the button below to share your link with friends!",
+                parseMode: ParseMode.Markdown,
+                replyMarkup: shareButton,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error sending referral link: {ex.Message}");
+            await Program.BotClient.SendTextMessageAsync(
+                chatId: chatId,
+                text: "Sorry, I couldn't generate your referral link right now. Please try again later.",
+                cancellationToken: cancellationToken);
+        }
     }
 
     /// <summary>
@@ -1229,73 +1240,6 @@ public static class MessageProcessor
             cancellationToken: cancellationToken);
     }
     
-    /// <summary>
-    /// Tests the Bricks system by simulating different point-earning activities
-    /// </summary>
-    private static async Task TestPointsSystemAsync(long chatId, CancellationToken cancellationToken)
-    {
-        string userId = chatId.ToString();
-        
-        // Test join group reward
-        if (!Program.JoinedReferrals.ContainsKey((int)chatId))
-        {
-            Program.JoinedReferrals.Add((int)chatId, DateTime.UtcNow.ToString("o"));
-        }
-        
-        // Test referral reward
-        string referralId = "test_referral_" + new Random().Next(1000, 9999);
-        if (!Program.ReferredBy.ContainsKey(referralId))
-        {
-            Program.ReferredBy.Add(referralId, userId);
-        }
-        
-        // Test group activity Bricks
-        string today = DateTime.UtcNow.ToString("MM/dd/yyyy");
-        if (!Program.UserActivity.ContainsKey(userId))
-        {
-            Program.UserActivity.Add(userId, new Dictionary<string, int>());
-        }
-        
-        if (!Program.UserActivity[userId].ContainsKey(today))
-        {
-            Program.UserActivity[userId].Add(today, 0);
-        }
-        
-        Program.UserActivity[userId][today] += 5;
-        
-        // Test adding Bricks to referrer
-        if (!Program.PointsByReferrer.ContainsKey(userId))
-        {
-            Program.PointsByReferrer.Add(userId, 0);
-        }
-        
-        Program.PointsByReferrer[userId] += Config.ReferralReward;
-        
-        // Sync with backend if configured
-        await ApiIntegration.SyncReferralsAsync();
-        
-        // Show test results
-        int totalPoints = 0;
-        if (Program.PointsByReferrer.ContainsKey(userId))
-        {
-            totalPoints += Program.PointsByReferrer[userId];
-        }
-        
-        string testResults = 
-            "🧪 *Bricks System Test Results* 🧪\n\n" +
-            $"Join Group: +{Config.JoinReward} Bricks\n" +
-            $"Referral: +{Config.ReferralReward} Bricks\n" +
-            $"Group Activity: +{Math.Min(Program.UserActivity[userId][today], Config.MaxPointsPerDay)} Bricks\n\n" +
-            $"Total Bricks in Bot: {totalPoints} Bricks\n\n" +
-            "Note: Bricks have been synced with the backend system if configured correctly.";
-        
-        await Program.BotClient.SendTextMessageAsync(
-            chatId: chatId,
-            text: testResults,
-            parseMode: ParseMode.Markdown,
-            cancellationToken: cancellationToken);
-    }
-
     /// <summary>
     /// Sends a list of all members with their Bricks
     /// </summary>
