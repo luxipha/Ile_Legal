@@ -20,8 +20,8 @@ RUN mkdir -p /app/data
 # Environment variables
 ENV BACKEND_URL=https://ile-backend.onrender.com
 
-# Copy config file from secrets
-CMD cp /etc/secrets/config.conf /app/config.conf && dotnet TelegramReferralBot.dll
-
-# Expose port for health check
+# Expose port for health check and webhook
 EXPOSE 5000
+
+# Copy config file from secrets and run the app
+CMD cp /etc/secrets/config.conf /app/config.conf && dotnet TelegramReferralBot.dll

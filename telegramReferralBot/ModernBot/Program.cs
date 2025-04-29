@@ -4,13 +4,17 @@ using System.Text;
 using System.Timers;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
-using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using File = System.IO.File;
 using Polly;
 using Polly.Extensions.Http;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace TelegramReferralBot;
 
@@ -46,154 +50,137 @@ public class Program
 
     public static async Task Main(string[] args)
     {
-        // Check if we should run tests
-        if (args.Length > 0 && args[0].ToLower() == "test")
-        {
-            await RunTests();
-            return;
-        }
-
         try
         {
+            Console.WriteLine("Starting bot...");
+            Logging.AddToLog("Bot starting...");
+            
             // Load configuration
-            LoadData.LoadConf();
+            Config.LoadConfig();
             
-            Console.WriteLine("Beginning load config.");
-            string path = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string path = Directory.GetCurrentDirectory();
             Console.WriteLine($"Found path: {path}");
-            
-            // Clear any existing webhook
-            await ClearWebhook();
             
             // Initialize bot client with maximum resilience to network issues
             var httpClientHandler = new HttpClientHandler
             {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-                AutomaticDecompression = System.Net.DecompressionMethods.All,
-                MaxConnectionsPerServer = 20
+                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
             };
             
-            // Create a super resilient HTTP client
             var httpClient = new HttpClient(new SuperRetryHandler(httpClientHandler))
             {
-                Timeout = TimeSpan.FromMinutes(2) // Increase timeout to 2 minutes
+                Timeout = TimeSpan.FromMinutes(2)
             };
             
-            // Create the bot client
             BotClient = new TelegramBotClient(Config.BotAccessToken, httpClient);
             
-            // Get bot info with retry
-            User me = null;
-            int retryCount = 0;
-            while (me == null && retryCount < 5)
-            {
-                try
-                {
-                    me = await BotClient.GetMeAsync();
-                }
-                catch (Exception ex)
-                {
-                    retryCount++;
-                    Console.WriteLine($"Failed to get bot info (attempt {retryCount}): {ex.Message}");
-                    Logging.AddToLog($"Failed to get bot info (attempt {retryCount}): {ex.Message}");
-                    await Task.Delay(retryCount * 1000);
-                }
-            }
+            // Get bot info to verify connection
+            var me = await BotClient.GetMeAsync();
+            Console.WriteLine($"Bot successfully connected to Telegram API.");
+            Logging.AddToLog($"Bot successfully connected to Telegram API. Username: {me.Username}");
+
+            // Start API sync timer
+            StartApiSyncTimer();
             
-            if (me == null)
-            {
-                throw new Exception("Could not connect to Telegram API after multiple attempts");
-            }
-            
-            Console.WriteLine($"I am user {me.Id} and my name is {me.FirstName}.");
-            Console.WriteLine("Bot successfully connected to Telegram API.");
-            
-            // Set up timer for hourly data backup
-            System.Timers.Timer timer = new(3600000); // 1 hour
-            timer.Elapsed += TimerElapsed;
-            timer.Enabled = true;
-            timer.Start();
-            
-            // Set up API sync timer (sync every 15 minutes)
-            _apiSyncTimer = new System.Timers.Timer(15 * 60 * 1000); // 15 minutes
-            _apiSyncTimer.Elapsed += async (sender, e) => await ApiIntegration.SyncReferralsAsync();
-            _apiSyncTimer.AutoReset = true;
-            _apiSyncTimer.Start();
-            
-            Console.WriteLine("API sync timer started. Will sync with backend every 15 minutes.");
-            
-            // Set up a watchdog timer to check if the bot is still receiving updates
-            System.Timers.Timer watchdogTimer = new(60000); // 1 minute
-            watchdogTimer.Elapsed += WatchdogTimer_Elapsed;
-            watchdogTimer.Enabled = true;
-            watchdogTimer.Start();
-            
-            // Start receiving updates
-            Console.WriteLine("Starting to receive messages...");
-            
-            // Create receiver options that ensure we don't get duplicate messages
-            var receiverOptions = new ReceiverOptions
-            {
-                AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
-                ThrowPendingUpdates = true, // This is critical - discard any pending updates to avoid duplicates
-                Limit = 100  // Process more updates at once
-            };
-            
-            // Start receiving updates
-            BotClient.StartReceiving(
-                updateHandler: HandleUpdateAsync,
-                pollingErrorHandler: HandlePollingErrorAsync,
-                receiverOptions: receiverOptions,
-                cancellationToken: _cts.Token
-            );
-            
-            Console.WriteLine("Bot is running. Press Ctrl+C to exit.");
-            // Keep the application running
-            await Task.Delay(Timeout.Infinite, _cts.Token);
+            // Start the web server for both webhook and health check
+            await StartWebServerAsync();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Startup error: {ex.Message}");
             Logging.AddToLog($"Startup error: {ex.Message}");
             
-            // Wait and retry
-            await Task.Delay(5000);
-            await Main(args);
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                Logging.AddToLog($"Inner exception: {ex.InnerException.Message}");
+            }
         }
+    }
+    
+    private static async Task StartWebServerAsync()
+    {
+        var host = Host.CreateDefaultBuilder()
+            .ConfigureWebHostDefaults(webBuilder =>
+            {
+                webBuilder.ConfigureServices(services =>
+                {
+                    services.AddControllers().AddNewtonsoftJson();
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    
+                    app.UseEndpoints(endpoints =>
+                    {
+                        // Health check endpoint
+                        endpoints.MapGet("/", async context =>
+                        {
+                            context.Response.ContentType = "text/plain";
+                            await context.Response.WriteAsync("Bot is running!");
+                        });
+                        
+                        // Webhook endpoint
+                        endpoints.MapPost("/bot", async context =>
+                        {
+                            using var reader = new StreamReader(context.Request.Body);
+                            var requestBody = await reader.ReadToEndAsync();
+                            
+                            try
+                            {
+                                var update = JsonConvert.DeserializeObject<Update>(requestBody);
+                                if (update != null)
+                                {
+                                    await HandleUpdateAsync(BotClient, update, CancellationToken.None);
+                                }
+                                await context.Response.WriteAsync("OK");
+                            }
+                            catch (Exception ex)
+                            {
+                                Logging.AddToLog($"Error processing webhook: {ex.Message}");
+                                context.Response.StatusCode = 500;
+                                await context.Response.WriteAsync("Error processing update");
+                            }
+                        });
+                    });
+                })
+                .UseUrls("http://0.0.0.0:5000");
+            })
+            .Build();
+
+        // Set webhook
+        string webhookUrl = Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL");
+        if (!string.IsNullOrEmpty(webhookUrl))
+        {
+            webhookUrl = webhookUrl.TrimEnd('/') + "/bot";
+            await BotClient.SetWebhookAsync(webhookUrl);
+            Console.WriteLine($"Webhook set to: {webhookUrl}");
+            Logging.AddToLog($"Webhook set to: {webhookUrl}");
+        }
+        else
+        {
+            Console.WriteLine("RENDER_EXTERNAL_URL not found. Webhook not set.");
+            Logging.AddToLog("RENDER_EXTERNAL_URL not found. Webhook not set.");
+        }
+
+        // Run the web server
+        await host.RunAsync();
     }
     
     /// <summary>
     /// Clears any existing webhook to avoid conflicts
     /// </summary>
-    private static async Task ClearWebhook()
+    private static async Task ClearWebhook(ITelegramBotClient botClient)
     {
         try
         {
-            // Create a retry policy for the webhook clearing
-            var retryPolicy = Policy
-                .Handle<HttpRequestException>()
-                .Or<TaskCanceledException>() // This handles timeouts
-                .Or<TimeoutException>()
-                .WaitAndRetryAsync(
-                    3, // Number of retries
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Exponential backoff
-                    onRetry: (ex, timeSpan, retryCount, context) =>
-                    {
-                        string message = $"Webhook clearing attempt {retryCount} failed with {ex.GetType().Name}: {ex.Message}. Retrying in {timeSpan.TotalSeconds} seconds...";
-                        Logging.AddToLog(message);
-                        Console.WriteLine(message);
-                    }
-                );
-            
-            // Use a temporary client with retry policy
-            var tempClient = new TelegramBotClient(Config.BotAccessToken);
-            await retryPolicy.ExecuteAsync(async () => await tempClient.DeleteWebhookAsync());
-            Console.WriteLine("Webhook cleared successfully.");
+            await botClient.DeleteWebhookAsync(dropPendingUpdates: true);
+            Logging.AddToLog("Webhook cleared successfully.");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error clearing webhook: {ex.Message}");
             Logging.AddToLog($"Error clearing webhook: {ex.Message}");
+            throw; // Rethrow to be handled by the calling method
         }
     }
     
@@ -414,62 +401,46 @@ public class Program
         var errorMessage = exception switch
         {
             ApiRequestException apiRequestException => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
-            HttpRequestException httpException => $"HTTP Request Error: {httpException.Message}\nThis may be due to network connectivity issues.",
-            TaskCanceledException => "Request timed out. This may be due to network connectivity issues.",
-            _ => $"Unhandled error: {exception.GetType().Name} - {exception.Message}"
+            _ => exception.ToString()
         };
 
-        Console.WriteLine(errorMessage);
-        Logging.AddToLog($"Bot polling error: {errorMessage}");
-        
-        // For specific errors that might be temporary, we can try to reconnect
-        if (exception is HttpRequestException || exception is TaskCanceledException || 
-            (exception is ApiRequestException apiEx && (apiEx.ErrorCode == 409 || apiEx.ErrorCode == 429 || apiEx.ErrorCode >= 500)))
+        Logging.AddToLog(errorMessage);
+
+        // Handle specific error codes
+        if (exception is ApiRequestException apiEx && apiEx.ErrorCode == 409)
         {
-            // Calculate retry delay with exponential backoff
+            Logging.AddToLog("Conflict detected. Waiting longer to allow other instances to time out...");
+            await Task.Delay(60000, cancellationToken); // Wait a full minute
+            await ClearWebhook(botClient);
+            Logging.AddToLog("Attempting to restart receiving updates after conflict...");
+            return;
+        }
+
+        if (exception is HttpRequestException || exception is TaskCanceledException ||
+            (exception is ApiRequestException apiEx2 && (apiEx2.ErrorCode == 429 || apiEx2.ErrorCode >= 500)))
+        {
             int retryCount = _networkErrorRetryCount++;
             int delaySeconds = Math.Min(30, (int)Math.Pow(2, Math.Min(retryCount, 5)));
             
-            Console.WriteLine($"Connection issue detected. Waiting {delaySeconds} seconds before attempting to reconnect... (Attempt {retryCount + 1})");
-            Logging.AddToLog($"Connection issue detected. Waiting {delaySeconds} seconds before attempting to reconnect... (Attempt {retryCount + 1})");
+            Logging.AddToLog($"Connection issue detected. Waiting {delaySeconds} seconds before attempting to reconnect... (Attempt {retryCount})");
+            
+            await Task.Delay(delaySeconds * 1000, cancellationToken);
             
             try
             {
-                // Wait before trying to reconnect
-                await Task.Delay(delaySeconds * 1000, cancellationToken);
-                
-                if (!cancellationToken.IsCancellationRequested)
-                {
-                    // Clear any webhooks that might be interfering
-                    await ClearWebhook();
-                    
-                    Console.WriteLine("Attempting to restart receiving updates...");
-                    
-                    // Set up message handling with more conservative settings
-                    var receiverOptions = new ReceiverOptions
-                    {
-                        AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
-                        ThrowPendingUpdates = true,
-                        Limit = 50,
-                    };
-                    
-                    // Restart receiving
-                    botClient.StartReceiving(
-                        updateHandler: HandleUpdateAsync,
-                        pollingErrorHandler: HandlePollingErrorAsync,
-                        receiverOptions: receiverOptions,
-                        cancellationToken: cancellationToken
-                    );
-                    
-                    Console.WriteLine("Bot reconnected and is receiving updates again.");
-                    _networkErrorRetryCount = 0; // Reset the counter on successful reconnection
-                }
+                await ClearWebhook(botClient);
+                Logging.AddToLog("Webhook cleared successfully.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error during reconnection attempt: {ex.Message}");
-                Logging.AddToLog($"Error during reconnection attempt: {ex.Message}");
+                Logging.AddToLog($"Error clearing webhook: {ex.Message}");
             }
+            
+            Logging.AddToLog("Attempting to restart receiving updates...");
+        }
+        else
+        {
+            Logging.AddToLog($"Unhandled error: {errorMessage}");
         }
     }
     
@@ -855,5 +826,15 @@ public class Program
             Console.WriteLine($"Error in watchdog timer: {ex.Message}");
             Logging.AddToLog($"Error in watchdog timer: {ex.Message}");
         }
+    }
+    
+    private static void StartApiSyncTimer()
+    {
+        _apiSyncTimer = new System.Timers.Timer(15 * 60 * 1000); // 15 minutes
+        _apiSyncTimer.Elapsed += async (sender, e) => await ApiIntegration.SyncReferralsAsync();
+        _apiSyncTimer.AutoReset = true;
+        _apiSyncTimer.Start();
+        
+        Console.WriteLine("API sync timer started. Will sync with backend every 15 minutes.");
     }
 }
