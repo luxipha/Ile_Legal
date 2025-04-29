@@ -1,5 +1,5 @@
-using System.Globalization;
-using System.Security.Cryptography;
+using System;
+using System.Net;
 using System.Text;
 using System.Timers;
 using Telegram.Bot;
@@ -8,21 +8,27 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
-using File = System.IO.File;
+using System.Security.Cryptography;
 using Polly;
 using Polly.Extensions.Http;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Host;
+using System.Globalization;
+using File = System.IO.File;
 
 namespace TelegramReferralBot;
 
-public class Program
+class Program
 {
-    // Bot client
-    public static ITelegramBotClient BotClient = null!;
+    // Static variables
+    public static TelegramBotClient BotClient = null!;
+    private static readonly CancellationTokenSource _cts = new();
+    private static System.Timers.Timer _apiSyncTimer = null!;
+    private static readonly List<string> _awaitingReply = new();
+    private static int _networkErrorRetryCount = 0;
+    private static readonly HashSet<int> _recentlyProcessedMessageIds = new HashSet<int>();
+    private static readonly object _messageIdsLock = new object();
+    private static DateTime _lastUpdateTime = DateTime.MinValue;
+    private static HttpListener _listener = null!;
+    private static readonly char[] _chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".ToCharArray();
     
     // Data dictionaries
     public static Dictionary<string, bool> ShowWelcome { get; set; } = new();
@@ -38,17 +44,6 @@ public class Program
     public static Dictionary<int, Dictionary<string, string>> InteractedUser { get; set; } = new();
     public static List<string> CampaignDays { get; set; } = new();
     public static List<string> DisableNotice { get; set; } = new();
-    
-    // Other fields
-    private static User _bot = null!;
-    private static readonly List<string> _awaitingReply = new();
-    private static readonly CancellationTokenSource _cts = new();
-    private static readonly char[] _chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".ToCharArray();
-    private static System.Timers.Timer? _apiSyncTimer;
-    private static int _networkErrorRetryCount = 0;
-    private static readonly HashSet<int> _recentlyProcessedMessageIds = new HashSet<int>();
-    private static readonly object _messageIdsLock = new object();
-    private static DateTime _lastUpdateTime = DateTime.MinValue;
 
     public static async Task Main(string[] args)
     {
@@ -84,8 +79,29 @@ public class Program
             // Start API sync timer
             StartApiSyncTimer();
             
-            // Start the web server for both webhook and health check
-            await StartWebServerAsync();
+            // Start the health check server
+            await StartHealthCheckServer();
+            
+            // Set up polling with retry logic
+            var receiverOptions = new ReceiverOptions
+            {
+                AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
+                ThrowPendingUpdates = true,
+                Limit = 100
+            };
+            
+            // Start receiving updates
+            BotClient.StartReceiving(
+                updateHandler: HandleUpdateAsync,
+                pollingErrorHandler: HandlePollingErrorAsync,
+                receiverOptions: receiverOptions,
+                cancellationToken: _cts.Token
+            );
+            
+            Console.WriteLine("Bot is running. Press Ctrl+C to exit.");
+            
+            // Keep the application running
+            await Task.Delay(Timeout.Infinite, _cts.Token);
         }
         catch (Exception ex)
         {
@@ -100,73 +116,48 @@ public class Program
         }
     }
     
-    private static async Task StartWebServerAsync()
+    private static async Task StartHealthCheckServer()
     {
-        var host = Host.CreateDefaultBuilder()
-            .ConfigureWebHostDefaults(webBuilder =>
+        try
+        {
+            _listener = new HttpListener();
+            _listener.Prefixes.Add("http://*:5000/");
+            _listener.Start();
+            
+            Console.WriteLine("Health check server started on port 5000");
+            Logging.AddToLog("Health check server started on port 5000");
+            
+            // Handle requests in a background task
+            _ = Task.Run(async () =>
             {
-                webBuilder.ConfigureServices(services =>
+                while (_listener.IsListening)
                 {
-                    services.AddControllers().AddNewtonsoftJson();
-                })
-                .Configure(app =>
-                {
-                    app.UseRouting();
-                    
-                    app.UseEndpoints(endpoints =>
+                    try
                     {
-                        // Health check endpoint
-                        endpoints.MapGet("/", async context =>
-                        {
-                            context.Response.ContentType = "text/plain";
-                            await context.Response.WriteAsync("Bot is running!");
-                        });
+                        var context = await _listener.GetContextAsync();
+                        var response = context.Response;
                         
-                        // Webhook endpoint
-                        endpoints.MapPost("/bot", async context =>
-                        {
-                            using var reader = new StreamReader(context.Request.Body);
-                            var requestBody = await reader.ReadToEndAsync();
-                            
-                            try
-                            {
-                                var update = JsonConvert.DeserializeObject<Update>(requestBody);
-                                if (update != null)
-                                {
-                                    await HandleUpdateAsync(BotClient, update, CancellationToken.None);
-                                }
-                                await context.Response.WriteAsync("OK");
-                            }
-                            catch (Exception ex)
-                            {
-                                Logging.AddToLog($"Error processing webhook: {ex.Message}");
-                                context.Response.StatusCode = 500;
-                                await context.Response.WriteAsync("Error processing update");
-                            }
-                        });
-                    });
-                })
-                .UseUrls("http://0.0.0.0:5000");
-            })
-            .Build();
-
-        // Set webhook
-        string webhookUrl = Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL");
-        if (!string.IsNullOrEmpty(webhookUrl))
-        {
-            webhookUrl = webhookUrl.TrimEnd('/') + "/bot";
-            await BotClient.SetWebhookAsync(webhookUrl);
-            Console.WriteLine($"Webhook set to: {webhookUrl}");
-            Logging.AddToLog($"Webhook set to: {webhookUrl}");
+                        string responseString = "Bot is running!";
+                        byte[] buffer = Encoding.UTF8.GetBytes(responseString);
+                        
+                        response.ContentLength64 = buffer.Length;
+                        response.ContentType = "text/plain";
+                        var output = response.OutputStream;
+                        await output.WriteAsync(buffer, 0, buffer.Length);
+                        output.Close();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logging.AddToLog($"Error handling health check request: {ex.Message}");
+                    }
+                }
+            });
         }
-        else
+        catch (Exception ex)
         {
-            Console.WriteLine("RENDER_EXTERNAL_URL not found. Webhook not set.");
-            Logging.AddToLog("RENDER_EXTERNAL_URL not found. Webhook not set.");
+            Console.WriteLine($"Error starting health check server: {ex.Message}");
+            Logging.AddToLog($"Error starting health check server: {ex.Message}");
         }
-
-        // Run the web server
-        await host.RunAsync();
     }
     
     /// <summary>
@@ -187,188 +178,36 @@ public class Program
     }
     
     /// <summary>
-    /// Run the test suite
-    /// </summary>
-    private static async Task RunTests()
-    {
-        await TestRunner.RunTests();
-    }
-    
-    /// <summary>
-    /// Handles timer elapsed event for data backup
-    /// </summary>
-    private static void TimerElapsed(object? sender, ElapsedEventArgs e)
-    {
-        string now = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-        string filename = "Datafile-" + now + ".txt";
-        string folder = Path.Combine(Config.OutputFilePath, "Logs");
-        string file = Path.Combine(folder, filename);
-        
-        // Create logs directory if it doesn't exist
-        if (!Directory.Exists(folder))
-        {
-            Directory.CreateDirectory(folder);
-        }
-        
-        // Dump current data into log
-        try
-        {
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("userActivity=");
-                string data = "";
-                foreach (var entry in UserActivity)
-                {
-                    data = entry.Key;
-                    foreach (var line in entry.Value)
-                    {
-                        data += "?" + line.Key + "&" + line.Value.ToString();
-                    }
-                    sw.WriteLine(data);
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("refLinks=");
-                foreach (var entry in RefLinks)
-                {
-                    sw.WriteLine(entry.Key + "?" + entry.Value);
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("passwordAttempts=");
-                foreach (var entry in PasswordAttempts)
-                {
-                    sw.WriteLine(entry.Key + "?" + entry.Value.ToString());
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("showWelcome=");
-                foreach (var entry in ShowWelcome)
-                {
-                    sw.WriteLine(entry.Key + "?" + entry.Value);
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("referredBy=");
-                foreach (var entry in ReferredBy)
-                {
-                    sw.WriteLine(entry.Key + "?" + entry.Value);
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("groupChatIdNumber=");
-                sw.WriteLine(Config.GroupChatIdNumber.ToString());
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("pointsByReferrer=");
-                foreach (var entry in PointsByReferrer)
-                {
-                    sw.WriteLine(entry.Key + "?" + entry.Value.ToString());
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("userPointOffset=");
-                foreach (var entry in UserPointOffset)
-                {
-                    sw.WriteLine(entry.Key + "?" + entry.Value.ToString());
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("joinedReferrals=");
-                foreach (var entry in JoinedReferrals)
-                {
-                    sw.WriteLine(entry.Key.ToString() + "?" + entry.Value);
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("referralPoints=");
-                foreach (var entry in ReferralPoints)
-                {
-                    sw.WriteLine(entry.Key + "?" + entry.Value.ToString());
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("interactedUser=");
-                foreach (var entry in InteractedUser)
-                {
-                    string result = entry.Key.ToString() + "?????";
-                    foreach (var value in entry.Value)
-                    {
-                        result += "&&&&&" + value.Key + "#####" + value.Value;
-                    }
-                    sw.WriteLine(result);
-                }
-            }
-
-            using (StreamWriter sw = File.AppendText(file))
-            {
-                sw.WriteLine("disableNotice=");
-                string data = "";
-                foreach (string entry in DisableNotice)
-                {
-                    data += entry + "?";
-                }
-                sw.WriteLine(data);
-            }
-        }
-        catch (Exception ex)
-        {
-            string text = $"Error in timer_Elapsed: {ex.Message}";
-            Logging.AddToLog(text);
-            Console.WriteLine(text);
-        }
-    }
-    
-    /// <summary>
     /// Handles incoming updates from Telegram
     /// </summary>
     private static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
         try
         {
-            // Only process Message updates
-            if (update.Message is not { } message)
+            // Extract the message from the update
+            Message? message = update.Message;
+            
+            if (update.Type == UpdateType.CallbackQuery)
+            {
+                await MessageProcessor.ProcessCallbackQueryAsync(update.CallbackQuery, cancellationToken);
+                return;
+            }
+            
+            if (message == null)
                 return;
             
-            // Only process text messages
-            if (message.Text is not { } messageText)
-                return;
-            
-            // Check if we've already processed this message (deduplication)
+            // Deduplicate messages by ID to prevent processing the same message multiple times
             bool isDuplicate = false;
             lock (_messageIdsLock)
             {
                 if (_recentlyProcessedMessageIds.Contains(message.MessageId))
                 {
                     isDuplicate = true;
-                    Logging.AddToLog($"Skipping duplicate message ID: {message.MessageId}, text: '{messageText}'");
+                    Logging.AddToLog($"Skipping duplicate message ID: {message.MessageId}");
                 }
                 else
                 {
-                    // Add to recently processed messages
                     _recentlyProcessedMessageIds.Add(message.MessageId);
-                    
-                    // If we have too many message IDs, remove the oldest ones
                     if (_recentlyProcessedMessageIds.Count > 1000)
                     {
                         _recentlyProcessedMessageIds.Clear();
@@ -377,12 +216,8 @@ public class Program
                 }
             }
             
-            // Skip processing if it's a duplicate
             if (isDuplicate)
                 return;
-                
-            var chatId = message.Chat.Id;
-            var userId = message.From?.Id.ToString() ?? "unknown";
             
             // Process the message
             await ProcessMessageAsync(message, cancellationToken);
@@ -390,14 +225,42 @@ public class Program
         }
         catch (Exception ex)
         {
-            string text = $"Error in HandleUpdateAsync: {ex.Message}";
-            Logging.AddToLog(text);
-            Console.WriteLine(text);
+            Console.WriteLine($"Error handling update: {ex.Message}");
+            Logging.AddToLog($"Error handling update: {ex.Message}");
         }
     }
     
     /// <summary>
-    /// Handles polling errors
+    /// Processes a message from Telegram
+    /// </summary>
+    private static async Task ProcessMessageAsync(Message message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (message.From == null)
+                return;
+            
+            string? messageText = message.Text;
+            if (string.IsNullOrEmpty(messageText))
+                return;
+            
+            // Log the message
+            string userId = message.From.Id.ToString();
+            string username = message.From.Username ?? "Unknown";
+            Logging.AddToLog($"Message from {username} ({userId}): {messageText}");
+            
+            // Process the message with the message processor
+            await MessageProcessor.ProcessMessageAsync(message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing message: {ex.Message}");
+            Logging.AddToLog($"Error processing message: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Handles errors that occur during polling
     /// </summary>
     private static async Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
     {
@@ -445,14 +308,6 @@ public class Program
         {
             Logging.AddToLog($"Unhandled error: {errorMessage}");
         }
-    }
-    
-    /// <summary>
-    /// Process incoming messages
-    /// </summary>
-    private static async Task ProcessMessageAsync(Message message, CancellationToken cancellationToken)
-    {
-        await MessageProcessor.ProcessMessageAsync(message, cancellationToken);
     }
     
     /// <summary>

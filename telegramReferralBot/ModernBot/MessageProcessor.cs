@@ -43,6 +43,142 @@ public static class MessageProcessor
     }
 
     /// <summary>
+    /// Processes callback queries from inline keyboards
+    /// </summary>
+    public static async Task ProcessCallbackQueryAsync(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (callbackQuery?.Data == null)
+                return;
+
+            var chatId = callbackQuery.Message?.Chat.Id;
+            var userId = callbackQuery.From.Id.ToString();
+            
+            Logging.AddToLog($"Callback query from {userId}: {callbackQuery.Data}");
+            
+            // Answer the callback query to remove the loading indicator
+            await Program.BotClient.AnswerCallbackQueryAsync(
+                callbackQuery.Id,
+                cancellationToken: cancellationToken);
+            
+            // Process different callback data
+            if (callbackQuery.Data.StartsWith("viewpoints"))
+            {
+                await HandleViewPointsCallback(callbackQuery, cancellationToken);
+            }
+            else if (callbackQuery.Data.StartsWith("viewreferrals"))
+            {
+                await HandleViewReferralsCallback(callbackQuery, cancellationToken);
+            }
+            else if (callbackQuery.Data.StartsWith("help"))
+            {
+                await HandleHelpCallback(callbackQuery, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            string text = $"Error in ProcessCallbackQueryAsync: {ex.Message}";
+            Logging.AddToLog(text);
+            Console.WriteLine(text);
+        }
+    }
+    
+    /// <summary>
+    /// Handles the viewpoints callback
+    /// </summary>
+    private static async Task HandleViewPointsCallback(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chatId = callbackQuery.Message?.Chat.Id;
+            var userId = callbackQuery.From.Id.ToString();
+            
+            if (chatId == null)
+                return;
+            
+            // Get points from backend
+            var points = await ApiIntegration.GetUserPointsAsync(userId);
+            
+            string message = $"You have {points} points.";
+            
+            await Program.BotClient.SendTextMessageAsync(
+                chatId: chatId.Value,
+                text: message,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error in HandleViewPointsCallback: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Handles the viewreferrals callback
+    /// </summary>
+    private static async Task HandleViewReferralsCallback(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chatId = callbackQuery.Message?.Chat.Id;
+            var userId = callbackQuery.From.Id.ToString();
+            
+            if (chatId == null)
+                return;
+            
+            // Get referral count
+            int referralCount = 0;
+            foreach (var entry in Program.ReferredBy)
+            {
+                if (entry.Value == userId)
+                {
+                    referralCount++;
+                }
+            }
+            
+            string message = $"You have referred {referralCount} users.";
+            
+            await Program.BotClient.SendTextMessageAsync(
+                chatId: chatId.Value,
+                text: message,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error in HandleViewReferralsCallback: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Handles the help callback
+    /// </summary>
+    private static async Task HandleHelpCallback(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chatId = callbackQuery.Message?.Chat.Id;
+            
+            if (chatId == null)
+                return;
+            
+            string message = "Available commands:\n" +
+                             "/start - Start the bot\n" +
+                             "/help - Show this help message\n" +
+                             "/referral - Get your referral link\n" +
+                             "/points - Check your points";
+            
+            await Program.BotClient.SendTextMessageAsync(
+                chatId: chatId.Value,
+                text: message,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error in HandleHelpCallback: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Handles messages in private chats
     /// </summary>
     private static async Task HandlePrivateMessageAsync(Message message, CancellationToken cancellationToken)

@@ -1,7 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /app
 
-# Copy csproj and restore as distinct layers
+# Copy csproj and restore dependencies
 COPY *.csproj ./
 RUN dotnet restore
 
@@ -14,14 +14,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 COPY --from=build /app/out .
 
-# Create directory for data files
-RUN mkdir -p /app/data
-
-# Environment variables
-ENV BACKEND_URL=https://ile-backend.onrender.com
-
-# Expose port for health check and webhook
+# Expose port for health check
 EXPOSE 5000
 
-# Copy config file from secrets and run the app
+# Copy config file from Render secret
 CMD cp /etc/secrets/config.conf /app/config.conf && dotnet TelegramReferralBot.dll
