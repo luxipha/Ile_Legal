@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ilerefer-bot
+    env: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /
+    envVars:
+      - key: BACKEND_URL
+        value: https://ile-backend.onrender.com
+    secrets:
+      - name: config
+        mountPath: /app/config.conf
+    buildCommand: dotnet publish -c Release -o out
+    startCommand: dotnet out/TelegramReferralBot.dll

@@ -40,6 +40,9 @@ public class Program
     private static readonly CancellationTokenSource _cts = new();
     private static readonly char[] _chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".ToCharArray();
     private static System.Timers.Timer? _apiSyncTimer;
+    private static int _networkErrorRetryCount = 0;
+    private static readonly HashSet<int> _recentlyProcessedMessageIds = new HashSet<int>();
+    private static readonly object _messageIdsLock = new object();
 
     public static async Task Main(string[] args)
     {
@@ -49,43 +52,60 @@ public class Program
             await RunTests();
             return;
         }
-        
+
         try
         {
             // Load configuration
             LoadData.LoadConf();
             
-            // Make sure there are no active webhooks
+            Console.WriteLine("Beginning load config.");
+            string path = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            Console.WriteLine($"Found path: {path}");
+            
+            // Clear any existing webhook
             await ClearWebhook();
             
-            // Initialize bot client with retry handler
-            var httpClient = new HttpClient()
+            // Initialize bot client with maximum resilience to network issues
+            var httpClientHandler = new HttpClientHandler
             {
-                Timeout = TimeSpan.FromSeconds(30) // Increase timeout to 30 seconds
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+                MaxConnectionsPerServer = 20
             };
             
-            // Create a retry policy for the Telegram Bot client
-            var retryPolicy = Policy
-                .Handle<HttpRequestException>()
-                .Or<TaskCanceledException>() // This handles timeouts
-                .Or<TimeoutException>()
-                .WaitAndRetryAsync(
-                    5, // Number of retries
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Exponential backoff
-                    onRetry: (exception, timeSpan, retryCount, context) =>
-                    {
-                        string message = $"Request attempt {retryCount} failed with {exception.GetType().Name}: {exception.Message}. Retrying in {timeSpan.TotalSeconds} seconds...";
-                        Logging.AddToLog(message);
-                        Console.WriteLine(message);
-                    }
-                );
+            // Create a super resilient HTTP client
+            var httpClient = new HttpClient(new SuperRetryHandler(httpClientHandler))
+            {
+                Timeout = TimeSpan.FromMinutes(2) // Increase timeout to 2 minutes
+            };
             
-            // Create the bot client with the HTTP client
+            // Create the bot client
             BotClient = new TelegramBotClient(Config.BotAccessToken, httpClient);
             
-            // Get bot info
-            _bot = await retryPolicy.ExecuteAsync(async () => await BotClient.GetMeAsync());
-            Console.WriteLine($"I am user {_bot.Id} and my name is {_bot.FirstName}.");
+            // Get bot info with retry
+            User me = null;
+            int retryCount = 0;
+            while (me == null && retryCount < 5)
+            {
+                try
+                {
+                    me = await BotClient.GetMeAsync();
+                }
+                catch (Exception ex)
+                {
+                    retryCount++;
+                    Console.WriteLine($"Failed to get bot info (attempt {retryCount}): {ex.Message}");
+                    Logging.AddToLog($"Failed to get bot info (attempt {retryCount}): {ex.Message}");
+                    await Task.Delay(retryCount * 1000);
+                }
+            }
+            
+            if (me == null)
+            {
+                throw new Exception("Could not connect to Telegram API after multiple attempts");
+            }
+            
+            Console.WriteLine($"I am user {me.Id} and my name is {me.FirstName}.");
             Console.WriteLine("Bot successfully connected to Telegram API.");
             
             // Set up timer for hourly data backup
@@ -99,19 +119,27 @@ public class Program
             _apiSyncTimer.Elapsed += async (sender, e) => await ApiIntegration.SyncReferralsAsync();
             _apiSyncTimer.AutoReset = true;
             _apiSyncTimer.Start();
-
+            
             Console.WriteLine("API sync timer started. Will sync with backend every 15 minutes.");
             
-            // Set up message handling with more conservative settings
+            // Set up a watchdog timer to check if the bot is still receiving updates
+            System.Timers.Timer watchdogTimer = new(60000); // 1 minute
+            watchdogTimer.Elapsed += WatchdogTimer_Elapsed;
+            watchdogTimer.Enabled = true;
+            watchdogTimer.Start();
+            
+            // Start receiving updates
+            Console.WriteLine("Starting to receive messages...");
+            
+            // Create receiver options that ensure we don't get duplicate messages
             var receiverOptions = new ReceiverOptions
             {
                 AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
-                ThrowPendingUpdates = true,
-                Limit = 100,
+                ThrowPendingUpdates = true, // This is critical - discard any pending updates to avoid duplicates
+                Limit = 100  // Process more updates at once
             };
             
-            Console.WriteLine("Starting to receive messages...");
-            // Start receiving messages
+            // Start receiving updates
             BotClient.StartReceiving(
                 updateHandler: HandleUpdateAsync,
                 pollingErrorHandler: HandlePollingErrorAsync,
@@ -125,8 +153,12 @@ public class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Critical error in Main: {ex.Message}");
-            Console.WriteLine(ex.StackTrace);
+            Console.WriteLine($"Startup error: {ex.Message}");
+            Logging.AddToLog($"Startup error: {ex.Message}");
+            
+            // Wait and retry
+            await Task.Delay(5000);
+            await Main(args);
         }
     }
     
@@ -145,9 +177,9 @@ public class Program
                 .WaitAndRetryAsync(
                     3, // Number of retries
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Exponential backoff
-                    onRetry: (exception, timeSpan, retryCount, context) =>
+                    onRetry: (ex, timeSpan, retryCount, context) =>
                     {
-                        string message = $"Webhook clearing attempt {retryCount} failed with {exception.GetType().Name}: {exception.Message}. Retrying in {timeSpan.TotalSeconds} seconds...";
+                        string message = $"Webhook clearing attempt {retryCount} failed with {ex.GetType().Name}: {ex.Message}. Retrying in {timeSpan.TotalSeconds} seconds...";
                         Logging.AddToLog(message);
                         Console.WriteLine(message);
                     }
@@ -333,10 +365,35 @@ public class Program
             if (message.Text is not { } messageText)
                 return;
             
+            // Check if we've already processed this message (deduplication)
+            bool isDuplicate = false;
+            lock (_messageIdsLock)
+            {
+                if (_recentlyProcessedMessageIds.Contains(message.MessageId))
+                {
+                    isDuplicate = true;
+                    Logging.AddToLog($"Skipping duplicate message ID: {message.MessageId}, text: '{messageText}'");
+                }
+                else
+                {
+                    // Add to recently processed messages
+                    _recentlyProcessedMessageIds.Add(message.MessageId);
+                    
+                    // If we have too many message IDs, remove the oldest ones
+                    if (_recentlyProcessedMessageIds.Count > 1000)
+                    {
+                        _recentlyProcessedMessageIds.Clear();
+                        Logging.AddToLog("Cleared message ID cache (exceeded limit)");
+                    }
+                }
+            }
+            
+            // Skip processing if it's a duplicate
+            if (isDuplicate)
+                return;
+                
             var chatId = message.Chat.Id;
             var userId = message.From?.Id.ToString() ?? "unknown";
-            
-            Console.WriteLine($"Received a '{messageText}' message in chat {chatId} from user {userId}.");
             
             // Process the message
             await ProcessMessageAsync(message, cancellationToken);
@@ -363,17 +420,23 @@ public class Program
         };
 
         Console.WriteLine(errorMessage);
+        Logging.AddToLog($"Bot polling error: {errorMessage}");
         
         // For specific errors that might be temporary, we can try to reconnect
         if (exception is HttpRequestException || exception is TaskCanceledException || 
-            (exception is ApiRequestException apiEx && (apiEx.ErrorCode == 409 || apiEx.ErrorCode == 429)))
+            (exception is ApiRequestException apiEx && (apiEx.ErrorCode == 409 || apiEx.ErrorCode == 429 || apiEx.ErrorCode >= 500)))
         {
-            Console.WriteLine("Connection issue detected. Waiting 5 seconds before attempting to reconnect...");
+            // Calculate retry delay with exponential backoff
+            int retryCount = _networkErrorRetryCount++;
+            int delaySeconds = Math.Min(30, (int)Math.Pow(2, Math.Min(retryCount, 5)));
+            
+            Console.WriteLine($"Connection issue detected. Waiting {delaySeconds} seconds before attempting to reconnect... (Attempt {retryCount + 1})");
+            Logging.AddToLog($"Connection issue detected. Waiting {delaySeconds} seconds before attempting to reconnect... (Attempt {retryCount + 1})");
             
             try
             {
-                // Wait a bit before reconnecting
-                await Task.Delay(5000, cancellationToken);
+                // Wait before trying to reconnect
+                await Task.Delay(delaySeconds * 1000, cancellationToken);
                 
                 if (!cancellationToken.IsCancellationRequested)
                 {
@@ -399,11 +462,13 @@ public class Program
                     );
                     
                     Console.WriteLine("Bot reconnected and is receiving updates again.");
+                    _networkErrorRetryCount = 0; // Reset the counter on successful reconnection
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to reconnect: {ex.Message}");
+                Console.WriteLine($"Error during reconnection attempt: {ex.Message}");
+                Logging.AddToLog($"Error during reconnection attempt: {ex.Message}");
             }
         }
     }
@@ -720,4 +785,75 @@ public class Program
     /// List of users awaiting a reply (for password verification)
     /// </summary>
     public static List<string> AwaitingReply => _awaitingReply;
+    
+    private static async void WatchdogTimer_Elapsed(object? sender, ElapsedEventArgs e)
+    {
+        try
+        {
+            // Check if the bot is still connected to Telegram
+            bool isConnected = false;
+            try
+            {
+                var me = await BotClient.GetMeAsync();
+                isConnected = me != null;
+            }
+            catch
+            {
+                isConnected = false;
+            }
+            
+            if (!isConnected)
+            {
+                Console.WriteLine("Watchdog detected bot disconnection. Attempting to reconnect...");
+                Logging.AddToLog("Watchdog detected bot disconnection. Attempting to reconnect...");
+                
+                try
+                {
+                    // Recreate the HTTP client
+                    var httpClientHandler = new HttpClientHandler
+                    {
+                        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+                        AutomaticDecompression = System.Net.DecompressionMethods.All,
+                        MaxConnectionsPerServer = 20
+                    };
+                    
+                    var httpClient = new HttpClient(new SuperRetryHandler(httpClientHandler))
+                    {
+                        Timeout = TimeSpan.FromMinutes(2)
+                    };
+                    
+                    // Create a new bot client
+                    BotClient = new TelegramBotClient(Config.BotAccessToken, httpClient);
+                    
+                    // Restart receiving updates
+                    var receiverOptions = new ReceiverOptions
+                    {
+                        AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
+                        ThrowPendingUpdates = true,
+                        Limit = 100
+                    };
+                    
+                    BotClient.StartReceiving(
+                        updateHandler: HandleUpdateAsync,
+                        pollingErrorHandler: HandlePollingErrorAsync,
+                        receiverOptions: receiverOptions,
+                        cancellationToken: _cts.Token
+                    );
+                    
+                    Console.WriteLine("Watchdog successfully reconnected the bot.");
+                    Logging.AddToLog("Watchdog successfully reconnected the bot.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Watchdog failed to reconnect: {ex.Message}");
+                    Logging.AddToLog($"Watchdog failed to reconnect: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in watchdog timer: {ex.Message}");
+            Logging.AddToLog($"Error in watchdog timer: {ex.Message}");
+        }
+    }
 }

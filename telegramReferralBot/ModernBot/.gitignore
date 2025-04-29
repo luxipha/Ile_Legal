@@ -63,3 +63,6 @@ artifacts/
 
 # Output data files
 Output/
+
+# Configuration files
+config.conf
