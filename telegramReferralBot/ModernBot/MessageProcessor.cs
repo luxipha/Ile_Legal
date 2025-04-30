@@ -191,15 +191,22 @@ public static class MessageProcessor
             if (chatId == null)
                 return;
             
-            string message = "Available commands:\n" +
-                             "/start - Start the bot\n" +
-                             "/help - Show this help message\n" +
-                             "/referral - Get your referral link\n" +
-                             "/points - Check your points";
+            string helpMessage = "Available commands:\n\n" +
+                             "/disableNotice - (Private Chat Only) Turn off private bot notices.\n" +
+                             "/enableNotice - (Private Chat Only) Turn on private bot notices.\n" +
+                             "/getRefLink - (Private Chat Only) Generates your referral code for the program.\n" +
+                             "/help - Sends a list of available commands.\n" +
+                             "/journey - View the Ilé Bricks Journey Map with rewards.\n" +
+                             "/listAll - (Private Chat Only) Full list of all members with Bricks.\n" +
+                             "/listRef - (Private Chat Only) Full list of all members referral count.\n" +
+                             "/myID - Gets your Telegram user ID.\n" +
+                             "/myPoints - Gets your current Bricks total.\n" +
+                             "/refTotal - Displays a list of total referred members per day.\n" +
+                             "/top10 - Displays the names and Bricks of the top 10 ranks in the referral program.";
             
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId.Value,
-                text: message,
+                text: helpMessage,
                 cancellationToken: cancellationToken);
         }
         catch (Exception ex)
@@ -309,7 +316,7 @@ public static class MessageProcessor
             {
                 await SendReferralLinkAsync(chatId, userId, message.From!, cancellationToken);
             }
-            else if (messageText == "/myPoints" || messageText == "/points")
+            else if (messageText == "/myPoints")
             {
                 await SendPointsInfoAsync(chatId, userId, cancellationToken);
             }
@@ -345,11 +352,11 @@ public static class MessageProcessor
             {
                 await EnableNoticeAsync(chatId, userId, cancellationToken);
             }
-            else if (messageText == "/listAll" && IsAdmin(userId))
+            else if (messageText == "/listAll")
             {
                 await SendAllMembersListAsync(chatId, cancellationToken);
             }
-            else if (messageText == "/listRef" && IsAdmin(userId))
+            else if (messageText == "/listRef")
             {
                 await SendReferralCountListAsync(chatId, cancellationToken);
             }
@@ -405,7 +412,7 @@ public static class MessageProcessor
             {
                 await SendRefTotalAsync(chatId, cancellationToken);
             }
-            else if (messageText == "/points" || messageText == "/myPoints")
+            else if (messageText == "/myPoints")
             {
                 await SendPointsInfoAsync(chatId, userId, cancellationToken);
             }
@@ -462,8 +469,7 @@ public static class MessageProcessor
                             "/listAll - (Private Chat Only) Full list of all members with Bricks.\n" +
                             "/listRef - (Private Chat Only) Full list of all members referral count.\n" +
                             "/myID - Gets your Telegram user ID.\n" +
-                            "/myPoints - Gets your current referral Bricks total.\n" +
-                            "/points - View your current Bricks balance.\n" +
+                            "/myPoints - Gets your current Bricks total.\n" +
                             "/refTotal - Displays a list of total referred members per day.\n" +
                             "/top10 - Displays the names and Bricks of the top 10 ranks in the referral program.";
 
