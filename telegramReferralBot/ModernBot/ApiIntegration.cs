@@ -18,7 +18,7 @@ namespace TelegramReferralBot;
 public static class ApiIntegration
 {
     private static readonly HttpClient _httpClient;
-    private static readonly string _apiBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL") ?? "http://localhost:3000"; // Use environment variable with fallback
+    private static readonly string _apiBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL") ?? "https://ile-backend.onrender.com"; // Use Render backend server
     private static readonly string _apiKey;
     private static readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     
@@ -95,20 +95,23 @@ public static class ApiIntegration
     {
         try
         {
+            // Always use the Render backend URL for sync operations
+            string renderBackendUrl = "https://ile-backend.onrender.com";
+            
             // Debug: Log the base URL being used
-            Logging.AddToLog($"Using API base URL: {_apiBaseUrl}");
-            Console.WriteLine($"Using API base URL: {_apiBaseUrl}");
+            Logging.AddToLog($"Using API base URL: {renderBackendUrl}");
+            Console.WriteLine($"Using API base URL: {renderBackendUrl}");
             
             // Ensure the base URL is properly formatted
-            if (!_apiBaseUrl.StartsWith("http://") && !_apiBaseUrl.StartsWith("https://"))
+            if (!renderBackendUrl.StartsWith("http://") && !renderBackendUrl.StartsWith("https://"))
             {
-                Logging.AddToLog($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
-                Console.WriteLine($"Invalid base URL format: {_apiBaseUrl}. Must start with http:// or https://");
+                Logging.AddToLog($"Invalid base URL format: {renderBackendUrl}. Must start with http:// or https://");
+                Console.WriteLine($"Invalid base URL format: {renderBackendUrl}. Must start with http:// or https://");
                 return;
             }
             
             // Remove any trailing slash to avoid double slashes in the URL
-            string baseUrl = _apiBaseUrl.TrimEnd('/');
+            string baseUrl = renderBackendUrl.TrimEnd('/');
             string fullUrl = $"{baseUrl}/bot-integration/sync-referrals";
             
             // Debug: Log the full URL being used

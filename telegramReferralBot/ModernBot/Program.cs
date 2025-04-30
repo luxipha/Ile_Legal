@@ -74,8 +74,17 @@ class Program
             // Get bot info to verify connection
             var me = await BotClient.GetMeAsync();
             Console.WriteLine($"Bot successfully connected to Telegram API.");
-            Logging.AddToLog($"Bot successfully connected to Telegram API. Username: {me.Username}");
-
+            Console.WriteLine($"Bot Name: {me.FirstName}");
+            Console.WriteLine($"Bot Username: @{me.Username}");
+            Console.WriteLine($"Bot ID: {me.Id}");
+            
+            // Update Config.LinkToBot to use the bot's username
+            Config.LinkToBot = $"https://telegram.me/{me.Username}";
+            Console.WriteLine($"Using referral link format: {Config.LinkToBot}?start=XXXXX");
+            
+            Logging.AddToLog($"Bot successfully connected to Telegram API. Name: {me.FirstName}, Username: @{me.Username}, ID: {me.Id}");
+            Logging.AddToLog($"Using referral link format: {Config.LinkToBot}?start=XXXXX");
+            
             // Test API connection to backend
             Console.WriteLine("Testing connection to backend API...");
             Logging.AddToLog("Testing connection to backend API...");
@@ -384,7 +393,12 @@ class Program
             Logging.AddToLog("Reflink already exists for " + userId);
             // Ensure we're using the correct link format from config
             string link = Config.LinkToBot + "?start=" + RefLinks[userId];
-            return "Exists?" + link;
+            
+            // Log the link for debugging
+            Logging.AddToLog($"Retrieved existing referral link: {link}");
+            Console.WriteLine($"Retrieved existing referral link: {link}");
+            
+            return link;
         }
         else
         {

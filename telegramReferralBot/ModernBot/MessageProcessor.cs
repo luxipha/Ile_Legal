@@ -421,23 +421,18 @@ public static class MessageProcessor
     /// </summary>
     private static async Task SendWelcomeMessageAsync(long chatId, string userId, CancellationToken cancellationToken)
     {
-        string welcomeMessage = $"Welcome to IleRefer Bot!\n\n" +
+        string botName = GetBotNameFromConfig();
+        
+        string welcomeMessage = $"Welcome to {botName}!\n\n" +
                                $"This bot helps you track referrals and earn Bricks.\n\n" +
                                $"• Get your referral link and share it with friends\n" +
                                $"• When they join using your link, you get Bricks\n" +
                                $"• Earn more Bricks when your referrals are active\n" +
                                $"• Compete for the top position on the leaderboard\n\n" +
-                               $"Use the buttons below or type commands to interact with me:";
+                               $"Type /help to see available commands.";
 
-        // Create a custom keyboard with the most common commands
-        var replyMarkup = new ReplyKeyboardMarkup(new[]
-        {
-            new KeyboardButton[] { "🔗 Get Referral Link", "🏆 My Bricks" },
-            new KeyboardButton[] { "📊 Leaderboard", "❓ Help" }
-        })
-        {
-            ResizeKeyboard = true
-        };
+        // Remove custom keyboard by sending ReplyKeyboardRemove
+        var replyMarkup = new ReplyKeyboardRemove();
 
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
@@ -485,17 +480,10 @@ public static class MessageProcessor
     {
         try
         {
-            string result = Program.GetRefLink(user);
-            string referralLink;
+            // Get the referral link directly
+            string referralLink = Program.GetRefLink(user);
             
-            if (result.StartsWith("Exists?"))
-            {
-                referralLink = result.Substring(7);
-            }
-            else
-            {
-                referralLink = result;
-            }
+            string botName = GetBotNameFromConfig();
             
             // Create a share button
             var shareButton = new InlineKeyboardMarkup(new[]
@@ -513,7 +501,7 @@ public static class MessageProcessor
             
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId,
-                text: $"🔗 *Your IleReferBot Referral Link*\n\n`{referralLink}`\n\n" +
+                text: $"🔗 *Your {botName} Referral Link*\n\n`{referralLink}`\n\n" +
                       $"*Share this link to earn Bricks!*\n\n" +
                       $"• You earn *{Config.ReferralReward} Bricks* for each new user who joins\n" +
                       $"• Earn *additional Bricks* when your referrals are active\n" +
@@ -1279,5 +1267,34 @@ public static class MessageProcessor
             // If we can't get the chat, just return the ID
             return userId;
         }
+    }
+    
+    /// <summary>
+    /// Extracts the bot name from Config.LinkToBot
+    /// </summary>
+    private static string GetBotNameFromConfig()
+    {
+        string botName = "Telegram Bot"; // Default fallback
+        
+        if (!string.IsNullOrEmpty(Config.LinkToBot))
+        {
+            try
+            {
+                // Extract bot name from the URL (e.g., https://telegram.me/IleReferBot -> IleReferBot)
+                Uri uri = new Uri(Config.LinkToBot);
+                string path = uri.AbsolutePath.TrimStart('/');
+                if (!string.IsNullOrEmpty(path))
+                {
+                    botName = path;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.AddToLog($"Error extracting bot name from config: {ex.Message}");
+                Console.WriteLine($"Error extracting bot name from config: {ex.Message}");
+            }
+        }
+        
+        return botName;
     }
 }
