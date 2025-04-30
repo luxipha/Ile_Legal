@@ -194,9 +194,9 @@ public static class MessageProcessor
             string message = "Available commands:\n" +
                              "/start - Start the bot\n" +
                              "/help - Show this help message\n" +
-                             "/referral - Get your referral link\n" +
+                             "/getRefLink - Get your referral link\n" +
                              "/myPoints - Check your points";
-            
+
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId.Value,
                 text: message,
@@ -284,16 +284,27 @@ public static class MessageProcessor
         // Handle commands
         if (messageText.StartsWith("/"))
         {
-            if (messageText == "/start")
+            if (messageText.StartsWith("/start"))
             {
                 // Check if this is a referral
-                if (messageText.Contains(" "))
+                if (messageText.Contains("="))
                 {
-                    string refCode = messageText.Split(' ')[1];
-                    await HandleReferralAsync(message, refCode, cancellationToken);
+                    // Format: /start=XXXXX
+                    string[] parts = messageText.Split('=');
+                    if (parts.Length > 1)
+                    {
+                        string refCode = parts[1];
+                        await HandleReferralAsync(message, refCode, cancellationToken);
+                    }
+                    else
+                    {
+                        // Invalid referral format, show regular welcome
+                        await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
+                    }
                 }
                 else
                 {
+                    // Regular start command without referral
                     await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
                 }
             }
@@ -431,13 +442,24 @@ public static class MessageProcessor
                                $"• Compete for the top position on the leaderboard\n\n" +
                                $"Type /help to see available commands.";
 
-        // Remove custom keyboard by sending ReplyKeyboardRemove
-        var replyMarkup = new ReplyKeyboardRemove();
+        // Create buttons with group link and help
+        var groupButton = new InlineKeyboardMarkup(new[]
+        {
+            new[]
+            {
+                InlineKeyboardButton.WithUrl("🏢 Join Ile Community", Config.LinkToGroup)
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("🔗 Get My Referral Link", "getreferral"),
+                InlineKeyboardButton.WithCallbackData("❓ How It Works", "help")
+            }
+        });
 
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
             text: welcomeMessage,
-            replyMarkup: replyMarkup,
+            replyMarkup: groupButton,
             cancellationToken: cancellationToken);
             
         // Mark that we've shown the welcome message
@@ -454,17 +476,10 @@ public static class MessageProcessor
     private static async Task SendHelpMessageAsync(long chatId, CancellationToken cancellationToken)
     {
         string helpMessage = "Available commands:\n\n" +
-                            "/disableNotice - (Private Chat Only) Turn off private bot notices.\n" +
-                            "/enableNotice - (Private Chat Only) Turn on private bot notices.\n" +
-                            "/getRefLink - (Private Chat Only) Generates your referral code for the program.\n" +
-                            "/help - Sends a list of available commands.\n" +
-                            "/journey - View the Ilé Bricks Journey Map with rewards.\n" +
-                            "/listAll - (Private Chat Only) Full list of all members with Bricks.\n" +
-                            "/listRef - (Private Chat Only) Full list of all members referral count.\n" +
-                            "/myID - Gets your Telegram user ID.\n" +
-                            "/myPoints - Gets your current Bricks total.\n" +
-                            "/refTotal - Displays a list of total referred members per day.\n" +
-                            "/top10 - Displays the names and Bricks of the top 10 ranks in the referral program.";
+                            "/start - Start the bot\n" +
+                            "/help - Show this help message\n" +
+                            "/getRefLink - Get your referral link\n" +
+                            "/myPoints - Check your points";
 
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
