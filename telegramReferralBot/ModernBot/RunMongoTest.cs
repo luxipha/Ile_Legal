@@ -47,7 +47,10 @@ namespace TelegramReferralBot
                 
                 // Get user
                 var retrievedUser = await mongoDbService.GetUserAsync(testUser.TelegramId);
-                Console.WriteLine($"Retrieved user: {retrievedUser.TelegramId}, Bricks: {retrievedUser.BricksTotal}");
+                if (retrievedUser != null)
+                {
+                    Console.WriteLine($"Retrieved user: {retrievedUser.TelegramId}, Bricks: {retrievedUser.BricksTotal}");
+                }
                 
                 // Update user bricks
                 await mongoDbService.UpdateUserBricksAsync(testUser.TelegramId, 200);
@@ -55,7 +58,10 @@ namespace TelegramReferralBot
                 
                 // Get updated user
                 retrievedUser = await mongoDbService.GetUserAsync(testUser.TelegramId);
-                Console.WriteLine($"Retrieved updated user: {retrievedUser.TelegramId}, Bricks: {retrievedUser.BricksTotal}");
+                if (retrievedUser != null)
+                {
+                    Console.WriteLine($"Retrieved updated user: {retrievedUser.TelegramId}, Bricks: {retrievedUser.BricksTotal}");
+                }
                 
                 // Test referral operations
                 Console.WriteLine("\nTesting referral operations:");
@@ -84,7 +90,10 @@ namespace TelegramReferralBot
                 
                 // Get updated user with referrals
                 retrievedUser = await mongoDbService.GetUserAsync(testUser.TelegramId);
-                Console.WriteLine($"User now has {retrievedUser.Referrals.Count} referrals and {retrievedUser.BricksTotal} bricks");
+                if (retrievedUser != null && retrievedUser.Referrals != null)
+                {
+                    Console.WriteLine($"User now has {retrievedUser.Referrals.Count} referrals and {retrievedUser.BricksTotal} bricks");
+                }
                 
                 Console.WriteLine("\nMongoDB integration test completed successfully!");
             }

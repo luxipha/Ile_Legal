@@ -33,7 +33,7 @@ class Program
     private static readonly char[] _chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".ToCharArray();
     
     // MongoDB service
-    public static MongoDbService MongoDb { get; private set; } = null!;
+    public static MongoDbService? MongoDb { get; private set; }
     
     // Data dictionaries
     public static Dictionary<string, bool> ShowWelcome { get; set; } = new();
@@ -198,7 +198,7 @@ class Program
         }
     }
     
-    private static async Task StartHealthCheckServer()
+    private static Task StartHealthCheckServer()
     {
         try
         {
@@ -240,6 +240,7 @@ class Program
             Console.WriteLine($"Error starting health check server: {ex.Message}");
             Logging.AddToLog($"Error starting health check server: {ex.Message}");
         }
+        return Task.CompletedTask;
     }
     
     /// <summary>
@@ -570,7 +571,7 @@ class Program
     /// <summary>
     /// Checks if a password is valid for admin access
     /// </summary>
-    public static string CheckPassword(string text, string userId)
+    public static string? CheckPassword(string text, string userId)
     {
         string message = "Beginning check password.";
         Logging.AddToLog(message);
@@ -587,7 +588,7 @@ class Program
             // Check if user is banned from admin access
             if (attempts >= 11)
             {
-                return null;
+                return string.Empty;
             }
             
             // Check password
@@ -825,7 +826,7 @@ class Program
             Logging.AddToLog("Loading data from MongoDB...");
             
             // Load referral links
-            var refLinks = await MongoDb.GetAllRefLinksAsync();
+            var refLinks = await MongoDb?.GetAllRefLinksAsync();
             if (refLinks != null && refLinks.Count > 0)
             {
                 RefLinks = refLinks;
@@ -861,17 +862,20 @@ class Program
                 // Process referral data
                 foreach (var referral in referrals)
                 {
-                    // Load referred by relationships
-                    ReferredBy[referral.ReferredId] = referral.ReferrerId;
-                    
-                    // Load referral points
-                    if (ReferralPoints.ContainsKey(referral.ReferrerId))
+                    if (referral.ReferredId != null && referral.ReferrerId != null)
                     {
-                        ReferralPoints[referral.ReferrerId] += referral.Points;
-                    }
-                    else
-                    {
-                        ReferralPoints[referral.ReferrerId] = referral.Points;
+                        // Load referred by relationships
+                        ReferredBy[referral.ReferredId] = referral.ReferrerId;
+                        
+                        // Load referral points
+                        if (ReferralPoints.ContainsKey(referral.ReferrerId))
+                        {
+                            ReferralPoints[referral.ReferrerId] += referral.Points;
+                        }
+                        else
+                        {
+                            ReferralPoints[referral.ReferrerId] = referral.Points;
+                        }
                     }
                 }
             }
@@ -879,10 +883,13 @@ class Program
             // Load user activities
             foreach (var user in users)
             {
-                var activities = await MongoDb.GetAllUserActivitiesAsync(user.TelegramId);
-                if (activities != null && activities.Count > 0)
+                if (user.TelegramId != null)
                 {
-                    UserActivity[user.TelegramId] = activities;
+                    var activities = await MongoDb?.GetAllUserActivitiesAsync(user.TelegramId);
+                    if (activities != null && activities.Count > 0)
+                    {
+                        UserActivity[user.TelegramId] = activities;
+                    }
                 }
             }
             

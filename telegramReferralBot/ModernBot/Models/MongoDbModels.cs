@@ -111,16 +111,17 @@ namespace TelegramReferralBot.Models
         public string? Id { get; set; }
         
         [BsonElement("userId")]
+        [BsonRepresentation(BsonType.ObjectId)]
         public string? UserId { get; set; }
         
         [BsonElement("name")]
         public string? Name { get; set; }
         
         [BsonElement("status")]
-        public string Status { get; set; } = "joined";
+        public string? Status { get; set; } = "joined";
         
         [BsonElement("joinedAt")]
-        public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? JoinedAt { get; set; } = DateTime.UtcNow;
         
         [BsonElement("bricksEarned")]
         public int BricksEarned { get; set; }

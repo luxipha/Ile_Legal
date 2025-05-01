@@ -840,18 +840,18 @@ public static class MessageProcessor
     /// <summary>
     /// Updates user activity in the group
     /// </summary>
-    private static async Task UpdateUserActivityAsync(Message message, CancellationToken cancellationToken)
+    private static Task UpdateUserActivityAsync(Message message, CancellationToken cancellationToken)
     {
         var userId = message.From?.Id.ToString() ?? "unknown";
         var messageText = message.Text ?? string.Empty;
         
         // Check if message is long enough to count for points
         if (messageText.Length < Config.ThresholdForMessagePoint)
-            return;
+            return Task.CompletedTask;
         
         // Check if user was referred by someone
         if (!Program.ReferredBy.ContainsKey(userId))
-            return;
+            return Task.CompletedTask;
         
         string referrerId = Program.ReferredBy[userId];
         
@@ -860,7 +860,7 @@ public static class MessageProcessor
         
         // Check if today is in the campaign period
         if (!Program.CampaignDays.Contains(today))
-            return;
+            return Task.CompletedTask;
         
         // Update user activity
         Dictionary<string, int> userActivityPerDay;
@@ -882,7 +882,7 @@ public static class MessageProcessor
             // Create new user activity dictionary
             userActivityPerDay = Program.CreateUserActivityDictionary(userId);
             if (userActivityPerDay is null)
-                return;
+                return Task.CompletedTask;
             
             // Increment activity count for today
             if (userActivityPerDay.ContainsKey(today))
@@ -896,6 +896,8 @@ public static class MessageProcessor
         
         // Update points
         Program.UpdatePointTotals();
+        
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -1234,7 +1236,6 @@ public static class MessageProcessor
                 if (referralsByDay.ContainsKey(date))
                 {
                     referralsByDay[date]++;
-                }
         */
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,

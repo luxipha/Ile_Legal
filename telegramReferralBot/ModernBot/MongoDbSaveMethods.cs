@@ -244,7 +244,7 @@ namespace TelegramReferralBot
         /// <summary>
         /// Saves referral points to MongoDB
         /// </summary>
-        public static async Task<bool> SaveReferralPointsAsync()
+        public static Task<bool> SaveReferralPointsAsync()
         {
             try
             {
@@ -252,7 +252,7 @@ namespace TelegramReferralBot
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save referral points.");
                     Console.WriteLine("MongoDB not initialized. Cannot save referral points.");
-                    return false;
+                    return Task.FromResult(false);
                 }
                 
                 // Referral points are saved as part of the referral creation process
@@ -260,21 +260,20 @@ namespace TelegramReferralBot
                 
                 Logging.AddToLog("Referral points saved to MongoDB successfully");
                 Console.WriteLine("Referral points saved to MongoDB successfully");
-                return true;
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                string text = $"Error saving referral points to MongoDB: {ex.Message}";
-                Logging.AddToLog(text);
-                Console.WriteLine(text);
-                return false;
+                Logging.AddToLog($"Error saving referral points to MongoDB: {ex.Message}");
+                Console.WriteLine($"Error saving referral points to MongoDB: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
         
         /// <summary>
         /// Saves points by referrer data to MongoDB
         /// </summary>
-        public static async Task<bool> SavePointsByReferrerAsync()
+        public static Task<bool> SavePointsByReferrerAsync()
         {
             try
             {
@@ -282,7 +281,7 @@ namespace TelegramReferralBot
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save points by referrer.");
                     Console.WriteLine("MongoDB not initialized. Cannot save points by referrer.");
-                    return false;
+                    return Task.FromResult(false);
                 }
                 
                 // Points by referrer are calculated based on referrals
@@ -290,14 +289,13 @@ namespace TelegramReferralBot
                 
                 Logging.AddToLog("Points by referrer saved to MongoDB successfully");
                 Console.WriteLine("Points by referrer saved to MongoDB successfully");
-                return true;
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                string text = $"Error saving points by referrer to MongoDB: {ex.Message}";
-                Logging.AddToLog(text);
-                Console.WriteLine(text);
-                return false;
+                Logging.AddToLog($"Error saving points by referrer to MongoDB: {ex.Message}");
+                Console.WriteLine($"Error saving points by referrer to MongoDB: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
         
@@ -396,7 +394,7 @@ namespace TelegramReferralBot
         /// <summary>
         /// Saves interacted user data to MongoDB
         /// </summary>
-        public static async Task<bool> SaveInteractedUserAsync()
+        public static Task<bool> SaveInteractedUserAsync()
         {
             try
             {
@@ -404,7 +402,7 @@ namespace TelegramReferralBot
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save interacted user.");
                     Console.WriteLine("MongoDB not initialized. Cannot save interacted user.");
-                    return false;
+                    return Task.FromResult(false);
                 }
                 
                 // Interacted user data is not directly mapped to MongoDB
@@ -412,21 +410,20 @@ namespace TelegramReferralBot
                 
                 Logging.AddToLog("Interacted user saved to MongoDB successfully");
                 Console.WriteLine("Interacted user saved to MongoDB successfully");
-                return true;
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                string text = $"Error saving interacted user to MongoDB: {ex.Message}";
-                Logging.AddToLog(text);
-                Console.WriteLine(text);
-                return false;
+                Logging.AddToLog($"Error saving interacted user to MongoDB: {ex.Message}");
+                Console.WriteLine($"Error saving interacted user to MongoDB: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
         
         /// <summary>
         /// Saves disable notice data to MongoDB
         /// </summary>
-        public static async Task<bool> SaveDisableNoticeAsync()
+        public static Task<bool> SaveDisableNoticeAsync()
         {
             try
             {
@@ -434,7 +431,7 @@ namespace TelegramReferralBot
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save disable notice.");
                     Console.WriteLine("MongoDB not initialized. Cannot save disable notice.");
-                    return false;
+                    return Task.FromResult(false);
                 }
                 
                 // Disable notice data is not directly mapped to MongoDB
@@ -442,21 +439,20 @@ namespace TelegramReferralBot
                 
                 Logging.AddToLog("Disable notice saved to MongoDB successfully");
                 Console.WriteLine("Disable notice saved to MongoDB successfully");
-                return true;
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                string text = $"Error saving disable notice to MongoDB: {ex.Message}";
-                Logging.AddToLog(text);
-                Console.WriteLine(text);
-                return false;
+                Logging.AddToLog($"Error saving disable notice to MongoDB: {ex.Message}");
+                Console.WriteLine($"Error saving disable notice to MongoDB: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
         
         /// <summary>
         /// Saves campaign days data to MongoDB
         /// </summary>
-        public static async Task<bool> SaveCampaignDaysAsync()
+        public static Task<bool> SaveCampaignDaysAsync()
         {
             try
             {
@@ -464,7 +460,7 @@ namespace TelegramReferralBot
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save campaign days.");
                     Console.WriteLine("MongoDB not initialized. Cannot save campaign days.");
-                    return false;
+                    return Task.FromResult(false);
                 }
                 
                 // Campaign days data is not directly mapped to MongoDB
@@ -472,21 +468,20 @@ namespace TelegramReferralBot
                 
                 Logging.AddToLog("Campaign days saved to MongoDB successfully");
                 Console.WriteLine("Campaign days saved to MongoDB successfully");
-                return true;
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                string text = $"Error saving campaign days to MongoDB: {ex.Message}";
-                Logging.AddToLog(text);
-                Console.WriteLine(text);
-                return false;
+                Logging.AddToLog($"Error saving campaign days to MongoDB: {ex.Message}");
+                Console.WriteLine($"Error saving campaign days to MongoDB: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
         
         /// <summary>
         /// Saves group chat ID number to MongoDB
         /// </summary>
-        public static async Task<bool> SaveGroupChatIdNumberAsync()
+        public static Task<bool> SaveGroupChatIdNumberAsync()
         {
             try
             {
@@ -494,7 +489,7 @@ namespace TelegramReferralBot
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save group chat ID number.");
                     Console.WriteLine("MongoDB not initialized. Cannot save group chat ID number.");
-                    return false;
+                    return Task.FromResult(false);
                 }
                 
                 // Group chat ID number is not directly mapped to MongoDB
@@ -502,14 +497,13 @@ namespace TelegramReferralBot
                 
                 Logging.AddToLog("Group chat ID number saved to MongoDB successfully");
                 Console.WriteLine("Group chat ID number saved to MongoDB successfully");
-                return true;
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
-                string text = $"Error saving group chat ID number to MongoDB: {ex.Message}";
-                Logging.AddToLog(text);
-                Console.WriteLine(text);
-                return false;
+                Logging.AddToLog($"Error saving group chat ID number to MongoDB: {ex.Message}");
+                Console.WriteLine($"Error saving group chat ID number to MongoDB: {ex.Message}");
+                return Task.FromResult(false);
             }
         }
     }
