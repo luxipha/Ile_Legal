@@ -451,7 +451,7 @@ public static class ApiIntegration
             Logging.AddToLog("Error loading API key from config: " + ex.Message);
             Console.WriteLine("Error loading API key from config: " + ex.Message);
         }
-        return null;
+        return string.Empty;
     }
 }
 

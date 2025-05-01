@@ -741,70 +741,147 @@ class Program
             }
             
             // Save referrals
-            foreach (var entry in ReferredBy)
+            if (MongoDb != null)
             {
-                var referredId = entry.Key;
-                var referrerId = entry.Value;
-                
-                // Check if referral already exists
-                var existingReferral = await MongoDb.GetReferralByReferredIdAsync(referredId);
-                if (existingReferral == null)
+                foreach (var entry in ReferredBy)
                 {
-                    // Create the referral document
-                    var referral = new Models.ReferralModel
-                    {
-                        ReferrerId = referrerId,
-                        ReferredId = referredId,
-                        Points = Config.ReferralReward,
-                        Timestamp = DateTime.UtcNow,
-                        Type = "referral"
-                    };
+                    var referredId = entry.Key;
+                    var referrerId = entry.Value;
                     
-                    await MongoDb.CreateReferralAsync(referral);
-                    
-                    // Also add to the user's referrals array
-                    // Get the referred user to get their name
-                    var referredUser = await MongoDb.GetUserAsync(referredId);
-                    string referredName = "Telegram User";
-                    if (referredUser != null && !string.IsNullOrEmpty(referredUser.FirstName))
+                    // Check if referral already exists
+                    var existingReferral = await MongoDb.GetReferralByReferredIdAsync(referredId);
+                    if (existingReferral == null)
                     {
-                        referredName = referredUser.FirstName;
-                        if (!string.IsNullOrEmpty(referredUser.LastName))
-                            referredName += " " + referredUser.LastName;
+                        // Create the referral document
+                        var referral = new Models.ReferralModel
+                        {
+                            ReferrerId = referrerId,
+                            ReferredId = referredId,
+                            Points = Config.ReferralReward,
+                            Timestamp = DateTime.UtcNow,
+                            Type = "referral"
+                        };
+                        
+                        await MongoDb.CreateReferralAsync(referral);
+                        
+                        // Also add to the user's referrals array
+                        // Get the referred user to get their name
+                        var referredUser = await MongoDb.GetUserAsync(referredId);
+                        string referredName = "Telegram User";
+                        if (referredUser != null && !string.IsNullOrEmpty(referredUser.FirstName))
+                        {
+                            referredName = referredUser.FirstName;
+                            if (!string.IsNullOrEmpty(referredUser.LastName))
+                                referredName += " " + referredUser.LastName;
+                        }
+                        
+                        // Add to referrer's referrals array
+                        await MongoDb.AddReferralToUserAsync(
+                            referrerId,
+                            referredId,
+                            referredName,
+                            Config.ReferralReward);
+                        
+                        Logging.AddToLog($"Created referral in MongoDB: {referredId} referred by {referrerId}");
                     }
-                    
-                    // Add to referrer's referrals array
-                    await MongoDb.AddReferralToUserAsync(
-                        referrerId,
-                        referredId,
-                        referredName,
-                        Config.ReferralReward);
-                    
-                    Logging.AddToLog($"Created referral in MongoDB: {referredId} referred by {referrerId}");
                 }
             }
             
             // Save referral links
-            foreach (var entry in RefLinks)
+            if (MongoDb != null)
             {
-                var userId = entry.Key;
-                var refCode = entry.Value;
-                
-                // Check if reflink already exists
-                var existingRefLink = await MongoDb.GetRefLinkByUserIdAsync(userId);
-                if (existingRefLink == null)
+                var refLinks = await MongoDb.GetAllRefLinksAsync();
+                if (refLinks != null && refLinks.Count > 0)
                 {
-                    var refLink = new Models.RefLinkModel
-                    {
-                        UserId = userId,
-                        RefCode = refCode,
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    
-                    await MongoDb.CreateRefLinkAsync(refLink);
-                    Logging.AddToLog($"Created reflink in MongoDB: {userId} -> {refCode}");
+                    RefLinks = refLinks;
+                    Console.WriteLine($"Loaded {refLinks.Count} referral links from MongoDB");
+                    Logging.AddToLog($"Loaded {refLinks.Count} referral links from MongoDB");
                 }
             }
+            
+            // Save users and their data
+            if (MongoDb != null)
+            {
+                var users = await MongoDb.GetAllUsersAsync();
+                if (users != null && users.Count > 0)
+                {
+                    Console.WriteLine($"Loaded {users.Count} users from MongoDB");
+                    Logging.AddToLog($"Loaded {users.Count} users from MongoDB");
+                    
+                    // Process user data
+                    foreach (var user in users)
+                    {
+                        // Load password attempts
+                        if (!string.IsNullOrEmpty(user.TelegramId))
+                        {
+                            PasswordAttempts[user.TelegramId] = user.IsAdmin ? -1 : user.PasswordAttempts;
+                        }
+                        
+                        // Load show welcome flag
+                        if (!string.IsNullOrEmpty(user.TelegramId))
+                        {
+                            ShowWelcome[user.TelegramId] = user.ShowWelcome;
+                        }
+                    }
+                }
+            }
+            
+            // Save referrals
+            if (MongoDb != null)
+            {
+                var referrals = await MongoDb.GetAllReferralsAsync();
+                if (referrals != null && referrals.Count > 0)
+                {
+                    Console.WriteLine($"Loaded {referrals.Count} referrals from MongoDB");
+                    Logging.AddToLog($"Loaded {referrals.Count} referrals from MongoDB");
+                    
+                    // Process referral data
+                    foreach (var referral in referrals)
+                    {
+                        if (referral.ReferredId != null && referral.ReferrerId != null)
+                        {
+                            // Load referred by relationships
+                            if (!string.IsNullOrEmpty(referral.ReferredId) && !string.IsNullOrEmpty(referral.ReferrerId))
+                            {
+                                ReferredBy[referral.ReferredId] = referral.ReferrerId;
+                                
+                                // Load referral points
+                                if (ReferralPoints.ContainsKey(referral.ReferrerId))
+                                {
+                                    ReferralPoints[referral.ReferrerId] += referral.Points;
+                                }
+                                else
+                                {
+                                    ReferralPoints[referral.ReferrerId] = referral.Points;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Load user activities
+            if (MongoDb != null)
+            {
+                var userList = await MongoDb.GetAllUsersAsync();
+                if (userList != null && userList.Count > 0)
+                {
+                    foreach (var user in userList)
+                    {
+                        if (user.TelegramId != null)
+                        {
+                            var activities = await MongoDb.GetAllUserActivitiesAsync(user.TelegramId);
+                            if (activities != null && activities.Count > 0 && !string.IsNullOrEmpty(user.TelegramId))
+                            {
+                                UserActivity[user.TelegramId] = activities;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Update point totals
+            UpdatePointTotals();
             
             Logging.AddToLog("Data saved to MongoDB successfully");
         }
@@ -826,69 +903,94 @@ class Program
             Logging.AddToLog("Loading data from MongoDB...");
             
             // Load referral links
-            var refLinks = await MongoDb?.GetAllRefLinksAsync();
-            if (refLinks != null && refLinks.Count > 0)
+            if (MongoDb != null)
             {
-                RefLinks = refLinks;
-                Console.WriteLine($"Loaded {RefLinks.Count} referral links from MongoDB");
-                Logging.AddToLog($"Loaded {RefLinks.Count} referral links from MongoDB");
+                var refLinks = await MongoDb.GetAllRefLinksAsync();
+                if (refLinks != null && refLinks.Count > 0)
+                {
+                    RefLinks = refLinks;
+                    Console.WriteLine($"Loaded {refLinks.Count} referral links from MongoDB");
+                    Logging.AddToLog($"Loaded {refLinks.Count} referral links from MongoDB");
+                }
             }
             
             // Load users and their data
-            var users = await MongoDb.GetAllUsersAsync();
-            if (users != null && users.Count > 0)
+            if (MongoDb != null)
             {
-                Console.WriteLine($"Loaded {users.Count} users from MongoDB");
-                Logging.AddToLog($"Loaded {users.Count} users from MongoDB");
-                
-                // Process user data
-                foreach (var user in users)
+                var users = await MongoDb.GetAllUsersAsync();
+                if (users != null && users.Count > 0)
                 {
-                    // Load password attempts
-                    PasswordAttempts[user.TelegramId] = user.IsAdmin ? -1 : user.PasswordAttempts;
+                    Console.WriteLine($"Loaded {users.Count} users from MongoDB");
+                    Logging.AddToLog($"Loaded {users.Count} users from MongoDB");
                     
-                    // Load show welcome flag
-                    ShowWelcome[user.TelegramId] = user.ShowWelcome;
+                    // Process user data
+                    foreach (var user in users)
+                    {
+                        // Load password attempts
+                        if (!string.IsNullOrEmpty(user.TelegramId))
+                        {
+                            PasswordAttempts[user.TelegramId] = user.IsAdmin ? -1 : user.PasswordAttempts;
+                        }
+                        
+                        // Load show welcome flag
+                        if (!string.IsNullOrEmpty(user.TelegramId))
+                        {
+                            ShowWelcome[user.TelegramId] = user.ShowWelcome;
+                        }
+                    }
                 }
             }
             
             // Load referrals
-            var referrals = await MongoDb.GetAllReferralsAsync();
-            if (referrals != null && referrals.Count > 0)
+            if (MongoDb != null)
             {
-                Console.WriteLine($"Loaded {referrals.Count} referrals from MongoDB");
-                Logging.AddToLog($"Loaded {referrals.Count} referrals from MongoDB");
-                
-                // Process referral data
-                foreach (var referral in referrals)
+                var referrals = await MongoDb.GetAllReferralsAsync();
+                if (referrals != null && referrals.Count > 0)
                 {
-                    if (referral.ReferredId != null && referral.ReferrerId != null)
+                    Console.WriteLine($"Loaded {referrals.Count} referrals from MongoDB");
+                    Logging.AddToLog($"Loaded {referrals.Count} referrals from MongoDB");
+                    
+                    // Process referral data
+                    foreach (var referral in referrals)
                     {
-                        // Load referred by relationships
-                        ReferredBy[referral.ReferredId] = referral.ReferrerId;
-                        
-                        // Load referral points
-                        if (ReferralPoints.ContainsKey(referral.ReferrerId))
+                        if (referral.ReferredId != null && referral.ReferrerId != null)
                         {
-                            ReferralPoints[referral.ReferrerId] += referral.Points;
-                        }
-                        else
-                        {
-                            ReferralPoints[referral.ReferrerId] = referral.Points;
+                            // Load referred by relationships
+                            if (!string.IsNullOrEmpty(referral.ReferredId) && !string.IsNullOrEmpty(referral.ReferrerId))
+                            {
+                                ReferredBy[referral.ReferredId] = referral.ReferrerId;
+                                
+                                // Load referral points
+                                if (ReferralPoints.ContainsKey(referral.ReferrerId))
+                                {
+                                    ReferralPoints[referral.ReferrerId] += referral.Points;
+                                }
+                                else
+                                {
+                                    ReferralPoints[referral.ReferrerId] = referral.Points;
+                                }
+                            }
                         }
                     }
                 }
             }
             
             // Load user activities
-            foreach (var user in users)
+            if (MongoDb != null)
             {
-                if (user.TelegramId != null)
+                var userList = await MongoDb.GetAllUsersAsync();
+                if (userList != null && userList.Count > 0)
                 {
-                    var activities = await MongoDb?.GetAllUserActivitiesAsync(user.TelegramId);
-                    if (activities != null && activities.Count > 0)
+                    foreach (var user in userList)
                     {
-                        UserActivity[user.TelegramId] = activities;
+                        if (user.TelegramId != null)
+                        {
+                            var activities = await MongoDb.GetAllUserActivitiesAsync(user.TelegramId);
+                            if (activities != null && activities.Count > 0 && !string.IsNullOrEmpty(user.TelegramId))
+                            {
+                                UserActivity[user.TelegramId] = activities;
+                            }
+                        }
                     }
                 }
             }

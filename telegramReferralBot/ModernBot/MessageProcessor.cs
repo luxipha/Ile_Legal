@@ -253,7 +253,7 @@ public static class MessageProcessor
         if (Program.AwaitingReply.Contains(userId))
         {
             // Handle password check
-            string result = Program.CheckPassword(messageText, userId);
+            string? result = Program.CheckPassword(messageText, userId);
             if (result == "confirmed")
             {
                 Program.AwaitingReply.Remove(userId);
@@ -269,7 +269,7 @@ public static class MessageProcessor
                     text: "Incorrect password. You have 9 attempts remaining.",
                     cancellationToken: cancellationToken);
             }
-            else if (result.StartsWith("wrong_"))
+            else if (result != null && result.StartsWith("wrong_"))
             {
                 int attemptsLeft = 10 - int.Parse(result.Split('_')[1]);
                 await Program.BotClient.SendTextMessageAsync(
@@ -552,9 +552,12 @@ public static class MessageProcessor
                     referralLink = Config.LinkToBot + "?start=" + refLink.RefCode;
                     
                     // Update in-memory cache if needed
-                    if (!Program.RefLinks.ContainsKey(userId) || Program.RefLinks[userId] != refLink.RefCode)
+                    if (refLink.RefCode != null)
                     {
-                        Program.RefLinks[userId] = refLink.RefCode;
+                        if (!Program.RefLinks.ContainsKey(userId) || Program.RefLinks[userId] != refLink.RefCode)
+                        {
+                            Program.RefLinks[userId] = refLink.RefCode;
+                        }
                     }
                 }
             }
@@ -880,9 +883,11 @@ public static class MessageProcessor
         else
         {
             // Create new user activity dictionary
-            userActivityPerDay = Program.CreateUserActivityDictionary(userId);
-            if (userActivityPerDay is null)
+            Dictionary<string, int>? tempActivityDict = Program.CreateUserActivityDictionary(userId);
+            if (tempActivityDict is null)
                 return Task.CompletedTask;
+            
+            userActivityPerDay = tempActivityDict;
             
             // Increment activity count for today
             if (userActivityPerDay.ContainsKey(today))
@@ -1234,8 +1239,6 @@ public static class MessageProcessor
                 string date = DateTime.Now.ToString("MM/dd/yyyy");
                 
                 if (referralsByDay.ContainsKey(date))
-                {
-                    referralsByDay[date]++;
         */
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,

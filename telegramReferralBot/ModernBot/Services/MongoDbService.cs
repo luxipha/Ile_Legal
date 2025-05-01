@@ -105,7 +105,7 @@ namespace TelegramReferralBot.Services
             {
                 Logging.AddToLog($"Error getting user: {ex.Message}");
                 Console.WriteLine($"Error getting user: {ex.Message}");
-                return null;
+                return new UserModel();
             }
         }
         
@@ -448,7 +448,7 @@ namespace TelegramReferralBot.Services
             {
                 Logging.AddToLog($"Error getting referral: {ex.Message}");
                 Console.WriteLine($"Error getting referral: {ex.Message}");
-                return null;
+                return new ReferralModel();
             }
         }
         
@@ -467,7 +467,7 @@ namespace TelegramReferralBot.Services
             {
                 Logging.AddToLog($"Error creating referral: {ex.Message}");
                 Console.WriteLine($"Error creating referral: {ex.Message}");
-                return null;
+                return new ReferralModel();
             }
         }
         
@@ -577,7 +577,7 @@ namespace TelegramReferralBot.Services
             {
                 Logging.AddToLog($"Error getting user activity: {ex.Message}");
                 Console.WriteLine($"Error getting user activity: {ex.Message}");
-                return null;
+                return new ActivityModel();
             }
         }
         
@@ -641,7 +641,10 @@ namespace TelegramReferralBot.Services
                 var result = new Dictionary<string, int>();
                 foreach (var activity in activities)
                 {
-                    result[activity.Date] = activity.Points;
+                    if (activity.Date != null)
+                    {
+                        result[activity.Date] = activity.Points;
+                    }
                 }
                 
                 return result;
@@ -671,7 +674,8 @@ namespace TelegramReferralBot.Services
             catch (Exception ex)
             {
                 Logging.AddToLog($"Error getting ref link by user ID: {ex.Message}");
-                return null;
+                Console.WriteLine($"Error getting ref link by user ID: {ex.Message}");
+                return new RefLinkModel();
             }
         }
         
@@ -688,7 +692,8 @@ namespace TelegramReferralBot.Services
             catch (Exception ex)
             {
                 Logging.AddToLog($"Error getting ref link by code: {ex.Message}");
-                return null;
+                Console.WriteLine($"Error getting ref link by code: {ex.Message}");
+                return new RefLinkModel();
             }
         }
         
@@ -706,6 +711,7 @@ namespace TelegramReferralBot.Services
             catch (Exception ex)
             {
                 Logging.AddToLog($"Error getting user ID by ref code: {ex.Message}");
+                Console.WriteLine($"Error getting user ID by ref code: {ex.Message}");
                 return null;
             }
         }
@@ -724,7 +730,8 @@ namespace TelegramReferralBot.Services
             catch (Exception ex)
             {
                 Logging.AddToLog($"Error creating ref link: {ex.Message}");
-                return null;
+                Console.WriteLine($"Error creating ref link: {ex.Message}");
+                return new RefLinkModel();
             }
         }
         
@@ -740,7 +747,10 @@ namespace TelegramReferralBot.Services
                 var result = new Dictionary<string, string>();
                 foreach (var refLink in refLinks)
                 {
-                    result[refLink.UserId] = refLink.RefCode;
+                    if (refLink.UserId != null && refLink.RefCode != null)
+                    {
+                        result[refLink.UserId] = refLink.RefCode;
+                    }
                 }
                 
                 return result;
@@ -748,6 +758,7 @@ namespace TelegramReferralBot.Services
             catch (Exception ex)
             {
                 Logging.AddToLog($"Error getting all ref links: {ex.Message}");
+                Console.WriteLine($"Error getting all ref links: {ex.Message}");
                 return new Dictionary<string, string>();
             }
         }
