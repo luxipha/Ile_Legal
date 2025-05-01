@@ -309,6 +309,21 @@ public static class MessageProcessor
                         await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
                     }
                 }
+                else if (messageText.Contains(" "))
+                {
+                    // Format: /start XXXXX
+                    string[] parts = messageText.Split(' ');
+                    if (parts.Length > 1)
+                    {
+                        string refCode = parts[1];
+                        await HandleReferralAsync(message, refCode, cancellationToken);
+                    }
+                    else
+                    {
+                        // Invalid referral format, show regular welcome
+                        await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
+                    }
+                }
                 else
                 {
                     // Regular start command without referral
