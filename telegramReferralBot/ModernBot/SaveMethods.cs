@@ -8,11 +8,30 @@ public static class SaveMethods
     private static readonly object _lockObject = new();
 
     /// <summary>
-    /// Saves user activity data to file
+    /// Saves user activity data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveUserActivity()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveUserActivityAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving user activity to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -46,7 +65,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving userActivityData: {ex.Message}";
+            string text = $"Error saving userActivityData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -54,11 +73,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves referral links data to file
+    /// Saves referral links data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveRefLinks()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveRefLinksAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving ref links to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -87,7 +125,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving refLinksData: {ex.Message}";
+            string text = $"Error saving refLinksData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -95,11 +133,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves password attempts data to file
+    /// Saves password attempts data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SavePasswordAttempts()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SavePasswordAttemptsAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving password attempts to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -128,7 +185,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving passwordAttemptsData: {ex.Message}";
+            string text = $"Error saving passwordAttemptsData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -136,11 +193,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves show welcome data to file
+    /// Saves show welcome data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveShowWelcome()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveShowWelcomeAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving show welcome to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -169,7 +245,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving showWelcomeData: {ex.Message}";
+            string text = $"Error saving showWelcomeData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -177,11 +253,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves referred by data to file
+    /// Saves referred by data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveReferredBy()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveReferredByAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving referred by to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -210,7 +305,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving referredByData: {ex.Message}";
+            string text = $"Error saving referredByData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -218,11 +313,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves group chat ID number to file
+    /// Saves group chat ID number to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveGroupChatIdNumber()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveGroupChatIdNumberAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving group chat ID number to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -248,7 +362,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving groupIDnumber: {ex.Message}";
+            string text = $"Error saving groupIDnumber to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -256,11 +370,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves points by referrer data to file
+    /// Saves points by referrer data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SavePointsByReferrer()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SavePointsByReferrerAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving points by referrer to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -289,7 +422,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving pointsByReferrerData: {ex.Message}";
+            string text = $"Error saving pointsByReferrerData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -297,11 +430,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves user point offset data to file
+    /// Saves user point offset data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveUserPointOffset()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveUserPointOffsetAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving user point offset to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -330,7 +482,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving userPointOffsetData: {ex.Message}";
+            string text = $"Error saving userPointOffsetData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -338,11 +490,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves joined referrals data to file
+    /// Saves joined referrals data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveJoinedReferrals()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveJoinedReferralsAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving joined referrals to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -371,7 +542,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving joinedReferralsData: {ex.Message}";
+            string text = $"Error saving joinedReferralsData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -379,11 +550,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves referral points data to file
+    /// Saves referral points data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveReferralPoints()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveReferralPointsAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving referral points to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -412,7 +602,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving referralPointsData: {ex.Message}";
+            string text = $"Error saving referralPointsData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -420,11 +610,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves interacted user data to file
+    /// Saves interacted user data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveInteractedUser()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveInteractedUserAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving interacted user to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -458,7 +667,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving interactedUserData: {ex.Message}";
+            string text = $"Error saving interactedUserData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -466,11 +675,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves disable notice data to file
+    /// Saves disable notice data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveDisableNotice()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveDisableNoticeAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving disable notice to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -499,7 +727,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving disableNoticeData: {ex.Message}";
+            string text = $"Error saving disableNoticeData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;
@@ -507,11 +735,30 @@ public static class SaveMethods
     }
 
     /// <summary>
-    /// Saves campaign days data to file
+    /// Saves campaign days data to file or MongoDB
     /// </summary>
     /// <returns>True if successful, false otherwise</returns>
     public static bool SaveCampaignDays()
     {
+        // Try to save to MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                // Call the async method synchronously
+                Task.Run(async () => await MongoDbSaveMethods.SaveCampaignDaysAsync()).Wait();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                string text = $"Error saving campaign days to MongoDB: {ex.Message}. Falling back to file storage.";
+                Logging.AddToLog(text);
+                Console.WriteLine(text);
+                // Fall back to file storage
+            }
+        }
+        
+        // Fall back to file storage
         try
         {
             lock (_lockObject)
@@ -540,7 +787,7 @@ public static class SaveMethods
         }
         catch (Exception ex)
         {
-            string text = $"Error saving campaignDaysData: {ex.Message}";
+            string text = $"Error saving campaignDaysData to file: {ex.Message}";
             Logging.AddToLog(text);
             Console.WriteLine(text);
             return false;

@@ -1,11 +1,52 @@
 # IleRefer Bot Deployment Guide
 
-This guide explains how to deploy the IleRefer Telegram bot to Render.
+This guide explains how to deploy the IleRefer Telegram bot to a cloud provider.
 
 ## Prerequisites
 
-- A Render account (free tier is sufficient for testing)
+- A cloud provider account (Render, Digital Ocean, or Google Cloud)
 - A GitHub repository containing this code
+- A MongoDB database (Atlas or self-hosted)
+
+## MongoDB Integration
+
+The bot now uses the backend's MongoDB for persistent data storage. This ensures that all user data, referrals, and points are preserved across bot restarts and deployments, and stays in sync with the main backend.
+
+### Using the Backend's MongoDB
+
+Instead of creating a separate MongoDB instance, the bot connects directly to the same MongoDB database used by the Ile backend. This provides several advantages:
+
+1. **Data Consistency**: All user data is stored in one place
+2. **Simplified Management**: No need to maintain separate databases
+3. **Seamless Integration**: User data from the bot is immediately available to the backend
+
+### Configuring the Bot for Backend MongoDB
+
+Add the following to your `config.conf` file:
+
+```
+# MongoDB connection string from the backend
+mongoDb=mongodb+srv://Ile-admin:password@clusterile.aqtxsry.mongodb.net/ileDB?retryWrites=true&w=majority
+
+# MongoDB database name from the backend (usually ileDB)
+mongoDbName=ileDB
+
+# Backend API URL for synchronization
+backendUrl=https://ile-backend.onrender.com
+```
+
+Replace the connection string with the actual backend MongoDB connection string.
+
+### Data Model Integration
+
+The bot's data models have been aligned with the backend schema:
+
+- **Users**: Stored in the backend's `users` collection with `telegramChatId` field
+- **Referrals**: Stored in a `referrals` collection
+- **Activities**: Stored in an `activities` collection
+- **Referral Links**: Stored in a `reflinks` collection
+
+This integration ensures that all data is preserved and accessible by both the bot and the backend.
 
 ## Deployment Steps
 

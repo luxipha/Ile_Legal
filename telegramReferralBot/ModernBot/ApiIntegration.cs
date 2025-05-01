@@ -144,13 +144,17 @@ public static class ApiIntegration
             }
             
             // Add group join events
-            foreach (KeyValuePair<int, string> entry in Program.JoinedReferrals)
+            foreach (KeyValuePair<string, bool> entry in Program.JoinedReferrals)
             {
-                int userId = entry.Key;
+                string userId = entry.Key;
+                bool joined = entry.Value;
+                
+                // Skip entries that aren't joined
+                if (!joined) continue;
                 
                 referrals.Add(new {
-                    referrerId = userId.ToString(),
-                    referredId = userId.ToString(), // Self-referential for join events
+                    referrerId = userId,
+                    referredId = userId, // Self-referential for join events
                     points = Config.JoinReward, // Use the configured join reward
                     timestamp = DateTime.UtcNow.ToString("o"),
                     type = "join_group"

@@ -13,6 +13,8 @@ using Polly;
 using Polly.Extensions.Http;
 using System.Globalization;
 using File = System.IO.File;
+using TelegramReferralBot.Services;
+using TelegramReferralBot.Models;
 
 namespace TelegramReferralBot;
 
@@ -30,6 +32,9 @@ class Program
     private static HttpListener _listener = null!;
     private static readonly char[] _chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".ToCharArray();
     
+    // MongoDB service
+    public static MongoDbService MongoDb { get; private set; } = null!;
+    
     // Data dictionaries
     public static Dictionary<string, bool> ShowWelcome { get; set; } = new();
     public static Dictionary<string, string> RefLinks { get; set; } = new();
@@ -39,7 +44,7 @@ class Program
     public static Dictionary<string, int> PointTotals { get; set; } = new();
     public static Dictionary<string, int> UserPointOffset { get; set; } = new();
     public static Dictionary<string, int> PointsByReferrer { get; set; } = new();
-    public static Dictionary<int, string> JoinedReferrals { get; set; } = new();
+    public static Dictionary<string, bool> JoinedReferrals { get; set; } = new();
     public static Dictionary<string, int> ReferralPoints { get; set; } = new();
     public static Dictionary<int, Dictionary<string, string>> InteractedUser { get; set; } = new();
     public static List<string> CampaignDays { get; set; } = new();
@@ -52,11 +57,71 @@ class Program
             Console.WriteLine("Starting bot...");
             Logging.AddToLog("Bot starting...");
             
-            // Load configuration
-            LoadData.LoadConf();
+            // Load configuration from environment variables
+            LoadData.LoadFromEnvironment();
             
             string path = Directory.GetCurrentDirectory();
             Console.WriteLine($"Found path: {path}");
+            
+            // Initialize MongoDB service
+            try
+            {
+                // Debug logging for MongoDB configuration
+                Console.WriteLine($"DEBUG: MongoDB Connection String: {(string.IsNullOrEmpty(Config.MongoDbConnectionString) ? "Not found" : "Found (length: " + Config.MongoDbConnectionString.Length + ")")}");
+                Console.WriteLine($"DEBUG: MongoDB Database Name: {(string.IsNullOrEmpty(Config.MongoDbDatabaseName) ? "Not found" : Config.MongoDbDatabaseName)}");
+                
+                // Add fallback MongoDB connection string if not found in config
+                if (string.IsNullOrEmpty(Config.MongoDbConnectionString))
+                {
+                    Config.MongoDbConnectionString = "mongodb+srv://Ile-admin:EQ3fMy8uu@clusterile.aqtxsry.mongodb.net/ileDB?retryWrites=true&w=majority";
+                    Console.WriteLine("Using fallback MongoDB connection string");
+                }
+                
+                // Set default database name if not found in config
+                if (string.IsNullOrEmpty(Config.MongoDbDatabaseName))
+                {
+                    Config.MongoDbDatabaseName = "ileDB";
+                    Console.WriteLine("Using fallback MongoDB database name: ileDB");
+                }
+                
+                if (string.IsNullOrEmpty(Config.MongoDbConnectionString) || string.IsNullOrEmpty(Config.MongoDbDatabaseName))
+                {
+                    Console.WriteLine("MongoDB connection string or database name not found in config or environment variables. Using file storage as fallback.");
+                    Logging.AddToLog("MongoDB connection string or database name not found in config or environment variables. Using file storage as fallback.");
+                }
+                else
+                {
+                    Console.WriteLine($"Initializing MongoDB connection with database: {Config.MongoDbDatabaseName}...");
+                    Logging.AddToLog($"Initializing MongoDB connection with database: {Config.MongoDbDatabaseName}...");
+                    
+                    // Create MongoDB service instance
+                    MongoDb = new MongoDbService(Config.MongoDbConnectionString, Config.MongoDbDatabaseName);
+                    
+                    // Test connection by getting a document count
+                    var isConnected = await MongoDb.TestConnectionAsync();
+                    if (isConnected)
+                    {
+                        Console.WriteLine("MongoDB connection initialized successfully.");
+                        Logging.AddToLog("MongoDB connection initialized successfully.");
+                        
+                        // Load data from MongoDB
+                        await LoadDataFromMongoDbAsync();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Failed to connect to MongoDB. Using file storage as fallback.");
+                        Logging.AddToLog("Failed to connect to MongoDB. Using file storage as fallback.");
+                        MongoDb = null;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing MongoDB: {ex.Message}");
+                Logging.AddToLog($"Error initializing MongoDB: {ex.Message}");
+                Console.WriteLine("Using file storage as fallback.");
+                Logging.AddToLog("Using file storage as fallback.");
+            }
             
             // Initialize bot client with maximum resilience to network issues
             var httpClientHandler = new HttpClientHandler
@@ -92,6 +157,9 @@ class Program
             
             // Start API sync timer
             StartApiSyncTimer();
+            
+            // Start MongoDB save timer
+            StartMongoDbSaveTimer();
             
             // Start the health check server
             await StartHealthCheckServer();
@@ -203,7 +271,10 @@ class Program
             
             if (update.Type == UpdateType.CallbackQuery)
             {
-                await MessageProcessor.ProcessCallbackQueryAsync(update.CallbackQuery, cancellationToken);
+                if (update.CallbackQuery != null)
+                {
+                    await MessageProcessor.ProcessCallbackQueryAsync(update.CallbackQuery, cancellationToken);
+                }
                 return;
             }
             
@@ -456,95 +527,44 @@ class Program
     /// <summary>
     /// Updates Point totals for all users
     /// </summary>
-    public static void UpdatePointTotals()
+    public static async void UpdatePointTotals()
     {
-        Logging.AddToLog("Updating Point totals");
-        
-        // Clear current Point totals
-        PointsByReferrer.Clear();
-        
-        // Add Points from referrals
-        foreach (var entry in ReferralPoints)
+        foreach (string userId in UserActivity.Keys)
         {
-            PointsByReferrer[entry.Key] = entry.Value;
-        }
-        
-        // Add Points from user activity
-        foreach (var referralEntry in ReferredBy)
-        {
-            string referredId = referralEntry.Key;
-            string referrerId = referralEntry.Value;
+            int points = 0;
             
-            // Skip if user doesn't have activity
-            if (!UserActivity.ContainsKey(referredId))
-                continue;
-            
-            // Get today's date
-            string today = DateTime.UtcNow.ToString("MM/dd/yyyy");
-            
-            // Skip if no activity today
-            if (!UserActivity[referredId].ContainsKey(today))
-                continue;
-            
-            int activityCount = UserActivity[referredId][today];
-            int pointsToAdd = Math.Min(activityCount, Config.MaxPointsPerDay);
-            
-            // Add Points to referrer
-            if (PointsByReferrer.ContainsKey(referrerId))
-            {
-                PointsByReferrer[referrerId] += pointsToAdd;
-            }
-            else
-            {
-                PointsByReferrer[referrerId] = pointsToAdd;
-            }
-        }
-        
-        // Apply Point offsets
-        foreach (var offset in UserPointOffset)
-        {
-            string userId = offset.Key;
-            int offsetValue = offset.Value;
-            
-            // Skip if offset is 0
-            if (offsetValue == 0)
-                continue;
-            
+            // Add points from referrals
             if (PointsByReferrer.ContainsKey(userId))
             {
-                PointsByReferrer[userId] += offsetValue;
+                points += PointsByReferrer[userId];
             }
-            else
+            
+            // Apply any point offset
+            if (UserPointOffset.ContainsKey(userId))
             {
-                PointsByReferrer[userId] = offsetValue;
+                points += UserPointOffset[userId];
+            }
+            
+            // Update in-memory cache
+            PointTotals[userId] = points;
+            
+            // Update MongoDB if available
+            if (MongoDb != null)
+            {
+                try
+                {
+                    // Use the dedicated method for updating bricks
+                    await MongoDb.UpdateUserBricksAsync(userId, points);
+                }
+                catch (Exception ex)
+                {
+                    Logging.AddToLog($"Error updating user points in MongoDB: {ex.Message}");
+                }
             }
         }
         
-        // Remove banned users
-        foreach (var entry in UserPointOffset)
-        {
-            // Skip if not banned
-            if (entry.Value >= 0)
-                continue;
-            
-            string bannedUserId = entry.Key;
-            
-            if (PointsByReferrer.ContainsKey(bannedUserId))
-            {
-                PointsByReferrer.Remove(bannedUserId);
-            }
-        }
-        
-        // Save Points
-        if (PointsByReferrer.Any())
-        {
-            bool saved = SaveMethods.SavePointsByReferrer();
-            if (saved)
-            {
-                string text = "PointsByReferrer was saved.";
-                Logging.AddToLog(text);
-            }
-        }
+        // Save to file
+        SaveMethods.SavePointsByReferrer();
     }
     
     /// <summary>
@@ -641,6 +661,8 @@ class Program
     /// </summary>
     public static List<string> AwaitingReply => _awaitingReply;
     
+    private static System.Timers.Timer? _mongoDbSaveTimer;
+    
     private static void StartApiSyncTimer()
     {
         _apiSyncTimer = new System.Timers.Timer(15 * 60 * 1000); // 15 minutes
@@ -649,5 +671,271 @@ class Program
         _apiSyncTimer.Start();
         
         Console.WriteLine("API sync timer started. Will sync with backend every 15 minutes.");
+    }
+    
+    /// <summary>
+    /// Starts a timer to periodically save data to MongoDB
+    /// </summary>
+    private static void StartMongoDbSaveTimer()
+    {
+        if (MongoDb == null)
+        {
+            Console.WriteLine("MongoDB not initialized. Not starting MongoDB save timer.");
+            return;
+        }
+        
+        _mongoDbSaveTimer = new System.Timers.Timer(5 * 60 * 1000); // 5 minutes
+        _mongoDbSaveTimer.Elapsed += async (sender, e) => await SaveDataToMongoDbAsync();
+        _mongoDbSaveTimer.AutoReset = true;
+        _mongoDbSaveTimer.Start();
+        
+        Console.WriteLine("MongoDB save timer started. Will save data to MongoDB every 5 minutes.");
+    }
+    
+    /// <summary>
+    /// Saves all in-memory data to MongoDB
+    /// </summary>
+    private static async Task SaveDataToMongoDbAsync()
+    {
+        if (MongoDb == null)
+        {
+            Logging.AddToLog("MongoDB not available for saving data");
+            return;
+        }
+        
+        try
+        {
+            Logging.AddToLog("Saving data to MongoDB...");
+            
+            // Save users and their points
+            foreach (var entry in PointTotals)
+            {
+                var userId = entry.Key;
+                var points = entry.Value;
+                
+                // Get or create user
+                var user = await MongoDb.GetUserAsync(userId);
+                if (user == null)
+                {
+                    // Create new user with proper nested bricks structure
+                    user = new Models.UserModel
+                    {
+                        TelegramId = userId,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    
+                    // Set bricks using the property that handles the nested structure
+                    user.BricksTotal = points;
+                    
+                    await MongoDb.CreateUserAsync(user);
+                    Logging.AddToLog($"Created user in MongoDB: {userId}");
+                }
+                else
+                {
+                    // Update bricks directly using the UpdateUserBricksAsync method
+                    await MongoDb.UpdateUserBricksAsync(userId, points);
+                    Logging.AddToLog($"Updated user bricks in MongoDB: {userId}");
+                }
+            }
+            
+            // Save referrals
+            foreach (var entry in ReferredBy)
+            {
+                var referredId = entry.Key;
+                var referrerId = entry.Value;
+                
+                // Check if referral already exists
+                var existingReferral = await MongoDb.GetReferralByReferredIdAsync(referredId);
+                if (existingReferral == null)
+                {
+                    // Create the referral document
+                    var referral = new Models.ReferralModel
+                    {
+                        ReferrerId = referrerId,
+                        ReferredId = referredId,
+                        Points = Config.ReferralReward,
+                        Timestamp = DateTime.UtcNow,
+                        Type = "referral"
+                    };
+                    
+                    await MongoDb.CreateReferralAsync(referral);
+                    
+                    // Also add to the user's referrals array
+                    // Get the referred user to get their name
+                    var referredUser = await MongoDb.GetUserAsync(referredId);
+                    string referredName = "Telegram User";
+                    if (referredUser != null && !string.IsNullOrEmpty(referredUser.FirstName))
+                    {
+                        referredName = referredUser.FirstName;
+                        if (!string.IsNullOrEmpty(referredUser.LastName))
+                            referredName += " " + referredUser.LastName;
+                    }
+                    
+                    // Add to referrer's referrals array
+                    await MongoDb.AddReferralToUserAsync(
+                        referrerId,
+                        referredId,
+                        referredName,
+                        Config.ReferralReward);
+                    
+                    Logging.AddToLog($"Created referral in MongoDB: {referredId} referred by {referrerId}");
+                }
+            }
+            
+            // Save referral links
+            foreach (var entry in RefLinks)
+            {
+                var userId = entry.Key;
+                var refCode = entry.Value;
+                
+                // Check if reflink already exists
+                var existingRefLink = await MongoDb.GetRefLinkByUserIdAsync(userId);
+                if (existingRefLink == null)
+                {
+                    var refLink = new Models.RefLinkModel
+                    {
+                        UserId = userId,
+                        RefCode = refCode,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    
+                    await MongoDb.CreateRefLinkAsync(refLink);
+                    Logging.AddToLog($"Created reflink in MongoDB: {userId} -> {refCode}");
+                }
+            }
+            
+            Logging.AddToLog("Data saved to MongoDB successfully");
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error saving data to MongoDB: {ex.Message}");
+            Console.WriteLine($"Error saving data to MongoDB: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Loads data from MongoDB into memory
+    /// </summary>
+    private static async Task LoadDataFromMongoDbAsync()
+    {
+        try
+        {
+            Console.WriteLine("Loading data from MongoDB...");
+            Logging.AddToLog("Loading data from MongoDB...");
+            
+            // Load referral links
+            var refLinks = await MongoDb.GetAllRefLinksAsync();
+            if (refLinks != null && refLinks.Count > 0)
+            {
+                RefLinks = refLinks;
+                Console.WriteLine($"Loaded {RefLinks.Count} referral links from MongoDB");
+                Logging.AddToLog($"Loaded {RefLinks.Count} referral links from MongoDB");
+            }
+            
+            // Load users and their data
+            var users = await MongoDb.GetAllUsersAsync();
+            if (users != null && users.Count > 0)
+            {
+                Console.WriteLine($"Loaded {users.Count} users from MongoDB");
+                Logging.AddToLog($"Loaded {users.Count} users from MongoDB");
+                
+                // Process user data
+                foreach (var user in users)
+                {
+                    // Load password attempts
+                    PasswordAttempts[user.TelegramId] = user.IsAdmin ? -1 : user.PasswordAttempts;
+                    
+                    // Load show welcome flag
+                    ShowWelcome[user.TelegramId] = user.ShowWelcome;
+                }
+            }
+            
+            // Load referrals
+            var referrals = await MongoDb.GetAllReferralsAsync();
+            if (referrals != null && referrals.Count > 0)
+            {
+                Console.WriteLine($"Loaded {referrals.Count} referrals from MongoDB");
+                Logging.AddToLog($"Loaded {referrals.Count} referrals from MongoDB");
+                
+                // Process referral data
+                foreach (var referral in referrals)
+                {
+                    // Load referred by relationships
+                    ReferredBy[referral.ReferredId] = referral.ReferrerId;
+                    
+                    // Load referral points
+                    if (ReferralPoints.ContainsKey(referral.ReferrerId))
+                    {
+                        ReferralPoints[referral.ReferrerId] += referral.Points;
+                    }
+                    else
+                    {
+                        ReferralPoints[referral.ReferrerId] = referral.Points;
+                    }
+                }
+            }
+            
+            // Load user activities
+            foreach (var user in users)
+            {
+                var activities = await MongoDb.GetAllUserActivitiesAsync(user.TelegramId);
+                if (activities != null && activities.Count > 0)
+                {
+                    UserActivity[user.TelegramId] = activities;
+                }
+            }
+            
+            // Update point totals
+            UpdatePointTotals();
+            
+            Console.WriteLine("Data loaded from MongoDB successfully");
+            Logging.AddToLog("Data loaded from MongoDB successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data from MongoDB: {ex.Message}");
+            Logging.AddToLog($"Error loading data from MongoDB: {ex.Message}");
+            
+            // Fallback to file storage
+            Console.WriteLine("Falling back to file storage");
+            Logging.AddToLog("Falling back to file storage");
+            
+            // Load data from files instead
+            LoadAllData();
+        }
+    }
+    
+    /// <summary>
+    /// Load all data from files
+    /// </summary>
+    private static void LoadAllData()
+    {
+        try
+        {
+            // Load configuration
+            LoadData.LoadConf();
+            Console.WriteLine("Configuration loaded successfully.");
+            
+            // Initialize collections if they're null
+            if (UserActivity == null) UserActivity = new Dictionary<string, Dictionary<string, int>>();
+            if (RefLinks == null) RefLinks = new Dictionary<string, string>();
+            if (ReferredBy == null) ReferredBy = new Dictionary<string, string>();
+            if (PasswordAttempts == null) PasswordAttempts = new Dictionary<string, int>();
+            if (ShowWelcome == null) ShowWelcome = new Dictionary<string, bool>();
+            if (ReferralPoints == null) ReferralPoints = new Dictionary<string, int>();
+            if (PointsByReferrer == null) PointsByReferrer = new Dictionary<string, int>();
+            if (UserPointOffset == null) UserPointOffset = new Dictionary<string, int>();
+            if (JoinedReferrals == null) JoinedReferrals = new Dictionary<string, bool>();
+            
+            // Log that we're using MongoDB instead of file storage
+            Console.WriteLine("Using MongoDB for data persistence. File loading skipped.");
+            Logging.AddToLog("Using MongoDB for data persistence. File loading skipped.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading configuration: {ex.Message}");
+            Logging.AddToLog($"Error loading configuration: {ex.Message}");
+        }
     }
 }

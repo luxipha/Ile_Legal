@@ -74,4 +74,14 @@ public static class Config
     /// Points awarded for winning daily leaderboard (Stage 3)
     /// </summary>
     public static int LeaderboardReward { get; set; } = 200;
+    
+    /// <summary>
+    /// MongoDB connection string
+    /// </summary>
+    public static string MongoDbConnectionString { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// MongoDB database name
+    /// </summary>
+    public static string MongoDbDatabaseName { get; set; } = "ile_referral_bot";
 }

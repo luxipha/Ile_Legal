@@ -12,7 +12,7 @@ public static class LoadData
     /// <summary>
     /// Loads configuration from the config file
     /// </summary>
-    public static void LoadConf()
+    public static bool LoadConf()
     {
         string message = "Beginning load config.";
         Logging.AddToLog(message);
@@ -235,6 +235,30 @@ public static class LoadData
                             error = true;
                         }
                     }
+                    else if (s.StartsWith("mongoDbConnectionString=") || s.StartsWith("mongoDb="))
+                    {
+                        string[] parse = s.Split('=');
+                        if (parse.Length == 2 && !string.IsNullOrWhiteSpace(parse[1]) && !parse[1].Contains('<') && !parse[1].Contains('>'))
+                        {
+                            Config.MongoDbConnectionString = parse[1];
+                        }
+                        else
+                        {
+                            error = true;
+                        }
+                    }
+                    else if (s.StartsWith("mongoDbDatabaseName=") || s.StartsWith("mongoDbName="))
+                    {
+                        string[] parse = s.Split('=');
+                        if (parse.Length == 2 && !string.IsNullOrWhiteSpace(parse[1]) && !parse[1].Contains('<') && !parse[1].Contains('>'))
+                        {
+                            Config.MongoDbDatabaseName = parse[1];
+                        }
+                        else
+                        {
+                            error = true;
+                        }
+                    }
                 }
 
                 if (error)
@@ -307,7 +331,9 @@ public static class LoadData
             
             // Load campaign days
             LoadCampaignDays();
+            return true;
         }
+        return false;
     }
 
     /// <summary>
@@ -686,9 +712,11 @@ public static class LoadData
             foreach (string s in lines)
             {
                 string[] parts = s.Split('?');
-                if (parts.Length == 2 && int.TryParse(parts[0], out int id))
+                if (parts.Length == 2)
                 {
-                    Program.JoinedReferrals.Add(id, parts[1]);
+                    string userId = parts[0];
+                    bool joined = parts[1].Equals("true", StringComparison.OrdinalIgnoreCase);
+                    Program.JoinedReferrals.Add(userId, joined);
                 }
             }
             
@@ -850,6 +878,181 @@ public static class LoadData
             string text = "Error parsing start date. Could not create campaign days.";
             Logging.AddToLog(text);
             Console.WriteLine(text);
+        }
+    }
+
+    /// <summary>
+    /// Loads configuration from environment variables as a fallback
+    /// </summary>
+    /// <returns>True if successful, false if there were errors</returns>
+    public static bool LoadFromEnvironment()
+    {
+        Console.WriteLine("Attempting to load configuration from environment variables...");
+        bool loaded = false;
+
+        // Try to load from .env file first
+        LoadEnvFile();
+
+        // MongoDB connection string
+        string? mongoDbConnectionString = Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
+        if (!string.IsNullOrEmpty(mongoDbConnectionString))
+        {
+            Config.MongoDbConnectionString = mongoDbConnectionString;
+            Console.WriteLine("Loaded MongoDB connection string from environment variable");
+            loaded = true;
+        }
+
+        // MongoDB database name
+        string? mongoDbDatabaseName = Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
+        if (!string.IsNullOrEmpty(mongoDbDatabaseName))
+        {
+            Config.MongoDbDatabaseName = mongoDbDatabaseName;
+            Console.WriteLine($"Loaded MongoDB database name from environment variable: {mongoDbDatabaseName}");
+            loaded = true;
+        }
+
+        // Bot token
+        string? botToken = Environment.GetEnvironmentVariable("BOT_TOKEN");
+        if (!string.IsNullOrEmpty(botToken))
+        {
+            Config.BotAccessToken = botToken;
+            Console.WriteLine("Loaded bot token from environment variable");
+            loaded = true;
+        }
+        
+        // Admin password
+        string? adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
+        if (!string.IsNullOrEmpty(adminPassword))
+        {
+            Config.AdminPassword = adminPassword;
+            Console.WriteLine("Loaded admin password from environment variable");
+            loaded = true;
+        }
+        
+        // Link to group
+        string? linkToGroup = Environment.GetEnvironmentVariable("LINK_GROUP");
+        if (!string.IsNullOrEmpty(linkToGroup))
+        {
+            Config.LinkToGroup = linkToGroup;
+            Console.WriteLine("Loaded link to group from environment variable");
+            loaded = true;
+        }
+        
+        // Link to bot
+        string? linkToBot = Environment.GetEnvironmentVariable("LINK_BOT");
+        if (!string.IsNullOrEmpty(linkToBot))
+        {
+            Config.LinkToBot = linkToBot;
+            Console.WriteLine("Loaded link to bot from environment variable");
+            loaded = true;
+        }
+        
+        // Start date
+        string? startDate = Environment.GetEnvironmentVariable("START_DATE");
+        if (!string.IsNullOrEmpty(startDate))
+        {
+            Config.StartDate = startDate;
+            Console.WriteLine($"Loaded start date from environment variable: {startDate}");
+            loaded = true;
+        }
+        
+        // Number of days
+        string? numberOfDays = Environment.GetEnvironmentVariable("NUMBER_OF_DAYS");
+        if (!string.IsNullOrEmpty(numberOfDays) && int.TryParse(numberOfDays, out int days))
+        {
+            Config.NumberOfDays = days;
+            Console.WriteLine($"Loaded number of days from environment variable: {days}");
+            loaded = true;
+        }
+        
+        // Max points per day
+        string? maxPointsPerDay = Environment.GetEnvironmentVariable("MAX_POINTS_PER_DAY");
+        if (!string.IsNullOrEmpty(maxPointsPerDay) && int.TryParse(maxPointsPerDay, out int max))
+        {
+            Config.MaxPointsPerDay = max;
+            Console.WriteLine($"Loaded max points per day from environment variable: {max}");
+            loaded = true;
+        }
+        
+        // Threshold for message point
+        string? thresholdForMessagePoint = Environment.GetEnvironmentVariable("THRESHOLD_FOR_MESSAGE_POINT");
+        if (!string.IsNullOrEmpty(thresholdForMessagePoint) && int.TryParse(thresholdForMessagePoint, out int threshold))
+        {
+            Config.ThresholdForMessagePoint = threshold;
+            Console.WriteLine($"Loaded threshold for message point from environment variable: {threshold}");
+            loaded = true;
+        }
+        
+        // Join reward
+        string? joinReward = Environment.GetEnvironmentVariable("JOIN_REWARD");
+        if (!string.IsNullOrEmpty(joinReward) && int.TryParse(joinReward, out int join))
+        {
+            Config.JoinReward = join;
+            Console.WriteLine($"Loaded join reward from environment variable: {join}");
+            loaded = true;
+        }
+        
+        // Referral reward
+        string? referralReward = Environment.GetEnvironmentVariable("REFERRAL_REWARD");
+        if (!string.IsNullOrEmpty(referralReward) && int.TryParse(referralReward, out int referral))
+        {
+            Config.ReferralReward = referral;
+            Console.WriteLine($"Loaded referral reward from environment variable: {referral}");
+            loaded = true;
+        }
+        
+        // Streak reward
+        string? streakReward = Environment.GetEnvironmentVariable("STREAK_REWARD");
+        if (!string.IsNullOrEmpty(streakReward) && int.TryParse(streakReward, out int streak))
+        {
+            Config.StreakReward = streak;
+            Console.WriteLine($"Loaded streak reward from environment variable: {streak}");
+            loaded = true;
+        }
+        
+        // Leaderboard reward
+        string? leaderboardReward = Environment.GetEnvironmentVariable("LEADERBOARD_REWARD");
+        if (!string.IsNullOrEmpty(leaderboardReward) && int.TryParse(leaderboardReward, out int leaderboard))
+        {
+            Config.LeaderboardReward = leaderboard;
+            Console.WriteLine($"Loaded leaderboard reward from environment variable: {leaderboard}");
+            loaded = true;
+        }
+
+        return loaded;
+    }
+
+    /// <summary>
+    /// Loads environment variables from .env file
+    /// </summary>
+    private static void LoadEnvFile()
+    {
+        string envFile = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+        Console.WriteLine($"Looking for .env file at: {envFile}");
+        
+        if (File.Exists(envFile))
+        {
+            Console.WriteLine(".env file found, loading environment variables...");
+            foreach (var line in File.ReadAllLines(envFile))
+            {
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+                    continue;
+
+                var parts = line.Split('=', 2);
+                if (parts.Length != 2)
+                    continue;
+
+                var key = parts[0].Trim();
+                var value = parts[1].Trim();
+                
+                // Set environment variable
+                Environment.SetEnvironmentVariable(key, value);
+                Console.WriteLine($"Set environment variable: {key}");
+            }
+        }
+        else
+        {
+            Console.WriteLine(".env file not found, using system environment variables only.");
         }
     }
 }

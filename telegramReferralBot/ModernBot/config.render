@@ -1,0 +1,29 @@
+* SETUP INFO
+* 
+* This is the configuration file for the Telegram Referral Bot on Render
+* All values will be overridden by environment variables if present
+*
+
+bot=$TELEGRAM_BOT_TOKEN
+
+linkGroup=$LINK_GROUP
+
+linkBot=$LINK_BOT
+
+pw=$ADMIN_PASSWORD
+
+start=$CAMPAIGN_START_DATE
+
+days=$CAMPAIGN_DAYS
+
+max=$MAX_POINTS_PER_DAY
+
+threshold=$MESSAGE_THRESHOLD
+
+joinReward=$JOIN_REWARD
+
+referralReward=$REFERRAL_REWARD
+
+streakReward=$STREAK_REWARD
+
+leaderboardReward=$LEADERBOARD_REWARD
