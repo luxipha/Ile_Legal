@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TelegramReferralBot")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+12633b458ea39670fa76da1ede992cd5c88bd1c4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ea6674258fe861853a09f51b4a62cef9cd64912a")]
 [assembly: System.Reflection.AssemblyProductAttribute("TelegramReferralBot")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TelegramReferralBot")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
