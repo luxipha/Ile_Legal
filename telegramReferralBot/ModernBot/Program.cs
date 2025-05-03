@@ -162,7 +162,7 @@ class Program
             StartMongoDbSaveTimer();
             
             // Start the health check server
-            await StartHealthCheckServer();
+            StartHealthCheckServer();
             
             // Set up polling with retry logic
             var receiverOptions = new ReceiverOptions
@@ -198,49 +198,62 @@ class Program
         }
     }
     
-    private static Task StartHealthCheckServer()
+    private static void StartHealthCheckServer()
     {
         try
         {
             _listener = new HttpListener();
-            _listener.Prefixes.Add("http://*:5000/");
+            _listener.Prefixes.Add("http://+:8080/");
             _listener.Start();
             
-            Console.WriteLine("Health check server started on port 5000");
-            Logging.AddToLog("Health check server started on port 5000");
+            Logging.AddToLog("Started health check server on port 8080");
             
-            // Handle requests in a background task
-            _ = Task.Run(async () =>
+            // Start a thread to handle health check requests
+            new Thread(() =>
             {
                 while (_listener.IsListening)
                 {
                     try
                     {
-                        var context = await _listener.GetContextAsync();
-                        var response = context.Response;
+                        // Wait for a request
+                        HttpListenerContext context = _listener.GetContext();
+                        HttpListenerRequest request = context.Request;
+                        HttpListenerResponse response = context.Response;
                         
-                        string responseString = "Bot is running!";
-                        byte[] buffer = Encoding.UTF8.GetBytes(responseString);
+                        // Log the request
+                        Logging.AddToLog($"Received request: {request.HttpMethod} {request.Url.PathAndQuery}");
                         
-                        response.ContentLength64 = buffer.Length;
-                        response.ContentType = "text/plain";
-                        var output = response.OutputStream;
-                        await output.WriteAsync(buffer, 0, buffer.Length);
-                        output.Close();
+                        // Handle health check endpoint
+                        if (request.Url.PathAndQuery == "/health" || request.Url.PathAndQuery == "/")
+                        {
+                            string responseString = "OK - IleRefer Bot is running";
+                            byte[] buffer = Encoding.UTF8.GetBytes(responseString);
+                            
+                            response.ContentLength64 = buffer.Length;
+                            response.StatusCode = 200;
+                            Stream output = response.OutputStream;
+                            output.Write(buffer, 0, buffer.Length);
+                            output.Close();
+                            
+                            Logging.AddToLog("Health check request successful");
+                        }
+                        else
+                        {
+                            response.StatusCode = 404;
+                            response.Close();
+                        }
                     }
                     catch (Exception ex)
                     {
                         Logging.AddToLog($"Error handling health check request: {ex.Message}");
                     }
                 }
-            });
+            }).Start();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error starting health check server: {ex.Message}");
-            Logging.AddToLog($"Error starting health check server: {ex.Message}");
+            Logging.AddToLog($"Failed to start health check server: {ex.Message}");
         }
-        return Task.CompletedTask;
     }
     
     /// <summary>
