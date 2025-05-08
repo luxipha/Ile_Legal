@@ -105,7 +105,7 @@ namespace TelegramReferralBot.Services
             {
                 Logging.AddToLog($"Error getting user: {ex.Message}");
                 Console.WriteLine($"Error getting user: {ex.Message}");
-                return new UserModel();
+                return null;
             }
         }
         
@@ -140,6 +140,12 @@ namespace TelegramReferralBot.Services
                     
                     // Set default values for backend schema
                     user.Balance = user.BricksTotal; // Use bricks as initial balance
+                    
+                    // Ensure Bricks is properly initialized
+                    if (user.Bricks == null)
+                    {
+                        user.Bricks = new BricksModel { Total = user.BricksTotal };
+                    }
                     
                     await _users.InsertOneAsync(user);
                     Logging.AddToLog($"Created new user with telegramChatId: {user.TelegramId}");
@@ -271,6 +277,27 @@ namespace TelegramReferralBot.Services
             try
             {
                 var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, userId);
+                
+                // First check if user exists
+                var user = await _users.Find(filter).FirstOrDefaultAsync();
+                if (user == null)
+                {
+                    // Create user if they don't exist
+                    user = new UserModel
+                    {
+                        TelegramId = userId,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        Bricks = new BricksModel { Total = bricksTotal },
+                        Balance = bricksTotal
+                    };
+                    
+                    await _users.InsertOneAsync(user);
+                    Logging.AddToLog($"Created new user with {bricksTotal} bricks: {userId}");
+                    return true;
+                }
+                
+                // Update existing user
                 var update = Builders<UserModel>.Update
                     .Set("bricks.total", bricksTotal)
                     .Set(u => u.Balance, bricksTotal)
