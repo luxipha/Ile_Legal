@@ -1027,7 +1027,7 @@ public static class LoadData
     /// </summary>
     private static void LoadEnvFile()
     {
-        string envFile = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+        string envFile = Path.Combine(Directory.GetCurrentDirectory(), ".env.local");
         Console.WriteLine($"Looking for .env file at: {envFile}");
         
         if (File.Exists(envFile))

@@ -60,15 +60,18 @@ public static class MessageProcessor
 
             var chatId = callbackQuery.Message?.Chat.Id;
             var userId = callbackQuery.From.Id.ToString();
-            
+
+            // Ensure user exists in the database whenever they interact with the bot
+            await EnsureUserExistsAsync(userId, callbackQuery.From, cancellationToken);
+
             Logging.AddToLog($"Callback query from {userId}: {callbackQuery.Data}");
-            
-            // Answer the callback query to remove the loading indicator
+
+            // Acknowledge the callback query
             await Program.BotClient.AnswerCallbackQueryAsync(
                 callbackQuery.Id,
-                cancellationToken: cancellationToken);
-            
-            // Process different callback data
+                cancellationToken: cancellationToken
+            );
+
             if (callbackQuery.Data.StartsWith("viewpoints"))
             {
                 await HandleViewPointsCallback(callbackQuery, cancellationToken);
@@ -85,6 +88,10 @@ public static class MessageProcessor
             {
                 await HandleGetReferralCallback(callbackQuery, cancellationToken);
             }
+            else if (callbackQuery.Data.StartsWith("joingroup"))
+            {
+                await HandleJoinGroupCallback(callbackQuery, cancellationToken);
+            }
         }
         catch (Exception ex)
         {
@@ -93,7 +100,40 @@ public static class MessageProcessor
             Console.WriteLine(text);
         }
     }
-    
+
+    /// <summary>
+    /// Handles the join group button callback
+    /// </summary>
+    private static async Task HandleJoinGroupCallback(CallbackQuery callbackQuery, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var chatId = callbackQuery.Message?.Chat.Id;
+            var userId = callbackQuery.From.Id.ToString();
+
+            if (chatId == null)
+                return;
+
+            // Ensure user exists in the database
+            await EnsureUserExistsAsync(userId, callbackQuery.From, cancellationToken);
+
+            // Send the group link
+            await Program.BotClient.SendTextMessageAsync(
+                chatId: chatId.Value,
+                text: $"Great! Click the button below to join the Ile Community group:",
+                replyMarkup: new InlineKeyboardMarkup(
+                    InlineKeyboardButton.WithUrl("Join Ile Community", Config.LinkToGroup)
+                ),
+                cancellationToken: cancellationToken
+            );
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error handling join group callback: {ex.Message}");
+            Console.WriteLine($"Error handling join group callback: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Handles the viewpoints callback
     /// </summary>
@@ -103,46 +143,19 @@ public static class MessageProcessor
         {
             var chatId = callbackQuery.Message?.Chat.Id;
             var userId = callbackQuery.From.Id.ToString();
-            
+
             if (chatId == null)
                 return;
-            
-            // Get points from backend or local storage
-            int points = 0;
-            
-            // Try to get points from the API first
-            try 
-            {
-                var apiPoints = await ApiIntegration.GetUserPointsAsync(userId);
-                if (apiPoints != null)
-                {
-                    points = Convert.ToInt32(apiPoints);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logging.AddToLog($"Error getting points from API: {ex.Message}. Falling back to local data.");
-                
-                // Fallback to local data
-                if (Program.PointsByReferrer.ContainsKey(userId))
-                {
-                    points = Program.PointsByReferrer[userId];
-                }
-            }
-            
-            string message = $"You have {points} Bricks.";
-            
-            await Program.BotClient.SendTextMessageAsync(
-                chatId: chatId.Value,
-                text: message,
-                cancellationToken: cancellationToken);
+
+            // Call the same method as /myPoints to ensure a single source of truth
+            await SendPointsInfoAsync(chatId.Value, userId, cancellationToken);
         }
         catch (Exception ex)
         {
             Logging.AddToLog($"Error in HandleViewPointsCallback: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Handles the viewreferrals callback
     /// </summary>
@@ -152,10 +165,10 @@ public static class MessageProcessor
         {
             var chatId = callbackQuery.Message?.Chat.Id;
             var userId = callbackQuery.From.Id.ToString();
-            
+
             if (chatId == null)
                 return;
-            
+
             // Get referral count
             int referralCount = 0;
             foreach (var entry in Program.ReferredBy)
@@ -165,9 +178,9 @@ public static class MessageProcessor
                     referralCount++;
                 }
             }
-            
+
             string message = $"You have referred {referralCount} users.";
-            
+
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId.Value,
                 text: message,
@@ -178,7 +191,7 @@ public static class MessageProcessor
             Logging.AddToLog($"Error in HandleViewReferralsCallback: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Handles the help callback
     /// </summary>
@@ -187,10 +200,10 @@ public static class MessageProcessor
         try
         {
             var chatId = callbackQuery.Message?.Chat.Id;
-            
+
             if (chatId == null)
                 return;
-            
+
             string message = "Available commands:\n" +
                              "/disableNotice - (Private Chat Only) Turn off private bot notices.\n" +
                              "/enableNotice - (Private Chat Only) Turn on private bot notices.\n" +
@@ -225,10 +238,10 @@ public static class MessageProcessor
             var chatId = callbackQuery.Message?.Chat.Id;
             var userId = callbackQuery.From.Id.ToString();
             var user = callbackQuery.From;
-            
+
             if (chatId == null)
                 return;
-            
+
             await SendReferralLinkAsync(chatId.Value, userId, user, cancellationToken);
         }
         catch (Exception ex)
@@ -242,154 +255,164 @@ public static class MessageProcessor
     /// </summary>
     private static async Task HandlePrivateMessageAsync(Message message, CancellationToken cancellationToken)
     {
-        var chatId = message.Chat.Id;
-        var userId = message.From?.Id.ToString() ?? "unknown";
-        var messageText = message.Text ?? string.Empty;
-        
-        // Log received message for debugging
-        Console.WriteLine($"Received a '{messageText}' message in private chat {chatId} from user {userId}.");
-        
-        // Check if user is awaiting reply
-        if (Program.AwaitingReply.Contains(userId))
+        try
         {
-            // Handle password check
-            string? result = Program.CheckPassword(messageText, userId);
-            if (result == "confirmed")
+            long chatId = message.Chat.Id;
+            string userId = message.From.Id.ToString();
+            string messageText = message.Text ?? string.Empty;
+
+            // Ensure user exists in the database whenever they interact with the bot
+            await EnsureUserExistsAsync(userId, message.From, cancellationToken);
+
+            // Log received message for debugging
+            Console.WriteLine($"Received a '{messageText}' message in private chat {chatId} from user {userId}.");
+
+            // Check if user is awaiting reply
+            if (Program.AwaitingReply.Contains(userId))
             {
-                Program.AwaitingReply.Remove(userId);
-                await Program.BotClient.SendTextMessageAsync(
-                    chatId: chatId,
-                    text: "Password confirmed. You can now use admin commands.",
-                    cancellationToken: cancellationToken);
+                // Handle password check
+                string? result = Program.CheckPassword(messageText, userId);
+                if (result == "confirmed")
+                {
+                    Program.AwaitingReply.Remove(userId);
+                    await Program.BotClient.SendTextMessageAsync(
+                        chatId: chatId,
+                        text: "Password confirmed. You can now use admin commands.",
+                        cancellationToken: cancellationToken);
+                }
+                else if (result == "wrong_1")
+                {
+                    await Program.BotClient.SendTextMessageAsync(
+                        chatId: chatId,
+                        text: "Incorrect password. You have 9 attempts remaining.",
+                        cancellationToken: cancellationToken);
+                }
+                else if (result != null && result.StartsWith("wrong_"))
+                {
+                    int attemptsLeft = 10 - int.Parse(result.Split('_')[1]);
+                    await Program.BotClient.SendTextMessageAsync(
+                        chatId: chatId,
+                        text: $"Incorrect password. You have {attemptsLeft} attempts remaining.",
+                        cancellationToken: cancellationToken);
+                }
+                else if (result == "banned")
+                {
+                    Program.AwaitingReply.Remove(userId);
+                    await Program.BotClient.SendTextMessageAsync(
+                        chatId: chatId,
+                        text: "Too many incorrect attempts. You are now banned from using admin commands.",
+                        cancellationToken: cancellationToken);
+                }
+                return;
             }
-            else if (result == "wrong_1")
+
+            // Handle commands
+            if (messageText.StartsWith("/"))
             {
-                await Program.BotClient.SendTextMessageAsync(
-                    chatId: chatId,
-                    text: "Incorrect password. You have 9 attempts remaining.",
-                    cancellationToken: cancellationToken);
+                if (messageText.StartsWith("/start"))
+                {
+                    // Check if this is a referral
+                    if (messageText.Contains("="))
+                    {
+                        // Format: /start=XXXXX
+                        string[] parts = messageText.Split('=');
+                        if (parts.Length > 1)
+                        {
+                            string refCode = parts[1];
+                            await HandleReferralAsync(message, refCode, cancellationToken);
+                        }
+                        else
+                        {
+                            // Invalid referral format, show regular welcome
+                            await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
+                        }
+                    }
+                    else if (messageText.Contains(" "))
+                    {
+                        // Format: /start XXXXX
+                        string[] parts = messageText.Split(' ');
+                        if (parts.Length > 1)
+                        {
+                            string refCode = parts[1];
+                            await HandleReferralAsync(message, refCode, cancellationToken);
+                        }
+                        else
+                        {
+                            // Invalid referral format, show regular welcome
+                            await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
+                        }
+                    }
+                    else
+                    {
+                        // Regular start command without referral
+                        await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
+                    }
+                }
+                else if (messageText == "/help")
+                {
+                    await SendHelpMessageAsync(chatId, cancellationToken);
+                }
+                else if (messageText == "/myID")
+                {
+                    await SendUserIdAsync(chatId, userId, cancellationToken);
+                }
+                else if (messageText == "/getRefLink")
+                {
+                    await SendReferralLinkAsync(chatId, userId, message.From!, cancellationToken);
+                }
+                else if (messageText == "/myPoints")
+                {
+                    await SendPointsInfoAsync(chatId, userId, cancellationToken);
+                }
+                else if (messageText == "/admin")
+                {
+                    await RequestPasswordAsync(chatId, userId, cancellationToken);
+                }
+                else if (messageText.StartsWith("/ban") && IsAdmin(userId))
+                {
+                    await BanUserAsync(message, cancellationToken);
+                }
+                else if (messageText.StartsWith("/unban") && IsAdmin(userId))
+                {
+                    await UnbanUserAsync(message, cancellationToken);
+                }
+                else if (messageText.StartsWith("/setgroup") && IsAdmin(userId))
+                {
+                    await SetGroupAsync(message, cancellationToken);
+                }
+                else if (messageText == "/leaderboard" || messageText == "/top10")
+                {
+                    await SendLeaderboardAsync(chatId, cancellationToken);
+                }
+                else if (messageText == "/journey" || messageText == "/rewards" || messageText == "/map")
+                {
+                    await SendBricksJourneyMapAsync(chatId, cancellationToken);
+                }
+                else if (messageText == "/disableNotice")
+                {
+                    await DisableNoticeAsync(chatId, userId, cancellationToken);
+                }
+                else if (messageText == "/enableNotice")
+                {
+                    await EnableNoticeAsync(chatId, userId, cancellationToken);
+                }
+                else if (messageText == "/listAll")
+                {
+                    await SendAllMembersListAsync(chatId, cancellationToken);
+                }
+                else if (messageText == "/listRef")
+                {
+                    await SendReferralCountListAsync(chatId, cancellationToken);
+                }
+                else if (messageText == "/refTotal")
+                {
+                    await SendRefTotalAsync(chatId, cancellationToken);
+                }
             }
-            else if (result != null && result.StartsWith("wrong_"))
-            {
-                int attemptsLeft = 10 - int.Parse(result.Split('_')[1]);
-                await Program.BotClient.SendTextMessageAsync(
-                    chatId: chatId,
-                    text: $"Incorrect password. You have {attemptsLeft} attempts remaining.",
-                    cancellationToken: cancellationToken);
-            }
-            else if (result == "banned")
-            {
-                Program.AwaitingReply.Remove(userId);
-                await Program.BotClient.SendTextMessageAsync(
-                    chatId: chatId,
-                    text: "Too many incorrect attempts. You are now banned from using admin commands.",
-                    cancellationToken: cancellationToken);
-            }
-            return;
         }
-        
-        // Handle commands
-        if (messageText.StartsWith("/"))
+        catch (Exception ex)
         {
-            if (messageText.StartsWith("/start"))
-            {
-                // Check if this is a referral
-                if (messageText.Contains("="))
-                {
-                    // Format: /start=XXXXX
-                    string[] parts = messageText.Split('=');
-                    if (parts.Length > 1)
-                    {
-                        string refCode = parts[1];
-                        await HandleReferralAsync(message, refCode, cancellationToken);
-                    }
-                    else
-                    {
-                        // Invalid referral format, show regular welcome
-                        await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
-                    }
-                }
-                else if (messageText.Contains(" "))
-                {
-                    // Format: /start XXXXX
-                    string[] parts = messageText.Split(' ');
-                    if (parts.Length > 1)
-                    {
-                        string refCode = parts[1];
-                        await HandleReferralAsync(message, refCode, cancellationToken);
-                    }
-                    else
-                    {
-                        // Invalid referral format, show regular welcome
-                        await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
-                    }
-                }
-                else
-                {
-                    // Regular start command without referral
-                    await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
-                }
-            }
-            else if (messageText == "/help")
-            {
-                await SendHelpMessageAsync(chatId, cancellationToken);
-            }
-            else if (messageText == "/myID")
-            {
-                await SendUserIdAsync(chatId, userId, cancellationToken);
-            }
-            else if (messageText == "/getRefLink")
-            {
-                await SendReferralLinkAsync(chatId, userId, message.From!, cancellationToken);
-            }
-            else if (messageText == "/myPoints")
-            {
-                await SendPointsInfoAsync(chatId, userId, cancellationToken);
-            }
-            else if (messageText == "/admin")
-            {
-                await RequestPasswordAsync(chatId, userId, cancellationToken);
-            }
-            else if (messageText.StartsWith("/ban") && IsAdmin(userId))
-            {
-                await BanUserAsync(message, cancellationToken);
-            }
-            else if (messageText.StartsWith("/unban") && IsAdmin(userId))
-            {
-                await UnbanUserAsync(message, cancellationToken);
-            }
-            else if (messageText.StartsWith("/setgroup") && IsAdmin(userId))
-            {
-                await SetGroupAsync(message, cancellationToken);
-            }
-            else if (messageText == "/leaderboard" || messageText == "/top10")
-            {
-                await SendLeaderboardAsync(chatId, cancellationToken);
-            }
-            else if (messageText == "/journey" || messageText == "/rewards" || messageText == "/map")
-            {
-                await SendBricksJourneyMapAsync(chatId, cancellationToken);
-            }
-            else if (messageText == "/disableNotice")
-            {
-                await DisableNoticeAsync(chatId, userId, cancellationToken);
-            }
-            else if (messageText == "/enableNotice")
-            {
-                await EnableNoticeAsync(chatId, userId, cancellationToken);
-            }
-            else if (messageText == "/listAll")
-            {
-                await SendAllMembersListAsync(chatId, cancellationToken);
-            }
-            else if (messageText == "/listRef")
-            {
-                await SendReferralCountListAsync(chatId, cancellationToken);
-            }
-            else if (messageText == "/refTotal")
-            {
-                await SendRefTotalAsync(chatId, cancellationToken);
-            }
+            Logging.AddToLog($"Error in HandlePrivateMessageAsync: {ex.Message}");
         }
     }
 
@@ -454,9 +477,13 @@ public static class MessageProcessor
     /// </summary>
     private static async Task SendWelcomeMessageAsync(long chatId, string userId, CancellationToken cancellationToken)
     {
+        // Get user information from Telegram
+        var user = await Program.BotClient.GetChatAsync(chatId, cancellationToken);
+        string userName = !string.IsNullOrEmpty(user.FirstName) ? user.FirstName : "there";
+
         string botName = GetBotNameFromConfig();
-        
-        string welcomeMessage = $"Welcome to {botName}!\n\n" +
+
+        string welcomeMessage = $"Hello {userName}! 👋\n\nWelcome to {botName}!\n\n" +
                                $"This bot helps you track referrals and earn Bricks.\n\n" +
                                $"• Get your referral link and share it with friends\n" +
                                $"• When they join using your link, you get Bricks\n" +
@@ -483,12 +510,26 @@ public static class MessageProcessor
             text: welcomeMessage,
             replyMarkup: groupButton,
             cancellationToken: cancellationToken);
-            
+
         // Mark that we've shown the welcome message
         if (!Program.ShowWelcome.ContainsKey(userId))
         {
             Program.ShowWelcome.Add(userId, true);
             SaveMethods.SaveShowWelcome();
+        }
+
+        // Also save the user's name to MongoDB if available
+        if (Program.MongoDb != null && !string.IsNullOrEmpty(user.FirstName))
+        {
+            try
+            {
+                // await Program.MongoDb.UpdateUserNameAsync(userId, user.FirstName, user.LastName ?? ""); // Temporarily commented out
+                Logging.AddToLog($"Updated user {userId} name to {user.FirstName} {user.LastName ?? ""}");
+            }
+            catch (Exception ex)
+            {
+                Logging.AddToLog($"Error updating user name: {ex.Message}");
+            }
         }
     }
 
@@ -523,76 +564,83 @@ public static class MessageProcessor
     {
         try
         {
-            string referralLink;
-            
+            // Ensure user exists in the database
+            await EnsureUserExistsAsync(userId, user, cancellationToken);
+
+            string referralLink = "";
+            string botName = GetBotNameFromConfig();
+
             // Try to get referral link from MongoDB first
             if (Program.MongoDb != null)
             {
-                var refLink = await Program.MongoDb.GetRefLinkByUserIdAsync(userId);
-                
-                if (refLink == null)
+                try
                 {
-                    // Generate a new referral link
-                    referralLink = Program.GetRefLink(user);
-                    
-                    // Store the new referral link in MongoDB
-                    var newRefLink = new Models.RefLinkModel
+                    var refLink = await Program.MongoDb.GetRefLinkByUserIdAsync(userId);
+                    if (refLink == null)
                     {
-                        UserId = userId,
-                        RefCode = Program.RefLinks[userId],
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    
-                    await Program.MongoDb.CreateRefLinkAsync(newRefLink);
-                    Logging.AddToLog($"Created new referral link in MongoDB for user {userId}");
-                }
-                else
-                {
-                    // Use existing referral link
-                    referralLink = Config.LinkToBot + "?start=" + refLink.RefCode;
-                    
-                    // Update in-memory cache if needed
-                    if (refLink.RefCode != null)
-                    {
-                        if (!Program.RefLinks.ContainsKey(userId) || Program.RefLinks[userId] != refLink.RefCode)
+                        // Generate a new referral link
+                        var chat = await Program.BotClient.GetChatAsync(long.Parse(userId));
+                        var telegramUser = new Telegram.Bot.Types.User
                         {
-                            Program.RefLinks[userId] = refLink.RefCode;
-                        }
+                            Id = long.Parse(userId),
+                            FirstName = chat.FirstName,
+                            LastName = chat.LastName,
+                            Username = chat.Username
+                        };
+                        referralLink = Program.GetRefLink(telegramUser);
+
+                        // Store the new referral link in MongoDB
+                        var newRefLink = new Models.RefLinkModel
+                        {
+                            UserId = userId,
+                            RefCode = referralLink.Split('=').Last(),
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        await Program.MongoDb.CreateRefLinkAsync(newRefLink);
+                        Logging.AddToLog($"Created new referral link in MongoDB for user {userId}");
+                    }
+                    else
+                    {
+                        // Use existing referral link
+                        referralLink = $"{Config.LinkToBot}?start={refLink.RefCode}";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logging.AddToLog($"Error getting points from API: {ex.Message}. Falling back to local data.");
+
+                    // Fallback to local data
+                    if (Program.PointsByReferrer.ContainsKey(userId))
+                    {
+                        referralLink = Program.GetRefLink(user);
                     }
                 }
             }
             else
             {
-                // Fall back to in-memory/file-based referral link
+                // MongoDB not available, use in-memory/file-based referral link
                 referralLink = Program.GetRefLink(user);
             }
-            
-            string botName = GetBotNameFromConfig();
-            
-            // Create a share button
-            var shareButton = new InlineKeyboardMarkup(new[]
+
+            // Create inline keyboard with share button
+            var inlineKeyboard = new InlineKeyboardMarkup(new[]
             {
                 new[]
                 {
                     InlineKeyboardButton.WithSwitchInlineQueryCurrentChat("📲 Share with Friends", "Join Ile to earn tokens and invest in property! Use my referral link:")
-                },
-                new[]
-                {
-                    InlineKeyboardButton.WithCallbackData("📊 View My Referrals", "viewreferrals"),
-                    InlineKeyboardButton.WithCallbackData("🏆 View My Bricks", "viewpoints")
                 }
             });
-            
+
+            // Send referral link message
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId,
                 text: $"🔗 *Your {botName} Referral Link*\n\n`{referralLink}`\n\n" +
-                      $"*Share this link to earn Bricks!*\n\n" +
-                      $"• You earn *{Config.ReferralReward} Bricks* for each new user who joins\n" +
-                      $"• Earn *additional Bricks* when your referrals are active\n" +
-                      $"• Compete on the leaderboard for special rewards\n\n" +
-                      $"Click the button below to share your link with friends!",
+                      $"Share this link with your friends. When they join using your link, you'll earn {Config.ReferralReward} Bricks!\n\n" +
+                      $"You can also use the button below to easily share your link.",
                 parseMode: ParseMode.Markdown,
-                replyMarkup: shareButton,
+                disableWebPagePreview: true,
+                replyMarkup: inlineKeyboard,
                 cancellationToken: cancellationToken);
         }
         catch (Exception ex)
@@ -612,7 +660,7 @@ public static class MessageProcessor
     {
         int points = 0;
         int referralCount = 0;
-        
+
         // Try to get points from MongoDB first
         if (Program.MongoDb != null)
         {
@@ -621,23 +669,23 @@ public static class MessageProcessor
             {
                 // Use the BricksTotal property which handles the nested bricks.total field
                 points = user.BricksTotal;
-                
+
                 // Use the Referrals.Count for referral count
                 referralCount = user.Referrals?.Count ?? 0;
             }
         }
-        
+
         // If not found in MongoDB or MongoDB is not available, fall back to memory cache
         if (points == 0 && Program.PointTotals.ContainsKey(userId))
         {
             points = Program.PointTotals[userId];
         }
-        
+
         if (referralCount == 0 && Program.ReferralPoints.ContainsKey(userId))
         {
             referralCount = Program.ReferralPoints[userId] / Config.ReferralReward;
         }
-        
+
         if (points == 0)
         {
             await Program.BotClient.SendTextMessageAsync(
@@ -651,10 +699,10 @@ public static class MessageProcessor
         }
         else
         {
-            string referralInfo = referralCount > 0 
-                ? $"You have referred {referralCount} people to Ile.\n\n" 
+            string referralInfo = referralCount > 0
+                ? $"You have referred {referralCount} people to Ile.\n\n"
                 : "";
-            
+
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId,
                 text: $"You have {points} Bricks.\n\n" +
@@ -672,10 +720,10 @@ public static class MessageProcessor
         var chatId = message.Chat.Id;
         var userId = message.From?.Id.ToString() ?? "unknown";
         string referredName = message.From?.FirstName ?? "Telegram User";
-        
+
         // Find the referrer - try MongoDB first, then fallback to memory
         string? referrerId = null;
-        
+
         if (Program.MongoDb != null)
         {
             // Try to find the referral code in MongoDB
@@ -685,7 +733,7 @@ public static class MessageProcessor
                 referrerId = refLink.UserId;
             }
         }
-        
+
         // If not found in MongoDB, check in-memory cache
         if (referrerId == null)
         {
@@ -698,14 +746,14 @@ public static class MessageProcessor
                 }
             }
         }
-        
+
         if (referrerId is null)
         {
             // Invalid referral code
             await SendWelcomeMessageAsync(chatId, userId, cancellationToken);
             return;
         }
-        
+
         // Can't refer yourself
         if (referrerId == userId)
         {
@@ -715,22 +763,22 @@ public static class MessageProcessor
                 cancellationToken: cancellationToken);
             return;
         }
-        
+
         // Check if user is already referred - try MongoDB first, then fallback to memory
         bool alreadyReferred = false;
-        
+
         if (Program.MongoDb != null)
         {
             var existingReferral = await Program.MongoDb.GetReferralByReferredIdAsync(userId);
             alreadyReferred = existingReferral != null;
         }
-        
+
         // If not checked in MongoDB or not found, check in-memory cache
         if (!alreadyReferred && Program.ReferredBy.ContainsKey(userId))
         {
             alreadyReferred = true;
         }
-        
+
         if (alreadyReferred)
         {
             await Program.BotClient.SendTextMessageAsync(
@@ -739,12 +787,12 @@ public static class MessageProcessor
                 cancellationToken: cancellationToken);
             return;
         }
-        
+
         // Add referral to memory cache
         Program.ReferredBy[userId] = referrerId;
-        
+
         bool savedToMongoDB = false;
-        
+
         // Create referral in MongoDB if available
         if (Program.MongoDb != null)
         {
@@ -759,16 +807,16 @@ public static class MessageProcessor
                     Timestamp = DateTime.UtcNow,
                     Type = "referral"
                 };
-                
+
                 await Program.MongoDb.CreateReferralAsync(referral);
-                
+
                 // 2. Add referral to user's referrals array and update bricks
                 await Program.MongoDb.AddReferralToUserAsync(
-                    referrerId, 
-                    userId, 
-                    referredName, 
+                    referrerId,
+                    userId,
+                    referredName,
                     Config.ReferralReward);
-                
+
                 savedToMongoDB = true;
                 Logging.AddToLog($"Referral saved to MongoDB: {userId} referred by {referrerId}");
             }
@@ -779,7 +827,7 @@ public static class MessageProcessor
                 savedToMongoDB = false;
             }
         }
-        
+
         // Fall back to file storage if MongoDB save failed or not available
         if (!savedToMongoDB)
         {
@@ -792,15 +840,15 @@ public static class MessageProcessor
             {
                 Program.ReferralPoints.Add(referrerId, Config.ReferralReward);
             }
-            
+
             // Save to files
             SaveMethods.SaveReferredBy();
             SaveMethods.SaveReferralPoints();
         }
-        
+
         // Update points
         Program.UpdatePointTotals();
-        
+
         var groupButton = new InlineKeyboardMarkup(new[]
         {
             new[]
@@ -825,7 +873,7 @@ public static class MessageProcessor
             parseMode: ParseMode.Markdown,
             replyMarkup: groupButton,
             cancellationToken: cancellationToken);
-        
+
         // Notify referrer
         try
         {
@@ -847,36 +895,36 @@ public static class MessageProcessor
     {
         var userId = message.From?.Id.ToString() ?? "unknown";
         var messageText = message.Text ?? string.Empty;
-        
+
         // Check if message is long enough to count for points
         if (messageText.Length < Config.ThresholdForMessagePoint)
             return Task.CompletedTask;
-        
+
         // Check if user was referred by someone
         if (!Program.ReferredBy.ContainsKey(userId))
             return Task.CompletedTask;
-        
+
         string referrerId = Program.ReferredBy[userId];
-        
+
         // Get current date
         string today = DateTime.Now.ToString("MM/dd/yyyy");
-        
+
         // Check if today is in the campaign period
         if (!Program.CampaignDays.Contains(today))
             return Task.CompletedTask;
-        
+
         // Update user activity
         Dictionary<string, int> userActivityPerDay;
         if (Program.UserActivity.ContainsKey(userId))
         {
             userActivityPerDay = Program.UserActivity[userId];
-            
+
             // Add today if not present
             if (!userActivityPerDay.ContainsKey(today))
             {
                 userActivityPerDay.Add(today, 0);
             }
-            
+
             // Increment activity count for today
             userActivityPerDay[today]++;
         }
@@ -886,22 +934,22 @@ public static class MessageProcessor
             Dictionary<string, int>? tempActivityDict = Program.CreateUserActivityDictionary(userId);
             if (tempActivityDict is null)
                 return Task.CompletedTask;
-            
+
             userActivityPerDay = tempActivityDict;
-            
+
             // Increment activity count for today
             if (userActivityPerDay.ContainsKey(today))
             {
                 userActivityPerDay[today]++;
             }
         }
-        
+
         // Save user activity
         SaveMethods.SaveUserActivity();
-        
+
         // Update points
         Program.UpdatePointTotals();
-        
+
         return Task.CompletedTask;
     }
 
@@ -919,13 +967,13 @@ public static class MessageProcessor
                 cancellationToken: cancellationToken);
             return;
         }
-        
+
         // Add user to awaiting reply list
         if (!Program.AwaitingReply.Contains(userId))
         {
             Program.AwaitingReply.Add(userId);
         }
-        
+
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
             text: "Please enter the admin password:",
@@ -939,7 +987,7 @@ public static class MessageProcessor
     {
         var chatId = message.Chat.Id;
         var messageText = message.Text ?? string.Empty;
-        
+
         string[] parts = messageText.Split(' ');
         if (parts.Length < 2)
         {
@@ -949,9 +997,9 @@ public static class MessageProcessor
                 cancellationToken: cancellationToken);
             return;
         }
-        
+
         string targetUserId = parts[1];
-        
+
         // Set user point offset to -1000000 (banned)
         if (Program.UserPointOffset.ContainsKey(targetUserId))
         {
@@ -961,10 +1009,10 @@ public static class MessageProcessor
         {
             Program.UserPointOffset.Add(targetUserId, -1000000);
         }
-        
+
         SaveMethods.SaveUserPointOffset();
         Program.UpdatePointTotals();
-        
+
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
             text: $"User {targetUserId} has been banned from the referral program.",
@@ -978,7 +1026,7 @@ public static class MessageProcessor
     {
         var chatId = message.Chat.Id;
         var messageText = message.Text ?? string.Empty;
-        
+
         string[] parts = messageText.Split(' ');
         if (parts.Length < 2)
         {
@@ -988,9 +1036,9 @@ public static class MessageProcessor
                 cancellationToken: cancellationToken);
             return;
         }
-        
+
         string targetUserId = parts[1];
-        
+
         // Remove ban by setting point offset to 0
         if (Program.UserPointOffset.ContainsKey(targetUserId))
         {
@@ -1000,10 +1048,10 @@ public static class MessageProcessor
         {
             Program.UserPointOffset.Add(targetUserId, 0);
         }
-        
+
         SaveMethods.SaveUserPointOffset();
         Program.UpdatePointTotals();
-        
+
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
             text: $"User {targetUserId} has been unbanned from the referral program.",
@@ -1017,7 +1065,7 @@ public static class MessageProcessor
     {
         var chatId = message.Chat.Id;
         var messageText = message.Text ?? string.Empty;
-        
+
         string[] parts = messageText.Split(' ');
         if (parts.Length < 2)
         {
@@ -1027,12 +1075,12 @@ public static class MessageProcessor
                 cancellationToken: cancellationToken);
             return;
         }
-        
+
         if (long.TryParse(parts[1], out long groupId))
         {
             Config.GroupChatIdNumber = groupId;
             SaveMethods.SaveGroupChatIdNumber();
-            
+
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId,
                 text: $"Target group has been set to {groupId}.",
@@ -1058,7 +1106,7 @@ public static class MessageProcessor
             .OrderByDescending(x => x.Value)
             .Take(10)
             .ToList();
-        
+
         if (topReferrers.Count == 0)
         {
             await Program.BotClient.SendTextMessageAsync(
@@ -1067,14 +1115,14 @@ public static class MessageProcessor
                 cancellationToken: cancellationToken);
             return;
         }
-        
+
         string leaderboardMessage = "🏆 Top Referrers 🏆\n\n";
-        
+
         for (int i = 0; i < topReferrers.Count; i++)
         {
             leaderboardMessage += $"{i + 1}. User {topReferrers[i].Key}: {topReferrers[i].Value} Bricks\n";
         }
-        
+
         await Program.BotClient.SendTextMessageAsync(
             chatId: chatId,
             text: leaderboardMessage,
@@ -1086,7 +1134,7 @@ public static class MessageProcessor
     /// </summary>
     private static bool IsAdmin(string userId)
     {
-        return Program.PasswordAttempts.ContainsKey(userId) && 
+        return Program.PasswordAttempts.ContainsKey(userId) &&
                Program.PasswordAttempts[userId] == -1; // -1 is used to mark confirmed admins
     }
 
@@ -1256,7 +1304,7 @@ public static class MessageProcessor
             var sb = new StringBuilder();
             sb.AppendLine("*All Members with Bricks:*");
             sb.AppendLine();
-            
+
             if (Program.PointsByReferrer.Count == 0)
             {
                 sb.AppendLine("No members with Bricks yet.");
@@ -1267,7 +1315,7 @@ public static class MessageProcessor
                 var sortedMembers = Program.PointsByReferrer
                     .OrderByDescending(x => x.Value)
                     .ToList();
-                
+
                 for (int i = 0; i < sortedMembers.Count; i++)
                 {
                     var member = sortedMembers[i];
@@ -1275,7 +1323,7 @@ public static class MessageProcessor
                     sb.AppendLine($"{i + 1}. {username}: {member.Value} Bricks");
                 }
             }
-            
+
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId,
                 text: sb.ToString(),
@@ -1288,7 +1336,7 @@ public static class MessageProcessor
             Console.WriteLine($"Error in ListAllMembersAsync: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Lists all members with their referral count
     /// </summary>
@@ -1299,7 +1347,7 @@ public static class MessageProcessor
             var sb = new StringBuilder();
             sb.AppendLine("*All Members with Referral Count:*");
             sb.AppendLine();
-            
+
             if (Program.ReferralPoints.Count == 0)
             {
                 sb.AppendLine("No members with referrals yet.");
@@ -1310,7 +1358,7 @@ public static class MessageProcessor
                 var sortedMembers = Program.ReferralPoints
                     .OrderByDescending(x => x.Value)
                     .ToList();
-                
+
                 for (int i = 0; i < sortedMembers.Count; i++)
                 {
                     var member = sortedMembers[i];
@@ -1319,7 +1367,7 @@ public static class MessageProcessor
                     sb.AppendLine($"{i + 1}. {username}: {referralCount} referrals");
                 }
             }
-            
+
             await Program.BotClient.SendTextMessageAsync(
                 chatId: chatId,
                 text: sb.ToString(),
@@ -1332,32 +1380,32 @@ public static class MessageProcessor
             Console.WriteLine($"Error in ListReferralsAsync: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Sends the Bricks Journey Map to the user
     /// </summary>
     private static async Task SendBricksJourneyMapAsync(long chatId, CancellationToken cancellationToken)
     {
-        string journeyMap = 
+        string journeyMap =
             "🧱 *Ilé Bricks Journey Map* 🧱\n\n" +
             "*Stage 1: Welcome Explorer (0–500 Bricks)*\n\n" +
             "✅ Bind Email → +50 Bricks\n" +
             $"✅ Join Telegram Group → +{Config.JoinReward} Bricks\n" +
             "✅ First Check-in → +10 Bricks\n" +
             "→ Early wins! You're now part of the community!\n\n" +
-            
+
             "*Stage 2: Active Citizen (500–2,000 Bricks)*\n\n" +
             "🔥 Daily Check-Ins → +10 Bricks/day\n" +
             $"🔥 Daily Group Activity → +5 Bricks/message (Cap: {Config.MaxPointsPerDay}/day)\n" +
             $"🔥 First 3 Referrals → +{Config.ReferralReward * 3} Bricks\n" +
             "→ You're building your foundation!\n\n" +
-            
+
             "*Stage 3: Community Builder (2,000–5,000 Bricks)*\n\n" +
             "🛡️ 5+ Successful Referrals → +Bonus 500 Bricks\n" +
             $"🛡️ Win a Daily Leaderboard → +{Config.LeaderboardReward} Bricks\n" +
             $"🛡️ Maintain 7-Day Streak → +{Config.StreakReward} Bricks\n" +
             "→ You are now trusted! Special badge unlocked.\n\n" +
-            
+
             "*Stage 4: Brick Millionaire (5,000–10,000 Bricks)*\n\n" +
             "🏠 Special Tasks/Challenges → +500–1,000 Bricks";
 
@@ -1367,7 +1415,7 @@ public static class MessageProcessor
             parseMode: ParseMode.Markdown,
             cancellationToken: cancellationToken);
     }
-    
+
     /// <summary>
     /// Sends a list of all members with their Bricks
     /// </summary>
@@ -1375,7 +1423,7 @@ public static class MessageProcessor
     {
         await ListAllMembersAsync(chatId, cancellationToken);
     }
-    
+
     /// <summary>
     /// Sends a list of all members with their referral count
     /// </summary>
@@ -1383,7 +1431,7 @@ public static class MessageProcessor
     {
         await ListReferralsAsync(chatId, cancellationToken);
     }
-    
+
     /// <summary>
     /// Gets a username from a user ID
     /// </summary>
@@ -1393,7 +1441,7 @@ public static class MessageProcessor
         {
             // Try to get the chat from Telegram
             var chat = await Program.BotClient.GetChatAsync(long.Parse(userId));
-            
+
             // Return username or first name
             if (!string.IsNullOrEmpty(chat.Username))
                 return "@" + chat.Username;
@@ -1408,14 +1456,14 @@ public static class MessageProcessor
             return userId;
         }
     }
-    
+
     /// <summary>
     /// Extracts the bot name from Config.LinkToBot
     /// </summary>
     private static string GetBotNameFromConfig()
     {
         string botName = "Telegram Bot"; // Default fallback
-        
+
         if (!string.IsNullOrEmpty(Config.LinkToBot))
         {
             try
@@ -1434,7 +1482,146 @@ public static class MessageProcessor
                 Console.WriteLine($"Error extracting bot name from config: {ex.Message}");
             }
         }
-        
+
         return botName;
+    }
+
+    /// <summary>
+    /// Handles a request for a referral link
+    /// </summary>
+    private static async Task HandleReferralLinkRequestAsync(Message message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            long chatId = message.Chat.Id;
+            string userId = message.From.Id.ToString();
+
+            // Ensure user exists in the database
+            await EnsureUserExistsAsync(userId, message.From, cancellationToken);
+
+            // Get or generate referral link
+            string referralLink = await GetReferralLinkAsync(userId);
+
+            // Send the referral link
+            await Program.BotClient.SendTextMessageAsync(
+                chatId: chatId,
+                text: $"Here's your referral link:\n\n{referralLink}\n\nShare this link with your friends. When they join the Ile Community using your link, you'll earn {Config.ReferralReward} Bricks!",
+                disableWebPagePreview: true,
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error handling referral link request: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Ensures a user exists in the database
+    /// </summary>
+    private static async Task EnsureUserExistsAsync(string userId, User telegramUser, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (Program.MongoDb == null)
+            {
+                Logging.AddToLog("MongoDB not initialized. Cannot ensure user exists.");
+                return;
+            }
+
+            // Check if user already exists
+            var user = await Program.MongoDb.GetUserAsync(userId);
+            if (user == null || string.IsNullOrEmpty(user.Id))
+            {
+                // Create new user with proper nested bricks structure
+                var newUser = new Models.UserModel
+                {
+                    TelegramId = userId,
+                    FirstName = telegramUser.FirstName,
+                    LastName = telegramUser.LastName,
+                    Username = telegramUser.Username,
+                    Email = $"telegram-{userId}@placeholder.com",
+                    Balance = 0,
+                    Bricks = new Models.BricksModel { Total = 0 },
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    ShowWelcome = true
+                };
+
+                await Program.MongoDb.CreateUserAsync(newUser);
+                Logging.AddToLog($"Created new user in MongoDB: {userId} ({telegramUser.FirstName} {telegramUser.LastName})");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logging.AddToLog($"Error ensuring user exists: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Gets a referral link for a user
+    /// </summary>
+    private static async Task<string> GetReferralLinkAsync(string userId)
+    {
+        string referralLink = "";
+        
+        // Try to get referral link from MongoDB first
+        if (Program.MongoDb != null)
+        {
+            try
+            {
+                var refLink = await Program.MongoDb.GetRefLinkByUserIdAsync(userId);
+                if (refLink == null)
+                {
+                    // Generate a new referral link
+                    var chat = await Program.BotClient.GetChatAsync(long.Parse(userId));
+                    var telegramUser = new Telegram.Bot.Types.User
+                    {
+                        Id = long.Parse(userId),
+                        FirstName = chat.FirstName,
+                        LastName = chat.LastName,
+                        Username = chat.Username
+                    };
+                    referralLink = Program.GetRefLink(telegramUser);
+                    
+                    // Store the new referral link in MongoDB
+                    var newRefLink = new Models.RefLinkModel
+                    {
+                        UserId = userId,
+                        RefCode = referralLink.Split('=').Last(),
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    
+                    await Program.MongoDb.CreateRefLinkAsync(newRefLink);
+                    Logging.AddToLog($"Created new referral link in MongoDB for user {userId}");
+                }
+                else
+                {
+                    // Use existing referral link
+                    referralLink = $"https://t.me/{Program.BotClient.GetMeAsync().Result.Username}?start={refLink.RefCode}";
+                    Logging.AddToLog($"Retrieved existing referral link from MongoDB for user {userId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.AddToLog($"Error getting referral link from MongoDB: {ex.Message}. Falling back to in-memory data.");
+                referralLink = "";
+            }
+        }
+        
+        // If MongoDB failed or not available, use in-memory/file-based referral link
+        if (string.IsNullOrEmpty(referralLink))
+        {
+            var user = await Program.BotClient.GetChatAsync(long.Parse(userId));
+            var telegramUser = new Telegram.Bot.Types.User
+            {
+                Id = long.Parse(userId),
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Username = user.Username
+            };
+            referralLink = Program.GetRefLink(telegramUser);
+        }
+        
+        return referralLink;
     }
 }
