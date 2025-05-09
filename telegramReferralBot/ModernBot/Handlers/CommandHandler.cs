@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using TelegramReferralBot.Services;
 using TelegramReferralBot.Utils;
 
@@ -170,6 +171,7 @@ namespace TelegramReferralBot.Handlers
             Console.WriteLine($"[DEBUG] COMMAND: User {userId} has {points} Bricks");
             
             string response;
+            string stage = GetUserStage(points);
 
             if (points == 0)
             {
@@ -182,8 +184,9 @@ namespace TelegramReferralBot.Handlers
             }
             else
             {
-                Console.WriteLine($"[DEBUG] COMMAND: User {userId} has {points} Bricks, sending bricks message");
+                Console.WriteLine($"[DEBUG] COMMAND: User {userId} has {points} Bricks, sending bricks message with stage");
                 response = $"You have {points} Bricks! 🎉\n\n" +
+                           $"{stage}\n\n" +
                            "Keep earning more by referring friends to the group!";
             }
 
@@ -191,9 +194,39 @@ namespace TelegramReferralBot.Handlers
             await _botClient.SendTextMessageAsync(
                 chatId: chatId,
                 text: response,
+                parseMode: ParseMode.Markdown,
                 cancellationToken: cancellationToken
             );
             Console.WriteLine($"[DEBUG] TELEGRAM RESPONSE: Successfully sent points response to user {userId}");
+        }
+
+        /// <summary>
+        /// Determines the user's stage and title based on their Bricks total
+        /// </summary>
+        /// <param name="points">The user's total Bricks</param>
+        /// <returns>A string with the user's stage and title</returns>
+        private string GetUserStage(int points)
+        {
+            if (points < 500)
+                return "*Stage 1: Welcome Explorer* 🌱\nYou're taking your first steps in the community!";
+            else if (points < 2000)
+                return "*Stage 2: Active Citizen* 🔥\nYou're building your foundation in the community!";
+            else if (points < 5000)
+                return "*Stage 3: Community Builder* 🛡️\nYou're now a trusted member with a special badge!";
+            else if (points < 10000)
+                return "*Stage 4: Contributor* 🧠\nYou're shaping the culture here!";
+            else if (points < 20000)
+                return "*Stage 5: Influencer* 📢\nYou're making waves. Keep going!";
+            else if (points < 35000)
+                return "*Stage 6: Partner* 🤝\nYou're now a Bricks ally!";
+            else if (points < 60000)
+                return "*Stage 7: Ambassador* 🏆\nYou've got real influence with a special badge!";
+            else if (points < 100000)
+                return "*Stage 8: Luminary* ✨\nYou're a beacon for others!";
+            else if (points < 250000)
+                return "*Stage 9: Legend* 🔥\nYou're a legacy-maker in the community!";
+            else
+                return "*Stage 10: Hall of Flame* 🪙\nYou're eternalized in Bricks history!";
         }
 
         /// <summary>
@@ -395,8 +428,7 @@ namespace TelegramReferralBot.Handlers
                                "• /disableNotice - Turns off private bot notifications\n" +
                                "• /enableNotice - Turns on private bot notifications\n" +
                                "• /myID - Shows your Telegram user ID\n" +
-                               "• /stats - Shows personal statistics including referrals and points\n" +
-                               "• /listAll - List all members with Bricks\n\n" +
+                               "• /stats - Shows personal statistics including referrals and points\n\n" +
                                "Quick Actions Available Below 👇";
 
             var replyMarkup = ButtonHelper.CreateInlineKeyboard(new[]
