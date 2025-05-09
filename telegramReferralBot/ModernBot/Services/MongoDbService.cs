@@ -295,16 +295,7 @@ namespace TelegramReferralBot.Services
                     activity.Date = activity.CreatedAt.ToString("yyyy-MM-dd");
                 }
                 
-                // Log action ID if provided for tracking duplicate awards
-                if (!string.IsNullOrEmpty(activity.ActionId))
-                {
-                    Console.WriteLine($"[DEBUG] Creating activity record for user {activity.UserId}, type: {activity.Type}, points: {activity.Points}, actionId: {activity.ActionId}");
-                }
-                else
-                {
-                    Console.WriteLine($"[DEBUG] Creating activity record for user {activity.UserId}, type: {activity.Type}, points: {activity.Points}");
-                }
-                
+                Console.WriteLine($"[DEBUG] Creating activity record for user {activity.UserId}, type: {activity.Type}, points: {activity.Points}");
                 await _activities.InsertOneAsync(activity);
                 Console.WriteLine($"[DEBUG] Activity record created successfully");
             }
@@ -315,31 +306,14 @@ namespace TelegramReferralBot.Services
             }
         }
 
-        public async Task<List<ActivityModel>> GetTodayActivitiesAsync(string userId, string actionId, string date)
+        public async Task<List<ActivityModel>> GetTodayActivitiesAsync(string userId, string type, string date)
         {
-            Console.WriteLine($"[DEBUG] DB REQUEST: GetTodayActivitiesAsync({userId}, {actionId}, {date})");
-            
-            // Build filter based on whether we're checking by actionId or type
             var filter = Builders<ActivityModel>.Filter.And(
                 Builders<ActivityModel>.Filter.Eq(a => a.UserId, userId),
+                Builders<ActivityModel>.Filter.Eq(a => a.Type, type),
                 Builders<ActivityModel>.Filter.Eq(a => a.Date, date)
             );
-            
-            // If actionId is provided, use it for filtering instead of type
-            if (!string.IsNullOrEmpty(actionId))
-            {
-                filter = filter & Builders<ActivityModel>.Filter.Eq(a => a.ActionId, actionId);
-                Console.WriteLine($"[DEBUG] Filtering activities by actionId: {actionId}");
-            }
-            else
-            {
-                filter = filter & Builders<ActivityModel>.Filter.Eq(a => a.Type, actionId);
-                Console.WriteLine($"[DEBUG] Filtering activities by type: {actionId}");
-            }
-            
-            var results = await _activities.Find(filter).ToListAsync();
-            Console.WriteLine($"[DEBUG] DB RESPONSE: Found {results.Count} activities for user {userId} with actionId/type {actionId} on {date}");
-            return results;
+            return await _activities.Find(filter).ToListAsync();
         }
 
         private async Task CreateIndexesAsync()
@@ -552,12 +526,10 @@ namespace TelegramReferralBot.Services
                     BricksEarned = points
                 };
                 
-                // Add to user's referrals array without incrementing points (points are already awarded by PointsService)
+                // Add to user's referrals array without incrementing points (points are awarded by PointsService)
                 var update = Builders<UserModel>.Update
                     .Push(u => u.Referrals, referral)
                     .Set(u => u.UpdatedAt, DateTime.UtcNow);
-                    // Removed .Inc("bricks.total", points) to prevent duplicate points
-                    // Removed .Inc(u => u.Balance, points) to prevent duplicate points
                 
                 var result = await _users.UpdateOneAsync(filter, update);
                 
