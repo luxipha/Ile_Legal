@@ -2,6 +2,8 @@ using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Linq;
+using Microsoft.Extensions.Logging;
 using TelegramReferralBot.Models;
 
 namespace TelegramReferralBot.Services
@@ -15,31 +17,331 @@ namespace TelegramReferralBot.Services
         private readonly IMongoCollection<ReferralModel> _referrals;
         private readonly IMongoCollection<ActivityModel> _activities;
         private readonly IMongoCollection<RefLinkModel> _refLinks;
+        private readonly ILogger<MongoDbService> _logger;
         
         /// <summary>
         /// Initializes a new instance of the MongoDbService class
         /// </summary>
-        public MongoDbService(string connectionString, string databaseName)
+        public MongoDbService(string connectionString, string databaseName, ILogger<MongoDbService> logger)
         {
-            var client = new MongoClient(connectionString);
-            var database = client.GetDatabase(databaseName);
-            
-            // Use the existing collections from the backend
-            _users = database.GetCollection<UserModel>("users");
-            _referrals = database.GetCollection<ReferralModel>("referrals");
-            _activities = database.GetCollection<ActivityModel>("activities");
-            _refLinks = database.GetCollection<RefLinkModel>("reflinks");
-            
-            Logging.AddToLog($"MongoDB service initialized with backend database: {databaseName}");
-            Console.WriteLine($"Connected to backend MongoDB: {databaseName}");
-            
-            // Ensure indexes for better performance
-            CreateIndexesAsync().Wait();
+            try
+            {
+                _logger = logger;
+                
+                Console.WriteLine($"[MONGODB] Attempting to connect to MongoDB: {databaseName}");
+                _logger.LogInformation($"Attempting to connect to MongoDB: {databaseName}");
+                
+                // Create client with connection string
+                var client = new MongoClient(connectionString);
+                
+                // Test connection by listing databases
+                var dbList = client.ListDatabases().ToList();
+                Console.WriteLine($"[MONGODB] Successfully connected to MongoDB. Available databases: {dbList.Count}");
+                
+                // Get database
+                var database = client.GetDatabase(databaseName);
+                
+                // Use the existing collections from the backend
+                _users = database.GetCollection<UserModel>("users");
+                _referrals = database.GetCollection<ReferralModel>("referrals");
+                _activities = database.GetCollection<ActivityModel>("activities");
+                _refLinks = database.GetCollection<RefLinkModel>("reflinks");
+                
+                // Verify collections exist and are accessible
+                var userCount = _users.CountDocuments(FilterDefinition<UserModel>.Empty);
+                var referralCount = _referrals.CountDocuments(FilterDefinition<ReferralModel>.Empty);
+                var activityCount = _activities.CountDocuments(FilterDefinition<ActivityModel>.Empty);
+                var refLinkCount = _refLinks.CountDocuments(FilterDefinition<RefLinkModel>.Empty);
+                
+                Console.WriteLine($"[MONGODB] Collection counts - Users: {userCount}, Referrals: {referralCount}, Activities: {activityCount}, RefLinks: {refLinkCount}");
+                _logger.LogInformation($"MongoDB service initialized with backend database: {databaseName}");
+                _logger.LogInformation($"Collection counts - Users: {userCount}, Referrals: {referralCount}, Activities: {activityCount}, RefLinks: {refLinkCount}");
+                
+                // Ensure indexes for better performance
+                CreateIndexesAsync().Wait();
+                
+                Console.WriteLine($"[MONGODB] Successfully initialized MongoDB service with database: {databaseName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MONGODB] ERROR connecting to MongoDB: {ex.Message}");
+                _logger.LogError($"Error initializing MongoDB service: {ex.Message}");
+                throw; // Re-throw to ensure the application fails if MongoDB is unavailable
+            }
         }
         
         /// <summary>
         /// Creates indexes on frequently queried fields
         /// </summary>
+        public async Task InitializeAsync()
+        {
+            await CreateIndexesAsync();
+        }
+        
+        /// <summary>
+        /// Gets a generic collection for querying
+        /// </summary>
+        public IMongoCollection<MongoDB.Bson.BsonDocument> GetCollection(string collectionName)
+        {
+            try
+            {
+                Console.WriteLine($"[DEBUG] DB REQUEST: Getting collection {collectionName}");
+                var database = _users.Database;
+                return database.GetCollection<MongoDB.Bson.BsonDocument>(collectionName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] DB ERROR: Failed to get collection {collectionName}: {ex.Message}");
+                throw;
+            }
+        }
+        
+        /// <summary>
+        /// Checks if a group exists in the database and logs information about it
+        /// </summary>
+        public async Task CheckGroupExistsAsync(long groupId)
+        {
+            try
+            {
+                Console.WriteLine($"[DEBUG] DB REQUEST: Checking if group {groupId} exists");
+                var database = _users.Database;
+                var collection = database.GetCollection<MongoDB.Bson.BsonDocument>("groups");
+                
+                var filter = Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("groupId", groupId.ToString());
+                var cursor = await collection.FindAsync(filter);
+                var groups = await cursor.ToListAsync();
+                
+                if (groups.Count > 0)
+                {
+                    Console.WriteLine($"[DEBUG] DB RESPONSE: Found {groups.Count} records for group {groupId}");
+                    foreach (var group in groups)
+                    {
+                        Console.WriteLine($"[DEBUG] DB GROUP INFO: {group.ToString()}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[DEBUG] DB RESPONSE: No records found for group {groupId}, this may be a new group");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] DB ERROR: Failed to check group existence: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Gets a pending referral for a referred user
+        /// </summary>
+        public async Task<ReferralModel> GetPendingReferralAsync(string referredId)
+        {
+            Console.WriteLine($"[DEBUG] DB REQUEST: GetPendingReferralAsync({referredId})");
+            var filter = Builders<ReferralModel>.Filter.And(
+                Builders<ReferralModel>.Filter.Eq(r => r.ReferredId, referredId),
+                Builders<ReferralModel>.Filter.Eq(r => r.Status, "pending")
+            );
+            var result = await _referrals.Find(filter).FirstOrDefaultAsync();
+            Console.WriteLine($"[DEBUG] DB RESPONSE: GetPendingReferralAsync result: {(result != null ? $"Found referral from {result.ReferrerId}" : "No pending referral found")}");
+            return result;
+        }
+        
+        /// <summary>
+        /// Gets a referral between two users regardless of status
+        /// </summary>
+        public async Task<ReferralModel> GetReferralByUserIdsAsync(string referrerId, string referredId)
+        {
+            try
+            {
+                Console.WriteLine($"[DEBUG] DB REQUEST: GetReferralByUserIdsAsync({referrerId}, {referredId})");
+                var filter = Builders<ReferralModel>.Filter.And(
+                    Builders<ReferralModel>.Filter.Eq(r => r.ReferrerId, referrerId),
+                    Builders<ReferralModel>.Filter.Eq(r => r.ReferredId, referredId)
+                );
+                var result = await _referrals.Find(filter).FirstOrDefaultAsync();
+                Console.WriteLine($"[DEBUG] DB RESPONSE: GetReferralByUserIdsAsync result: {(result != null ? $"Found referral with status {result.Status}" : "No referral found")}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] DB ERROR: Error in GetReferralByUserIdsAsync: {ex.Message}");
+                return null;
+            }
+        }
+        
+        /// <summary>
+        /// Gets all completed referrals for a user (either as referrer or referred)
+        /// </summary>
+        public async Task<List<ReferralModel>> GetCompletedReferralsForUserAsync(string userId)
+        {
+            try
+            {
+                Console.WriteLine($"[DEBUG] DB REQUEST: GetCompletedReferralsForUserAsync({userId})");
+                var filter = Builders<ReferralModel>.Filter.And(
+                    Builders<ReferralModel>.Filter.Or(
+                        Builders<ReferralModel>.Filter.Eq(r => r.ReferrerId, userId),
+                        Builders<ReferralModel>.Filter.Eq(r => r.ReferredId, userId)
+                    ),
+                    Builders<ReferralModel>.Filter.Eq(r => r.Status, "completed")
+                );
+                var results = await _referrals.Find(filter).ToListAsync();
+                Console.WriteLine($"[DEBUG] DB RESPONSE: GetCompletedReferralsForUserAsync found {results.Count} completed referrals for user {userId}");
+                return results;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] DB ERROR: Error in GetCompletedReferralsForUserAsync: {ex.Message}");
+                return new List<ReferralModel>();
+            }
+        }
+
+        /// <summary>
+        /// Updates the status of a referral
+        /// </summary>
+        public async Task UpdateReferralStatusAsync(string referralId, string status)
+        {
+            try
+            {
+                Console.WriteLine($"[DEBUG] DB REQUEST: UpdateReferralStatusAsync({referralId}, {status})");
+                var filter = Builders<ReferralModel>.Filter.Eq(r => r.Id, referralId);
+                var update = Builders<ReferralModel>.Update.Set(r => r.Status, status);
+                var result = await _referrals.UpdateOneAsync(filter, update);
+                Console.WriteLine($"[DEBUG] DB RESPONSE: UpdateReferralStatusAsync result: {(result.ModifiedCount > 0 ? "Success" : "No changes")}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] DB ERROR: Error in UpdateReferralStatusAsync: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Marks a referral as completed
+        /// </summary>
+        public async Task MarkReferralCompletedAsync(string referralId)
+        {
+            await UpdateReferralStatusAsync(referralId, "completed");
+        }
+
+        public async Task<int> GetTodayPointsAsync(string userId)
+        {
+            try
+            {
+                // Get max points per day from environment variable directly
+                int maxPointsPerDay = 20; // Default value
+                string maxPointsStr = Environment.GetEnvironmentVariable("MAX_POINTS_PER_DAY");
+                if (!string.IsNullOrEmpty(maxPointsStr) && int.TryParse(maxPointsStr, out int envMaxPoints))
+                {
+                    maxPointsPerDay = envMaxPoints;
+                }
+                
+                Console.WriteLine($"[MONGODB] Calculating today's points for user {userId}, max allowed: {maxPointsPerDay}");
+                _logger.LogInformation($"Calculating today's points for user {userId}, max allowed: {maxPointsPerDay}");
+                
+                // Verify MongoDB connection before proceeding
+                if (!await TestConnectionAsync())
+                {
+                    Console.WriteLine($"[MONGODB] ERROR: Database connection failed when trying to get today's points for user {userId}");
+                    _logger.LogError($"Database connection failed when trying to get today's points for user {userId}");
+                    return 0;
+                }
+                
+                var today = DateTime.UtcNow.Date;
+                Console.WriteLine($"[MONGODB] Checking activities for user {userId} since {today} (UTC)");
+                
+                var filter = Builders<ActivityModel>.Filter.And(
+                    Builders<ActivityModel>.Filter.Eq(a => a.UserId, userId),
+                    Builders<ActivityModel>.Filter.Gte(a => a.CreatedAt, today)
+                );
+                
+                try
+                {
+                    var activities = await _activities.Find(filter).ToListAsync();
+                    Console.WriteLine($"[MONGODB] Found {activities.Count} activities for user {userId} today");
+                    
+                    // List all activities for debugging
+                    foreach (var activity in activities)
+                    {
+                        Console.WriteLine($"[MONGODB] Activity: {activity.Type}, Points: {activity.Points}, Time: {activity.CreatedAt}");
+                    }
+                    
+                    int totalPoints = activities.Sum(a => a.Points);
+                    Console.WriteLine($"[MONGODB] User {userId} has earned {totalPoints} points today out of {maxPointsPerDay} max");
+                    _logger.LogInformation($"User {userId} has earned {totalPoints} points today out of {maxPointsPerDay} max");
+                    
+                    return totalPoints;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[MONGODB] ERROR querying activities: {ex.Message}");
+                    _logger.LogError($"Error querying activities: {ex.Message}");
+                    return 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MONGODB] EXCEPTION in GetTodayPointsAsync: {ex.Message}");
+                _logger.LogError($"Exception in GetTodayPointsAsync: {ex.Message}");
+                return 0; // Return 0 instead of throwing an exception
+            }
+        }
+
+        public async Task CreateActivityAsync(ActivityModel activity)
+        {
+            try
+            {
+                // Set date field if not already set
+                if (string.IsNullOrEmpty(activity.Date))
+                {
+                    activity.Date = activity.CreatedAt.ToString("yyyy-MM-dd");
+                }
+                
+                // Log action ID if provided for tracking duplicate awards
+                if (!string.IsNullOrEmpty(activity.ActionId))
+                {
+                    Console.WriteLine($"[DEBUG] Creating activity record for user {activity.UserId}, type: {activity.Type}, points: {activity.Points}, actionId: {activity.ActionId}");
+                }
+                else
+                {
+                    Console.WriteLine($"[DEBUG] Creating activity record for user {activity.UserId}, type: {activity.Type}, points: {activity.Points}");
+                }
+                
+                await _activities.InsertOneAsync(activity);
+                Console.WriteLine($"[DEBUG] Activity record created successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DEBUG] Error creating activity: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task<List<ActivityModel>> GetTodayActivitiesAsync(string userId, string actionId, string date)
+        {
+            Console.WriteLine($"[DEBUG] DB REQUEST: GetTodayActivitiesAsync({userId}, {actionId}, {date})");
+            
+            // Build filter based on whether we're checking by actionId or type
+            var filter = Builders<ActivityModel>.Filter.And(
+                Builders<ActivityModel>.Filter.Eq(a => a.UserId, userId),
+                Builders<ActivityModel>.Filter.Eq(a => a.Date, date)
+            );
+            
+            // If actionId is provided, use it for filtering instead of type
+            if (!string.IsNullOrEmpty(actionId))
+            {
+                filter = filter & Builders<ActivityModel>.Filter.Eq(a => a.ActionId, actionId);
+                Console.WriteLine($"[DEBUG] Filtering activities by actionId: {actionId}");
+            }
+            else
+            {
+                filter = filter & Builders<ActivityModel>.Filter.Eq(a => a.Type, actionId);
+                Console.WriteLine($"[DEBUG] Filtering activities by type: {actionId}");
+            }
+            
+            var results = await _activities.Find(filter).ToListAsync();
+            Console.WriteLine($"[DEBUG] DB RESPONSE: Found {results.Count} activities for user {userId} with actionId/type {actionId} on {date}");
+            return results;
+        }
+
         private async Task CreateIndexesAsync()
         {
             try
@@ -60,7 +362,7 @@ namespace TelegramReferralBot.Services
                 );
                 await _refLinks.Indexes.CreateOneAsync(refLinkIndexModel);
                 
-                Logging.AddToLog("MongoDB indexes created successfully");
+                _logger.LogInformation("MongoDB indexes created successfully");
             }
             catch (Exception ex)
             {
@@ -176,7 +478,16 @@ namespace TelegramReferralBot.Services
                 {
                     // Preserve fields from backend that we don't want to change
                     user.Id = existingUser.Id;
-                    user.Email = existingUser.Email;
+                    
+                    // Only preserve email if the new email is null or the placeholder email
+                    if (string.IsNullOrEmpty(user.Email) || user.Email.Contains("@placeholder.ile"))
+                    {
+                        user.Email = existingUser.Email;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[DEBUG] DB UPDATE: Updating email for user {user.TelegramId} from {existingUser.Email} to {user.Email}");
+                    }
                     
                     // Preserve existing referrals and add new ones if needed
                     if (existingUser.Referrals != null && existingUser.Referrals.Count > 0)
@@ -241,12 +552,12 @@ namespace TelegramReferralBot.Services
                     BricksEarned = points
                 };
                 
-                // Add to user's referrals array
+                // Add to user's referrals array without incrementing points (points are already awarded by PointsService)
                 var update = Builders<UserModel>.Update
                     .Push(u => u.Referrals, referral)
-                    .Set(u => u.UpdatedAt, DateTime.UtcNow)
-                    .Inc("bricks.total", points)
-                    .Inc(u => u.Balance, points);
+                    .Set(u => u.UpdatedAt, DateTime.UtcNow);
+                    // Removed .Inc("bricks.total", points) to prevent duplicate points
+                    // Removed .Inc(u => u.Balance, points) to prevent duplicate points
                 
                 var result = await _users.UpdateOneAsync(filter, update);
                 
@@ -276,12 +587,27 @@ namespace TelegramReferralBot.Services
         {
             try
             {
+                Console.WriteLine($"[MONGODB] UpdateUserBricksAsync called for user {userId} with {bricksTotal} bricks");
+                _logger.LogInformation($"UpdateUserBricksAsync called for user {userId} with {bricksTotal} bricks");
+                
+                // Verify MongoDB connection before proceeding
+                if (!await TestConnectionAsync())
+                {
+                    Console.WriteLine($"[MONGODB] ERROR: Database connection failed when trying to update bricks for user {userId}");
+                    _logger.LogError($"Database connection failed when trying to update bricks for user {userId}");
+                    return false;
+                }
+                
                 var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, userId);
                 
                 // First check if user exists
+                Console.WriteLine($"[MONGODB] Checking if user {userId} exists in database");
                 var user = await _users.Find(filter).FirstOrDefaultAsync();
                 if (user == null)
                 {
+                    Console.WriteLine($"[MONGODB] User {userId} not found, creating new user with {bricksTotal} bricks");
+                    _logger.LogInformation($"User {userId} not found, creating new user with {bricksTotal} bricks");
+                    
                     // Create user if they don't exist
                     user = new UserModel
                     {
@@ -292,34 +618,93 @@ namespace TelegramReferralBot.Services
                         Balance = bricksTotal
                     };
                     
-                    await _users.InsertOneAsync(user);
-                    Logging.AddToLog($"Created new user with {bricksTotal} bricks: {userId}");
-                    return true;
+                    try
+                    {
+                        await _users.InsertOneAsync(user);
+                        Console.WriteLine($"[MONGODB] Successfully created new user {userId} with {bricksTotal} bricks");
+                        _logger.LogInformation($"Successfully created new user {userId} with {bricksTotal} bricks");
+                        Logging.AddToLog($"Created new user with {bricksTotal} bricks: {userId}");
+                        
+                        // Verify user was created by retrieving it again
+                        var verifyUser = await _users.Find(filter).FirstOrDefaultAsync();
+                        if (verifyUser != null)
+                        {
+                            Console.WriteLine($"[MONGODB] Verified user {userId} was created with {verifyUser.Bricks?.Total ?? 0} bricks");
+                            return true;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[MONGODB] WARNING: User {userId} was not found after creation");
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[MONGODB] ERROR creating user {userId}: {ex.Message}");
+                        _logger.LogError($"Error creating user {userId}: {ex.Message}");
+                        return false;
+                    }
                 }
                 
-                // Update existing user
+                // User exists, update their bricks
+                int currentBricks = user.Bricks?.Total ?? 0;
+                int newTotal = currentBricks + bricksTotal;
+                Console.WriteLine($"[MONGODB] User {userId} found, current bricks: {currentBricks}, adding: {bricksTotal}, new total will be: {newTotal}");
+                _logger.LogInformation($"User {userId} found, current bricks: {currentBricks}, adding: {bricksTotal}, new total will be: {newTotal}");
+                
+                // Update existing user by incrementing bricks
                 var update = Builders<UserModel>.Update
-                    .Set("bricks.total", bricksTotal)
-                    .Set(u => u.Balance, bricksTotal)
+                    .Inc("bricks.total", bricksTotal)
+                    .Inc(u => u.Balance, bricksTotal)
                     .Set(u => u.UpdatedAt, DateTime.UtcNow);
                 
-                var result = await _users.UpdateOneAsync(filter, update);
-                
-                if (result.ModifiedCount > 0)
+                try
                 {
-                    Logging.AddToLog($"Updated bricks total for user {userId} to {bricksTotal}");
-                    return true;
+                    var result = await _users.UpdateOneAsync(filter, update);
+                    
+                    if (result.ModifiedCount > 0)
+                    {
+                        Console.WriteLine($"[MONGODB] Successfully updated bricks for user {userId}, modified count: {result.ModifiedCount}");
+                        _logger.LogInformation($"Successfully updated bricks for user {userId}, modified count: {result.ModifiedCount}");
+                        Logging.AddToLog($"Updated bricks for user {userId}, added {bricksTotal}, new total should be {newTotal}");
+                        
+                        // Verify the update by retrieving the user again
+                        var updatedUser = await _users.Find(filter).FirstOrDefaultAsync();
+                        if (updatedUser != null)
+                        {
+                            int updatedBricks = updatedUser.Bricks?.Total ?? 0;
+                            Console.WriteLine($"[MONGODB] Verified user {userId} now has {updatedBricks} bricks (expected {newTotal})");
+                            _logger.LogInformation($"Verified user {userId} now has {updatedBricks} bricks (expected {newTotal})");
+                            
+                            if (updatedBricks != newTotal)
+                            {
+                                Console.WriteLine($"[MONGODB] WARNING: Bricks total mismatch for user {userId}. Expected: {newTotal}, Actual: {updatedBricks}");
+                                _logger.LogWarning($"Bricks total mismatch for user {userId}. Expected: {newTotal}, Actual: {updatedBricks}");
+                            }
+                        }
+                        
+                        return true;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[MONGODB] Failed to update bricks for user {userId}, modified count: {result.ModifiedCount}");
+                        _logger.LogWarning($"Failed to update bricks for user {userId}, modified count: {result.ModifiedCount}");
+                        Logging.AddToLog($"Failed to update bricks total for user {userId}");
+                        return false;
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Logging.AddToLog($"Failed to update bricks total for user {userId}");
+                    Console.WriteLine($"[MONGODB] ERROR updating bricks for user {userId}: {ex.Message}");
+                    _logger.LogError($"Error updating bricks for user {userId}: {ex.Message}");
                     return false;
                 }
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[MONGODB] EXCEPTION in UpdateUserBricksAsync: {ex.Message}");
+                _logger.LogError($"Exception in UpdateUserBricksAsync: {ex.Message}");
                 Logging.AddToLog($"Error updating user bricks: {ex.Message}");
-                Console.WriteLine($"Error updating user bricks: {ex.Message}");
                 return false;
             }
         }
