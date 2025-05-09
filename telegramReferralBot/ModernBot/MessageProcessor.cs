@@ -158,6 +158,10 @@ namespace TelegramReferralBot
                     await HandleStatsCommandAsync(message, cancellationToken);
                     break;
 
+                case "/admin":
+                    await _adminHandler.HandleAdminCommandAsync(message, cancellationToken);
+                    break;
+
                 case "/ban":
                     await _adminHandler.BanUserAsync(message, cancellationToken);
                     break;
