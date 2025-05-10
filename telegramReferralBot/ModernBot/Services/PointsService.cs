@@ -94,13 +94,39 @@ namespace TelegramReferralBot.Services
             }
         }
 
+        // In-memory cache for points to reduce database load and handle API inconsistencies
+        private static readonly Dictionary<string, PointsCacheEntry> _pointsCache = new Dictionary<string, PointsCacheEntry>();
+
+        // Cache entry class with expiration
+        private class PointsCacheEntry
+        {
+            public int Points { get; set; }
+            public DateTime Expiration { get; set; }
+
+            public bool IsExpired => DateTime.UtcNow > Expiration;
+        }
+
+        // Cache duration in minutes
+        private const int CACHE_DURATION_MINUTES = 5;
+
+        // Maximum number of retries for API sync issues
+        private const int MAX_SYNC_RETRIES = 3;
+
         /// <summary>
-        /// Gets a user's current points
+        /// Gets a user's current points with improved error handling and caching
         /// </summary>
         public async Task<int> GetPointsAsync(string userId)
         {
             try
             {
+                // Check cache first
+                if (_pointsCache.TryGetValue(userId, out var cacheEntry) && !cacheEntry.IsExpired)
+                {
+                    Console.WriteLine($"[DEBUG] CACHE HIT: Using cached value of {cacheEntry.Points} Bricks for user {userId}");
+                    _logger.Log(LogLevel.Debug, new EventId(0), $"CACHE HIT: Using cached value of {cacheEntry.Points} Bricks for user {userId}", null, (s, e) => s);
+                    return cacheEntry.Points;
+                }
+
                 Console.WriteLine($"[DEBUG] DB REQUEST: GetUserAsync({userId})");
                 _logger.Log(LogLevel.Information, new EventId(0), $"DB REQUEST: GetUserAsync({userId})", null, (s, e) => s);
                 
@@ -114,16 +140,95 @@ namespace TelegramReferralBot.Services
                 }
                 
                 int bricksTotal = user.BricksTotal;
-                Console.WriteLine($"[DEBUG] DB RESPONSE: User {userId} has {bricksTotal} Bricks (BricksTotal: {user.BricksTotal}, Balance: {user.Balance})");
-                _logger.Log(LogLevel.Information, new EventId(0), $"DB RESPONSE: User {userId} has {bricksTotal} Bricks", null, (s, e) => s);
+                int bricksFromNestedField = user.Bricks?.Total ?? 0;
+                
+                // Log detailed information about the points
+                Console.WriteLine($"[DEBUG] DB RESPONSE: User {userId} has {bricksTotal} Bricks (BricksTotal: {user.BricksTotal}, Bricks.Total: {bricksFromNestedField}, Balance: {user.Balance})");
+                _logger.Log(LogLevel.Information, new EventId(0), $"DB RESPONSE: User {userId} has BricksTotal: {bricksTotal}, Bricks.Total: {bricksFromNestedField}", null, (s, e) => s);
+                
+                // Check for sync issues where BricksTotal and Bricks.Total don't match
+                if (bricksTotal != bricksFromNestedField && bricksFromNestedField > 0)
+                {
+                    Console.WriteLine($"[DEBUG] WARNING: Points sync issue detected for user {userId}. BricksTotal: {bricksTotal}, Bricks.Total: {bricksFromNestedField}");
+                    _logger.Log(LogLevel.Warning, new EventId(0), $"Points sync issue detected for user {userId}. BricksTotal: {bricksTotal}, Bricks.Total: {bricksFromNestedField}", null, (s, e) => s);
+                    
+                    // Use the higher value to ensure users don't lose points
+                    int maxPoints = Math.Max(bricksTotal, bricksFromNestedField);
+                    
+                    // Attempt to fix the sync issue by updating both fields
+                    Console.WriteLine($"[DEBUG] SYNC FIX: Attempting to sync points for user {userId} to {maxPoints}");
+                    bool syncSuccess = await _mongoDb.UpdateUserBricksAsync(userId, maxPoints);
+                    
+                    if (syncSuccess)
+                    {
+                        Console.WriteLine($"[DEBUG] SYNC FIX: Successfully synced points for user {userId} to {maxPoints}");
+                        _logger.Log(LogLevel.Information, new EventId(0), $"Successfully synced points for user {userId} to {maxPoints}", null, (s, e) => s);
+                        bricksTotal = maxPoints;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[DEBUG] SYNC FIX: Failed to sync points for user {userId}");
+                        _logger.Log(LogLevel.Error, new EventId(0), $"Failed to sync points for user {userId}", null, (s, e) => s);
+                    }
+                }
+                
+                // Handle case where both BricksTotal and Bricks.Total are 0 but we know the user should have points
+                // This can happen if the API sync failed but we have a record in memory
+                if (bricksTotal == 0 && _pointsCache.TryGetValue(userId, out var oldCacheEntry))
+                {
+                    Console.WriteLine($"[DEBUG] API ISSUE: API returned 0 points for user {userId} but cache has {oldCacheEntry.Points}");
+                    _logger.Log(LogLevel.Warning, new EventId(0), $"API returned 0 points for user {userId} but cache has {oldCacheEntry.Points}", null, (s, e) => s);
+                    
+                    // If cache is recent (less than 1 hour old), trust it over the 0 value
+                    if (DateTime.UtcNow.Subtract(oldCacheEntry.Expiration).TotalHours < 1)
+                    {
+                        Console.WriteLine($"[DEBUG] USING CACHE: Using cached value of {oldCacheEntry.Points} instead of 0 from API");
+                        _logger.Log(LogLevel.Information, new EventId(0), $"Using cached value of {oldCacheEntry.Points} instead of 0 from API for user {userId}", null, (s, e) => s);
+                        
+                        // Attempt to fix the sync issue
+                        Console.WriteLine($"[DEBUG] SYNC FIX: Attempting to restore points for user {userId} to {oldCacheEntry.Points}");
+                        bool restoreSuccess = await _mongoDb.UpdateUserBricksAsync(userId, oldCacheEntry.Points);
+                        
+                        if (restoreSuccess)
+                        {
+                            Console.WriteLine($"[DEBUG] SYNC FIX: Successfully restored points for user {userId} to {oldCacheEntry.Points}");
+                            _logger.Log(LogLevel.Information, new EventId(0), $"Successfully restored points for user {userId} to {oldCacheEntry.Points}", null, (s, e) => s);
+                            bricksTotal = oldCacheEntry.Points;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[DEBUG] SYNC FIX: Failed to restore points for user {userId}");
+                            _logger.Log(LogLevel.Error, new EventId(0), $"Failed to restore points for user {userId}", null, (s, e) => s);
+                            // Still use cache value even if update failed
+                            bricksTotal = oldCacheEntry.Points;
+                        }
+                    }
+                }
+                
+                // Update cache
+                _pointsCache[userId] = new PointsCacheEntry
+                {
+                    Points = bricksTotal,
+                    Expiration = DateTime.UtcNow.AddMinutes(CACHE_DURATION_MINUTES)
+                };
                 
                 return bricksTotal;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DEBUG] ERROR: Exception in GetPointsAsync for user {userId}: {ex.Message}");
+                Console.WriteLine($"[DEBUG] STACK TRACE: {ex.StackTrace}");
                 _logger.Log(LogLevel.Error, new EventId(0), $"Error getting points for user {userId}: {ex.Message}", ex, (s, e) => s);
-                return 0; // Return 0 instead of throwing to avoid cascading errors
+                
+                // If we have a cached value, use it as fallback
+                if (_pointsCache.TryGetValue(userId, out var cacheEntry))
+                {
+                    Console.WriteLine($"[DEBUG] FALLBACK: Using cached value of {cacheEntry.Points} due to error");
+                    _logger.Log(LogLevel.Information, new EventId(0), $"Using cached value of {cacheEntry.Points} as fallback for user {userId} due to error", null, (s, e) => s);
+                    return cacheEntry.Points;
+                }
+                
+                return 0; // Return 0 as last resort
             }
         }
 

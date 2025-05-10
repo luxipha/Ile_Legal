@@ -2,6 +2,10 @@ using TelegramReferralBot.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MongoDB.Driver;
+using MongoDB.Bson;
+using System.Linq;
+using TelegramReferralBot.Utils;
 
 namespace TelegramReferralBot
 {
@@ -17,14 +21,14 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save user activity.");
                     Console.WriteLine("MongoDB not initialized. Cannot save user activity.");
                     return false;
                 }
                 
-                foreach (var entry in Program.UserActivity)
+                foreach (var entry in State.UserActivity)
                 {
                     string userId = entry.Key;
                     foreach (var activity in entry.Value)
@@ -32,7 +36,7 @@ namespace TelegramReferralBot
                         string date = activity.Key;
                         int points = activity.Value;
                         
-                        await Program.MongoDb.UpsertUserActivityAsync(userId, date, points);
+                        await State.MongoDb.UpsertUserActivityAsync(userId, date, points);
                     }
                 }
                 
@@ -56,20 +60,20 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save referral links.");
                     Console.WriteLine("MongoDB not initialized. Cannot save referral links.");
                     return false;
                 }
                 
-                foreach (var entry in Program.RefLinks)
+                foreach (var entry in State.RefLinks)
                 {
                     string userId = entry.Key;
                     string refCode = entry.Value;
                     
                     // Check if the ref link already exists
-                    var existingRefLink = await Program.MongoDb.GetRefLinkByUserIdAsync(userId);
+                    var existingRefLink = await State.MongoDb.GetRefLinkByUserIdAsync(userId);
                     if (existingRefLink == null)
                     {
                         // Create new ref link
@@ -80,7 +84,7 @@ namespace TelegramReferralBot
                             CreatedAt = DateTime.UtcNow
                         };
                         
-                        await Program.MongoDb.CreateRefLinkAsync(refLink);
+                        await State.MongoDb.CreateRefLinkAsync(refLink);
                     }
                 }
                 
@@ -104,20 +108,20 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save referred by data.");
                     Console.WriteLine("MongoDB not initialized. Cannot save referred by data.");
                     return false;
                 }
                 
-                foreach (var entry in Program.ReferredBy)
+                foreach (var entry in State.ReferredBy)
                 {
                     string referredId = entry.Key;
                     string referrerId = entry.Value;
                     
                     // Check if the referral already exists
-                    var existingReferral = await Program.MongoDb.GetReferralByReferredIdAsync(referredId);
+                    var existingReferral = await State.MongoDb.GetReferralByReferredIdAsync(referredId);
                     if (existingReferral == null)
                     {
                         // Create new referral
@@ -130,7 +134,7 @@ namespace TelegramReferralBot
                             Type = "referral"
                         };
                         
-                        await Program.MongoDb.CreateReferralAsync(referral);
+                        await State.MongoDb.CreateReferralAsync(referral);
                     }
                 }
                 
@@ -154,20 +158,20 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save password attempts.");
                     Console.WriteLine("MongoDB not initialized. Cannot save password attempts.");
                     return false;
                 }
                 
-                foreach (var entry in Program.PasswordAttempts)
+                foreach (var entry in State.PasswordAttempts)
                 {
                     string userId = entry.Key;
                     int attempts = entry.Value;
                     
                     // Get user
-                    var user = await Program.MongoDb.GetUserAsync(userId);
+                    var user = await State.MongoDb.GetUserAsync(userId);
                     if (user == null)
                     {
                         // Create new user
@@ -180,7 +184,7 @@ namespace TelegramReferralBot
                             UpdatedAt = DateTime.UtcNow
                         };
                         
-                        await Program.MongoDb.CreateUserAsync(user);
+                        await State.MongoDb.CreateUserAsync(user);
                     }
                     else
                     {
@@ -189,7 +193,7 @@ namespace TelegramReferralBot
                         user.IsAdmin = attempts == -1;
                         user.UpdatedAt = DateTime.UtcNow;
                         
-                        await Program.MongoDb.UpdateUserAsync(user);
+                        await State.MongoDb.UpdateUserAsync(user);
                     }
                 }
                 
@@ -213,19 +217,19 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save show welcome data.");
                     Console.WriteLine("MongoDB not initialized. Cannot save show welcome data.");
                     return false;
                 }
                 
-                foreach (var entry in Program.ShowWelcome)
+                foreach (var entry in State.ShowWelcome)
                 {
                     string userId = entry.Key;
                     bool showWelcome = entry.Value;
                     
-                    await Program.MongoDb.UpdateShowWelcomeAsync(userId, showWelcome);
+                    await State.MongoDb.UpdateShowWelcomeAsync(userId, showWelcome);
                 }
                 
                 Logging.AddToLog("Show welcome data saved to MongoDB successfully");
@@ -248,7 +252,7 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save referral points.");
                     Console.WriteLine("MongoDB not initialized. Cannot save referral points.");
@@ -277,7 +281,7 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save points by referrer.");
                     Console.WriteLine("MongoDB not initialized. Cannot save points by referrer.");
@@ -306,27 +310,27 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save user point offset.");
                     Console.WriteLine("MongoDB not initialized. Cannot save user point offset.");
                     return false;
                 }
                 
-                foreach (var entry in Program.UserPointOffset)
+                foreach (var entry in State.UserPointOffset)
                 {
                     string userId = entry.Key;
                     int offset = entry.Value;
                     
                     // Get user
-                    var user = await Program.MongoDb.GetUserAsync(userId);
+                    var user = await State.MongoDb.GetUserAsync(userId);
                     if (user != null)
                     {
                         // Update user's bricks total
                         user.BricksTotal += offset;
                         user.UpdatedAt = DateTime.UtcNow;
                         
-                        await Program.MongoDb.UpdateUserAsync(user);
+                        await State.MongoDb.UpdateUserAsync(user);
                     }
                 }
                 
@@ -350,14 +354,14 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save joined referrals.");
                     Console.WriteLine("MongoDB not initialized. Cannot save joined referrals.");
                     return false;
                 }
                 
-                foreach (var entry in Program.JoinedReferrals)
+                foreach (var entry in State.JoinedReferrals)
                 {
                     string userId = entry.Key;
                     bool joined = entry.Value;
@@ -375,7 +379,7 @@ namespace TelegramReferralBot
                         Type = "join_group"
                     };
                     
-                    await Program.MongoDb.CreateReferralAsync(referral);
+                    await State.MongoDb.CreateReferralAsync(referral);
                 }
                 
                 Logging.AddToLog("Joined referrals saved to MongoDB successfully");
@@ -398,7 +402,7 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save interacted user.");
                     Console.WriteLine("MongoDB not initialized. Cannot save interacted user.");
@@ -427,7 +431,7 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save disable notice.");
                     Console.WriteLine("MongoDB not initialized. Cannot save disable notice.");
@@ -456,7 +460,7 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save campaign days.");
                     Console.WriteLine("MongoDB not initialized. Cannot save campaign days.");
@@ -485,7 +489,7 @@ namespace TelegramReferralBot
         {
             try
             {
-                if (Program.MongoDb == null)
+                if (State.MongoDb == null)
                 {
                     Logging.AddToLog("MongoDB not initialized. Cannot save group chat ID number.");
                     Console.WriteLine("MongoDB not initialized. Cannot save group chat ID number.");

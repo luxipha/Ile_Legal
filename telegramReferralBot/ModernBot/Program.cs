@@ -94,6 +94,20 @@ class Program
             services.AddSingleton<IBotLogger>(_logger);
             services.AddSingleton<MessageProcessor>();
             
+            // Add app settings
+            var appSettings = new AppSettings
+            {
+                LinkGroup = Environment.GetEnvironmentVariable("LINK_GROUP") ?? "https://telegram.me/aisolae",
+                LinkBot = Environment.GetEnvironmentVariable("LINK_BOT") ?? "https://telegram.me/iletesbot",
+                JoinReward = int.Parse(Environment.GetEnvironmentVariable("JOIN_REWARD") ?? "30"),
+                ReferralReward = int.Parse(Environment.GetEnvironmentVariable("REFERRAL_REWARD") ?? "150"),
+                StreakReward = int.Parse(Environment.GetEnvironmentVariable("STREAK_REWARD") ?? "300")
+            };
+            services.AddSingleton(appSettings);
+            
+            // Add reminder service
+            services.AddSingleton<ReminderService>();
+            
             // Build service provider
             _services = services.BuildServiceProvider();
             

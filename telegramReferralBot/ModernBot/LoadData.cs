@@ -1,5 +1,8 @@
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
+using TelegramReferralBot.Utils;
+using System.Threading.Tasks;
 using File = System.IO.File;
 
 namespace TelegramReferralBot;
@@ -477,16 +480,16 @@ public static class LoadData
 
         if (File.Exists(disableNoticeFile))
         {
-            Program.DisableNotice.Clear();
-            Program.DisableNotice = File.ReadAllLines(disableNoticeFile).ToList();
+            State.DisableNotice.Clear();
+            State.DisableNotice = File.ReadAllLines(disableNoticeFile).ToList();
             string text = "disableNoticeData loaded.";
             Logging.AddToLog(text);
             Console.WriteLine(text);
         }
         else if (File.Exists(backupDisableNoticeFile))
         {
-            Program.DisableNotice.Clear();
-            Program.DisableNotice = File.ReadAllLines(backupDisableNoticeFile).ToList();
+            State.DisableNotice.Clear();
+            State.DisableNotice = File.ReadAllLines(backupDisableNoticeFile).ToList();
             string text = "disableNoticeData loaded from backup.";
             Logging.AddToLog(text);
             Console.WriteLine(text);
@@ -497,7 +500,7 @@ public static class LoadData
     {
         try
         {
-            Program.UserActivity.Clear();
+            State.UserActivity.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -519,7 +522,7 @@ public static class LoadData
                     }
                 }
                 
-                Program.UserActivity.Add(userId, perDay);
+                State.UserActivity.Add(userId, perDay);
             }
             
             string text = "userActivityData loaded.";
@@ -538,7 +541,7 @@ public static class LoadData
     {
         try
         {
-            Program.RefLinks.Clear();
+            State.RefLinks.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -546,7 +549,7 @@ public static class LoadData
                 string[] parts = s.Split('?');
                 if (parts.Length == 2)
                 {
-                    Program.RefLinks.Add(parts[0], parts[1]);
+                    State.RefLinks.Add(parts[0], parts[1]);
                 }
             }
             
@@ -566,7 +569,7 @@ public static class LoadData
     {
         try
         {
-            Program.PasswordAttempts.Clear();
+            State.PasswordAttempts.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -574,7 +577,7 @@ public static class LoadData
                 string[] parts = s.Split('?');
                 if (parts.Length == 2 && int.TryParse(parts[1], out int attempts))
                 {
-                    Program.PasswordAttempts.Add(parts[0], attempts);
+                    State.PasswordAttempts.Add(parts[0], attempts);
                 }
             }
             
@@ -594,7 +597,7 @@ public static class LoadData
     {
         try
         {
-            Program.ShowWelcome.Clear();
+            State.ShowWelcome.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -602,7 +605,7 @@ public static class LoadData
                 string[] parts = s.Split('?');
                 if (parts.Length == 2 && bool.TryParse(parts[1], out bool showWelcome))
                 {
-                    Program.ShowWelcome.Add(parts[0], showWelcome);
+                    State.ShowWelcome.Add(parts[0], showWelcome);
                 }
             }
             
@@ -622,7 +625,7 @@ public static class LoadData
     {
         try
         {
-            Program.ReferredBy.Clear();
+            State.ReferredBy.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -630,7 +633,7 @@ public static class LoadData
                 string[] parts = s.Split('?');
                 if (parts.Length == 2)
                 {
-                    Program.ReferredBy.Add(parts[0], parts[1]);
+                    State.ReferredBy.Add(parts[0], parts[1]);
                 }
             }
             
@@ -650,7 +653,7 @@ public static class LoadData
     {
         try
         {
-            Program.PointsByReferrer.Clear();
+            State.PointsByReferrer.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -658,7 +661,7 @@ public static class LoadData
                 string[] parts = s.Split('?');
                 if (parts.Length == 2 && int.TryParse(parts[1], out int points))
                 {
-                    Program.PointsByReferrer.Add(parts[0], points);
+                    State.PointsByReferrer.Add(parts[0], points);
                 }
             }
             
@@ -678,7 +681,7 @@ public static class LoadData
     {
         try
         {
-            Program.UserPointOffset.Clear();
+            State.UserPointOffset.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -686,7 +689,7 @@ public static class LoadData
                 string[] parts = s.Split('?');
                 if (parts.Length == 2 && int.TryParse(parts[1], out int offset))
                 {
-                    Program.UserPointOffset.Add(parts[0], offset);
+                    State.UserPointOffset.Add(parts[0], offset);
                 }
             }
             
@@ -706,7 +709,7 @@ public static class LoadData
     {
         try
         {
-            Program.JoinedReferrals.Clear();
+            State.JoinedReferrals.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -716,7 +719,7 @@ public static class LoadData
                 {
                     string userId = parts[0];
                     bool joined = parts[1].Equals("true", StringComparison.OrdinalIgnoreCase);
-                    Program.JoinedReferrals.Add(userId, joined);
+                    State.JoinedReferrals.Add(userId, joined);
                 }
             }
             
@@ -736,7 +739,7 @@ public static class LoadData
     {
         try
         {
-            Program.ReferralPoints.Clear();
+            State.ReferralPoints.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -744,7 +747,7 @@ public static class LoadData
                 string[] parts = s.Split('?');
                 if (parts.Length == 2 && int.TryParse(parts[1], out int points))
                 {
-                    Program.ReferralPoints.Add(parts[0], points);
+                    State.ReferralPoints.Add(parts[0], points);
                 }
             }
             
@@ -764,7 +767,7 @@ public static class LoadData
     {
         try
         {
-            Program.InteractedUser.Clear();
+            State.InteractedUser.Clear();
             List<string> lines = File.ReadAllLines(filePath).ToList();
             
             foreach (string s in lines)
@@ -785,7 +788,7 @@ public static class LoadData
                                 result.Add(temp1[0], temp1[1]);
                             }
                         }
-                        Program.InteractedUser.Add(value, result);
+                        State.InteractedUser.Add(value, result);
                     }
                     catch
                     {
@@ -816,18 +819,18 @@ public static class LoadData
 
         if (File.Exists(campaignDaysFile))
         {
-            Program.CampaignDays.Clear();
-            Program.CampaignDays = File.ReadAllLines(campaignDaysFile).ToList();
-            Program.CampaignDays.Sort();
+            State.CampaignDays.Clear();
+            State.CampaignDays = File.ReadAllLines(campaignDaysFile).ToList();
+            State.CampaignDays.Sort();
             string text = "campaignDaysData loaded.";
             Logging.AddToLog(text);
             Console.WriteLine(text);
         }
         else if (File.Exists(backupCampaignDaysFile))
         {
-            Program.CampaignDays.Clear();
-            Program.CampaignDays = File.ReadAllLines(backupCampaignDaysFile).ToList();
-            Program.CampaignDays.Sort();
+            State.CampaignDays.Clear();
+            State.CampaignDays = File.ReadAllLines(backupCampaignDaysFile).ToList();
+            State.CampaignDays.Sort();
             string text = "campaignDaysData loaded from backup.";
             Logging.AddToLog(text);
             Console.WriteLine(text);
@@ -849,7 +852,7 @@ public static class LoadData
         Logging.AddToLog(text);
         Console.WriteLine(text);
 
-        var group = await Program.BotClient.GetChatAsync(groupId);
+        var group = await State.BotClient.GetChatAsync(groupId);
         return group;
     }
 
@@ -858,7 +861,7 @@ public static class LoadData
     /// </summary>
     public static void CreateCampaignDays()
     {
-        Program.CampaignDays.Clear();
+        State.CampaignDays.Clear();
         
         if (DateTime.TryParse(Config.StartDate, out DateTime startDate))
         {
@@ -866,7 +869,7 @@ public static class LoadData
             {
                 DateTime dateTime = startDate.AddDays(i);
                 string date = dateTime.ToString("MM/dd/yyyy");
-                Program.CampaignDays.Add(date);
+                State.CampaignDays.Add(date);
             }
             
             Logging.AddToLog("Created campaignDays list");

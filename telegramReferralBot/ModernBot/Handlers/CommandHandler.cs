@@ -14,6 +14,7 @@ namespace TelegramReferralBot.Handlers
         private readonly ITelegramBotClient _botClient;
         private readonly ReferralService _referralService;
         private readonly PointsService _pointsService;
+        private readonly MongoDbService _mongoDb;
         private readonly ILogger<CommandHandler> _logger;
         private readonly string _adminUserId = "5962815632"; // Abisoye's Telegram ID
 
@@ -21,11 +22,13 @@ namespace TelegramReferralBot.Handlers
             ITelegramBotClient botClient,
             ReferralService referralService,
             PointsService pointsService,
+            MongoDbService mongoDb,
             ILogger<CommandHandler> logger)
         {
             _botClient = botClient;
             _referralService = referralService;
             _pointsService = pointsService;
+            _mongoDb = mongoDb;
             _logger = logger;
         }
 
@@ -165,13 +168,15 @@ namespace TelegramReferralBot.Handlers
                 Console.WriteLine($"[DEBUG] MESSAGE DETAILS: Is reply to message {message.ReplyToMessage.MessageId}");
             }
             
-            // Get user's points
+            // Get user's points and user data
             Console.WriteLine($"[DEBUG] COMMAND: Getting points for user {userId}");
             int points = await _pointsService.GetPointsAsync(userId);
+            var user = await _mongoDb.GetUserByIdAsync(userId);
             Console.WriteLine($"[DEBUG] COMMAND: User {userId} has {points} Bricks");
             
             string response;
-            string stage = GetUserStage(points);
+            (string stageName, int stageNumber, int nextStageThreshold) = GetUserStageInfo(points);
+            string progressBar = GenerateProgressBar(points, stageNumber);
 
             if (points == 0)
             {
@@ -185,9 +190,31 @@ namespace TelegramReferralBot.Handlers
             else
             {
                 Console.WriteLine($"[DEBUG] COMMAND: User {userId} has {points} Bricks, sending bricks message with stage");
-                response = $"You have {points} Bricks! 🎉\n\n" +
-                           $"{stage}\n\n" +
-                           "Keep earning more by referring friends to the group!";
+                
+                // Calculate progress to next stage
+                int currentStageThreshold = GetStageThreshold(stageNumber - 1);
+                int pointsInCurrentStage = points - currentStageThreshold;
+                int pointsNeededForNextStage = nextStageThreshold - currentStageThreshold;
+                int pointsRemainingForNextStage = nextStageThreshold - points;
+                int progressPercentage = (pointsInCurrentStage * 100) / pointsNeededForNextStage;
+                
+                // Add streak information if available
+                string streakInfo = "";
+                if (user != null && user.StreakCount > 0)
+                {
+                    streakInfo = $"\n🔥 *Current Streak: {user.StreakCount} days*\n" +
+                                $"Keep your streak going by being active daily!";
+                }
+                
+                response = $"You have *{points} Bricks*! 🎉\n\n" +
+                           $"{stageName}\n\n" +
+                           $"{progressBar}\n" +
+                           $"*{progressPercentage}%* complete - {pointsRemainingForNextStage} more Bricks needed for next stage\n" +
+                           $"{streakInfo}\n\n" +
+                           "*How to earn more Bricks:*\n" +
+                           "• Refer friends: 150 Bricks per referral\n" +
+                           "• Daily activity: Up to 20 Bricks per day\n" +
+                           "• Maintain streaks: Bonus rewards for consistency";
             }
 
             Console.WriteLine($"[DEBUG] TELEGRAM REQUEST: Sending points response to user {userId} in chat {chatId}");
@@ -205,28 +232,86 @@ namespace TelegramReferralBot.Handlers
         /// </summary>
         /// <param name="points">The user's total Bricks</param>
         /// <returns>A string with the user's stage and title</returns>
-        private string GetUserStage(int points)
+        /// <summary>
+        /// Gets the user's stage information based on their points
+        /// </summary>
+        /// <param name="points">User's points</param>
+        /// <returns>Tuple containing stage name, stage number, and next stage threshold</returns>
+        private (string StageName, int StageNumber, int NextStageThreshold) GetUserStageInfo(int points)
         {
             if (points < 500)
-                return "*Stage 1: Welcome Explorer* 🌱\nYou're taking your first steps in the community!";
+                return ("*Stage 1: Welcome Explorer* 🌱\nYou're taking your first steps in the community!", 1, 500);
             else if (points < 2000)
-                return "*Stage 2: Active Citizen* 🔥\nYou're building your foundation in the community!";
+                return ("*Stage 2: Active Citizen* 🔥\nYou're building your foundation in the community!", 2, 2000);
             else if (points < 5000)
-                return "*Stage 3: Community Builder* 🛡️\nYou're now a trusted member with a special badge!";
+                return ("*Stage 3: Community Builder* 🛡️\nYou're now a trusted member with a special badge!", 3, 5000);
             else if (points < 10000)
-                return "*Stage 4: Contributor* 🧠\nYou're shaping the culture here!";
+                return ("*Stage 4: Contributor* 🧠\nYou're shaping the culture here!", 4, 10000);
             else if (points < 20000)
-                return "*Stage 5: Influencer* 📢\nYou're making waves. Keep going!";
+                return ("*Stage 5: Influencer* 📢\nYou're making waves. Keep going!", 5, 20000);
             else if (points < 35000)
-                return "*Stage 6: Partner* 🤝\nYou're now a Bricks ally!";
+                return ("*Stage 6: Partner* 🤝\nYou're now a Bricks ally!", 6, 35000);
             else if (points < 60000)
-                return "*Stage 7: Ambassador* 🏆\nYou've got real influence with a special badge!";
+                return ("*Stage 7: Ambassador* 🏆\nYou've got real influence with a special badge!", 7, 60000);
             else if (points < 100000)
-                return "*Stage 8: Luminary* ✨\nYou're a beacon for others!";
+                return ("*Stage 8: Luminary* ✨\nYou're a beacon for others!", 8, 100000);
             else if (points < 250000)
-                return "*Stage 9: Legend* 🔥\nYou're a legacy-maker in the community!";
+                return ("*Stage 9: Legend* 🔥\nYou're a legacy-maker in the community!", 9, 250000);
             else
-                return "*Stage 10: Hall of Flame* 🪙\nYou're eternalized in Bricks history!";
+                return ("*Stage 10: Hall of Flame* 🪙\nYou're eternalized in Bricks history!", 10, int.MaxValue);
+        }
+        
+        /// <summary>
+        /// Gets the threshold for a specific stage
+        /// </summary>
+        private int GetStageThreshold(int stage)
+        {
+            switch (stage)
+            {
+                case 0: return 0;
+                case 1: return 500;
+                case 2: return 2000;
+                case 3: return 5000;
+                case 4: return 10000;
+                case 5: return 20000;
+                case 6: return 35000;
+                case 7: return 60000;
+                case 8: return 100000;
+                case 9: return 250000;
+                default: return 0;
+            }
+        }
+        
+        /// <summary>
+        /// Generates a visual progress bar based on points and stage
+        /// </summary>
+        private string GenerateProgressBar(int points, int stage)
+        {
+            // For the last stage, show a full bar
+            if (stage >= 10)
+                return "▓▓▓▓▓▓▓▓▓▓ 100%";
+                
+            int currentStageThreshold = GetStageThreshold(stage - 1);
+            int nextStageThreshold = GetStageThreshold(stage);
+            
+            // Calculate progress percentage within the current stage
+            int pointsInCurrentStage = points - currentStageThreshold;
+            int pointsNeededForNextStage = nextStageThreshold - currentStageThreshold;
+            int progressPercentage = (pointsInCurrentStage * 100) / pointsNeededForNextStage;
+            
+            // Generate a 10-character progress bar
+            int filledBlocks = (progressPercentage * 10) / 100;
+            string progressBar = new string('▓', filledBlocks) + new string('░', 10 - filledBlocks);
+            
+            return progressBar;
+        }
+        
+        /// <summary>
+        /// Legacy method for backward compatibility
+        /// </summary>
+        private string GetUserStage(int points)
+        {
+            return GetUserStageInfo(points).StageName;
         }
 
         /// <summary>

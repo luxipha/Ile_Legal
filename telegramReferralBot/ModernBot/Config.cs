@@ -11,6 +11,18 @@ public static class Config
     public static string BotAccessToken { get; set; } = string.Empty;
 
     /// <summary>
+    /// Points awarded for sending a message
+    /// </summary>
+    public static int MessageReward { get; set; } = 1;
+
+
+
+    /// <summary>
+    /// Maximum number of messages that can earn points per day
+    /// </summary>
+    public static int DailyMessageLimit { get; set; } = 10;
+
+    /// <summary>
     /// Path to save output files
     /// </summary>
     public static string OutputFilePath { get; set; } = string.Empty;
@@ -43,7 +55,7 @@ public static class Config
     /// <summary>
     /// Maximum number of points a user can earn per day per referred user
     /// </summary>
-    public static int MaxPointsPerDay { get; set; } = 0;
+    public static int MaxPointsPerDay { get; set; } = 20;
 
     /// <summary>
     /// Minimum message length to earn points

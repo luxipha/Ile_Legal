@@ -38,11 +38,11 @@ namespace TelegramReferralBot
             var referralService = new ReferralService(botClient, mongoDb, activityService, pointsService, loggerFactory.CreateLogger<ReferralService>());
 
             // Initialize handlers
-            _commandHandler = new CommandHandler(botClient, referralService, pointsService, loggerFactory.CreateLogger<CommandHandler>());
+            _commandHandler = new CommandHandler(botClient, referralService, pointsService, mongoDb, loggerFactory.CreateLogger<CommandHandler>());
             _groupHandler = new GroupHandler(botClient, mongoDb, pointsService, referralService, loggerFactory.CreateLogger<GroupHandler>());
             _leaderboardHandler = new LeaderboardHandler(botClient, mongoDb, loggerFactory.CreateLogger<LeaderboardHandler>());
             _adminHandler = new AdminHandler(botClient, mongoDb, loggerFactory.CreateLogger<AdminHandler>());
-            _callbackHandler = new CallbackHandler(botClient, _commandHandler, _leaderboardHandler, loggerFactory.CreateLogger<CallbackHandler>());
+            _callbackHandler = new CallbackHandler(botClient, _commandHandler, _leaderboardHandler, _adminHandler, loggerFactory.CreateLogger<CallbackHandler>());
         }
 
         /// <summary>
@@ -164,6 +164,18 @@ namespace TelegramReferralBot
 
                 case "/ban":
                     await _adminHandler.BanUserAsync(message, cancellationToken);
+                    break;
+
+                case "/findmemberid":
+                    await _adminHandler.HandleFindMemberIDCommandAsync(message, cancellationToken);
+                    break;
+                    
+                case "/adminmenu":
+                    await _adminHandler.HandleAdminMenuCommandAsync(message, cancellationToken);
+                    break;
+
+                case "/edituser":
+                    await _adminHandler.HandleEditUserCommandAsync(message, cancellationToken);
                     break;
 
                 case "/referrals":

@@ -48,6 +48,61 @@ The bot's data models have been aligned with the backend schema:
 
 This integration ensures that all data is preserved and accessible by both the bot and the backend.
 
+## Environment Variables
+
+The following environment variables are required for production deployment:
+
+### Required Variables
+
+```
+# MongoDB Connection
+MONGODB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/dbname?retryWrites=true&w=majority
+MONGODB_DATABASE_NAME=ileDB-prod
+
+# Telegram Bot Configuration
+BOT_TOKEN=your_telegram_bot_token
+BOT_API_KEY=your_telegram_bot_token
+
+# Backend Integration
+BACKEND_URL=https://api.ile.africa
+
+# Admin Configuration
+ADMIN_PASSWORD=strong_password_here
+
+# Group and Bot Links
+LINK_GROUP=https://telegram.me/your_group_name
+LINK_BOT=https://telegram.me/your_bot_name
+
+# Points System Configuration
+START_DATE=MM/DD/YYYY  # Format: month/day/year
+NUMBER_OF_DAYS=365
+MAX_POINTS_PER_DAY=20
+THRESHOLD_FOR_MESSAGE_POINT=10
+JOIN_REWARD=30
+REFERRAL_REWARD=150
+STREAK_REWARD=300
+LEADERBOARD_REWARD=200
+```
+
+### Variable Descriptions
+
+- **MONGODB_CONNECTION_STRING**: Full connection string to your MongoDB database
+- **MONGODB_DATABASE_NAME**: Name of the MongoDB database (use ileDB-prod for production)
+- **BOT_TOKEN**: Telegram Bot API token obtained from BotFather
+- **BOT_API_KEY**: Same as BOT_TOKEN, used for API authentication
+- **BACKEND_URL**: URL of the Ile backend API for points synchronization
+- **ADMIN_PASSWORD**: Password for admin commands (use a strong password in production)
+- **LINK_GROUP**: Invite link to your Telegram group
+- **LINK_BOT**: Direct link to your Telegram bot
+- **START_DATE**: Start date for the points system (MM/DD/YYYY format)
+- **NUMBER_OF_DAYS**: Duration of the points campaign in days
+- **MAX_POINTS_PER_DAY**: Maximum points a user can earn per day
+- **THRESHOLD_FOR_MESSAGE_POINT**: Number of messages required to earn points
+- **JOIN_REWARD**: Points awarded for joining the group
+- **REFERRAL_REWARD**: Points awarded for successful referrals
+- **STREAK_REWARD**: Points awarded for maintaining a streak
+- **LEADERBOARD_REWARD**: Points awarded for leaderboard placement
+
 ## Deployment Steps
 
 ### Option 1: Deploy via Render Dashboard (Recommended)

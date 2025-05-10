@@ -1,3 +1,9 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using TelegramReferralBot.Utils;
+
 namespace TelegramReferralBot;
 
 /// <summary>
@@ -14,7 +20,7 @@ public static class SaveMethods
     public static bool SaveUserActivity()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -51,7 +57,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.UserActivity)
+                foreach (var entry in State.UserActivity)
                 {
                     string data = entry.Key;
                     foreach (var line in entry.Value)
@@ -79,7 +85,7 @@ public static class SaveMethods
     public static bool SaveRefLinks()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -116,7 +122,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.RefLinks)
+                foreach (var entry in State.RefLinks)
                 {
                     writer.WriteLine(entry.Key + "?" + entry.Value);
                 }
@@ -139,7 +145,7 @@ public static class SaveMethods
     public static bool SavePasswordAttempts()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -176,7 +182,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.PasswordAttempts)
+                foreach (var entry in State.PasswordAttempts)
                 {
                     writer.WriteLine(entry.Key + "?" + entry.Value.ToString());
                 }
@@ -199,7 +205,7 @@ public static class SaveMethods
     public static bool SaveShowWelcome()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -236,7 +242,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.ShowWelcome)
+                foreach (var entry in State.ShowWelcome)
                 {
                     writer.WriteLine(entry.Key + "?" + entry.Value.ToString());
                 }
@@ -259,7 +265,7 @@ public static class SaveMethods
     public static bool SaveReferredBy()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -296,7 +302,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.ReferredBy)
+                foreach (var entry in State.ReferredBy)
                 {
                     writer.WriteLine(entry.Key + "?" + entry.Value);
                 }
@@ -319,7 +325,7 @@ public static class SaveMethods
     public static bool SaveGroupChatIdNumber()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -376,7 +382,7 @@ public static class SaveMethods
     public static bool SavePointsByReferrer()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -413,7 +419,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.PointsByReferrer)
+                foreach (var entry in State.PointsByReferrer)
                 {
                     writer.WriteLine(entry.Key + "?" + entry.Value.ToString());
                 }
@@ -436,7 +442,7 @@ public static class SaveMethods
     public static bool SaveUserPointOffset()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -473,7 +479,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.UserPointOffset)
+                foreach (var entry in State.UserPointOffset)
                 {
                     writer.WriteLine(entry.Key + "?" + entry.Value.ToString());
                 }
@@ -496,7 +502,7 @@ public static class SaveMethods
     public static bool SaveJoinedReferrals()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -533,7 +539,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.JoinedReferrals)
+                foreach (var entry in State.JoinedReferrals)
                 {
                     writer.WriteLine(entry.Key.ToString() + "?" + entry.Value);
                 }
@@ -556,7 +562,7 @@ public static class SaveMethods
     public static bool SaveReferralPoints()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -593,7 +599,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.ReferralPoints)
+                foreach (var entry in State.ReferralPoints)
                 {
                     writer.WriteLine(entry.Key + "?" + entry.Value.ToString());
                 }
@@ -616,7 +622,7 @@ public static class SaveMethods
     public static bool SaveInteractedUser()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -653,7 +659,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.InteractedUser)
+                foreach (var entry in State.InteractedUser)
                 {
                     string result = entry.Key.ToString() + "?????";
                     foreach (var value in entry.Value)
@@ -681,7 +687,7 @@ public static class SaveMethods
     public static bool SaveDisableNotice()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -718,7 +724,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.DisableNotice)
+                foreach (var entry in State.DisableNotice)
                 {
                     writer.WriteLine(entry);
                 }
@@ -741,7 +747,7 @@ public static class SaveMethods
     public static bool SaveCampaignDays()
     {
         // Try to save to MongoDB first
-        if (Program.MongoDb != null)
+        if (State.MongoDb != null)
         {
             try
             {
@@ -778,7 +784,7 @@ public static class SaveMethods
 
                 // Create new file with updated data
                 using StreamWriter writer = new(file);
-                foreach (var entry in Program.CampaignDays)
+                foreach (var entry in State.CampaignDays)
                 {
                     writer.WriteLine(entry);
                 }

@@ -6,6 +6,8 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using TelegramReferralBot.Models;
 
+using System.Text.RegularExpressions;
+
 namespace TelegramReferralBot.Services
 {
     /// <summary>
@@ -20,53 +22,122 @@ namespace TelegramReferralBot.Services
         private readonly ILogger<MongoDbService> _logger;
         
         /// <summary>
+        /// Maximum number of connection retry attempts
+        /// </summary>
+        private const int MaxRetryAttempts = 3;
+
+        /// <summary>
+        /// Delay between retry attempts in milliseconds
+        /// </summary>
+        private const int RetryDelayMs = 2000;
+
+        /// <summary>
+        /// Flag indicating if MongoDB connection is available
+        /// </summary>
+        public bool IsMongoDbAvailable { get; private set; }
+
+        /// <summary>
         /// Initializes a new instance of the MongoDbService class
         /// </summary>
         public MongoDbService(string connectionString, string databaseName, ILogger<MongoDbService> logger)
         {
-            try
+            _logger = logger;
+            IsMongoDbAvailable = false;
+            
+            if (string.IsNullOrEmpty(connectionString))
             {
-                _logger = logger;
-                
-                Console.WriteLine($"[MONGODB] Attempting to connect to MongoDB: {databaseName}");
-                _logger.LogInformation($"Attempting to connect to MongoDB: {databaseName}");
-                
-                // Create client with connection string
-                var client = new MongoClient(connectionString);
-                
-                // Test connection by listing databases
-                var dbList = client.ListDatabases().ToList();
-                Console.WriteLine($"[MONGODB] Successfully connected to MongoDB. Available databases: {dbList.Count}");
-                
-                // Get database
-                var database = client.GetDatabase(databaseName);
-                
-                // Use the existing collections from the backend
-                _users = database.GetCollection<UserModel>("users");
-                _referrals = database.GetCollection<ReferralModel>("referrals");
-                _activities = database.GetCollection<ActivityModel>("activities");
-                _refLinks = database.GetCollection<RefLinkModel>("reflinks");
-                
-                // Verify collections exist and are accessible
-                var userCount = _users.CountDocuments(FilterDefinition<UserModel>.Empty);
-                var referralCount = _referrals.CountDocuments(FilterDefinition<ReferralModel>.Empty);
-                var activityCount = _activities.CountDocuments(FilterDefinition<ActivityModel>.Empty);
-                var refLinkCount = _refLinks.CountDocuments(FilterDefinition<RefLinkModel>.Empty);
-                
-                Console.WriteLine($"[MONGODB] Collection counts - Users: {userCount}, Referrals: {referralCount}, Activities: {activityCount}, RefLinks: {refLinkCount}");
-                _logger.LogInformation($"MongoDB service initialized with backend database: {databaseName}");
-                _logger.LogInformation($"Collection counts - Users: {userCount}, Referrals: {referralCount}, Activities: {activityCount}, RefLinks: {refLinkCount}");
-                
-                // Ensure indexes for better performance
-                CreateIndexesAsync().Wait();
-                
-                Console.WriteLine($"[MONGODB] Successfully initialized MongoDB service with database: {databaseName}");
+                _logger.LogCritical("MongoDB connection string is null or empty");
+                Console.WriteLine("[MONGODB] CRITICAL ERROR: MongoDB connection string is null or empty");
+                return;
             }
-            catch (Exception ex)
+
+            if (string.IsNullOrEmpty(databaseName))
             {
-                Console.WriteLine($"[MONGODB] ERROR connecting to MongoDB: {ex.Message}");
-                _logger.LogError($"Error initializing MongoDB service: {ex.Message}");
-                throw; // Re-throw to ensure the application fails if MongoDB is unavailable
+                _logger.LogCritical("MongoDB database name is null or empty");
+                Console.WriteLine("[MONGODB] CRITICAL ERROR: MongoDB database name is null or empty");
+                return;
+            }
+
+            int retryCount = 0;
+            bool connected = false;
+
+            while (!connected && retryCount < MaxRetryAttempts)
+            {
+                try
+                {
+                    retryCount++;
+                    Console.WriteLine($"[MONGODB] Attempt {retryCount}/{MaxRetryAttempts} to connect to MongoDB: {databaseName}");
+                    _logger.LogInformation($"Attempt {retryCount}/{MaxRetryAttempts} to connect to MongoDB: {databaseName}");
+                    
+                    // Create client with connection string and server timeout settings
+                    var settings = MongoClientSettings.FromConnectionString(connectionString);
+                    settings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+                    settings.ConnectTimeout = TimeSpan.FromSeconds(10);
+                    var client = new MongoClient(settings);
+                    
+                    // Test connection by listing databases
+                    var dbList = client.ListDatabases().ToList();
+                    Console.WriteLine($"[MONGODB] Successfully connected to MongoDB. Available databases: {dbList.Count}");
+                    
+                    // Get database
+                    var database = client.GetDatabase(databaseName);
+                    
+                    // Use the existing collections from the backend
+                    _users = database.GetCollection<UserModel>("users");
+                    _referrals = database.GetCollection<ReferralModel>("referrals");
+                    _activities = database.GetCollection<ActivityModel>("activities");
+                    _refLinks = database.GetCollection<RefLinkModel>("reflinks");
+                    
+                    // Verify collections exist and are accessible
+                    var userCount = _users.CountDocuments(FilterDefinition<UserModel>.Empty);
+                    var referralCount = _referrals.CountDocuments(FilterDefinition<ReferralModel>.Empty);
+                    var activityCount = _activities.CountDocuments(FilterDefinition<ActivityModel>.Empty);
+                    var refLinkCount = _refLinks.CountDocuments(FilterDefinition<RefLinkModel>.Empty);
+                    
+                    Console.WriteLine($"[MONGODB] Collection counts - Users: {userCount}, Referrals: {referralCount}, Activities: {activityCount}, RefLinks: {refLinkCount}");
+                    _logger.LogInformation($"Collection counts - Users: {userCount}, Referrals: {referralCount}, Activities: {activityCount}, RefLinks: {refLinkCount}");
+                    
+                    // Create indexes
+                    CreateIndexes();
+                    
+                    Console.WriteLine($"[MONGODB] Successfully initialized MongoDB service with database: {databaseName}");
+                    connected = true;
+                    IsMongoDbAvailable = true;
+                }
+                catch (MongoConnectionException ex)
+                {
+                    string errorMessage = $"MongoDB connection error (attempt {retryCount}/{MaxRetryAttempts}): {ex.Message}";
+                    Console.WriteLine($"[MONGODB] {errorMessage}");
+                    _logger.LogError(errorMessage);
+                    
+                    if (retryCount < MaxRetryAttempts)
+                    {
+                        Console.WriteLine($"[MONGODB] Retrying in {RetryDelayMs/1000} seconds...");
+                        Thread.Sleep(RetryDelayMs);
+                    }
+                    else
+                    {
+                        _logger.LogCritical("Failed to connect to MongoDB after multiple attempts. Bot will run with limited functionality.");
+                        Console.WriteLine("[MONGODB] CRITICAL: Failed to connect to MongoDB after multiple attempts. Bot will run with limited functionality.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    string errorMessage = $"Error initializing MongoDB service (attempt {retryCount}/{MaxRetryAttempts}): {ex.Message}";
+                    Console.WriteLine($"[MONGODB] {errorMessage}");
+                    _logger.LogError(errorMessage);
+                    
+                    if (retryCount < MaxRetryAttempts)
+                    {
+                        Console.WriteLine($"[MONGODB] Retrying in {RetryDelayMs/1000} seconds...");
+                        Thread.Sleep(RetryDelayMs);
+                    }
+                    else
+                    {
+                        _logger.LogCritical("Failed to initialize MongoDB service after multiple attempts. Bot will run with limited functionality.");
+                        Console.WriteLine("[MONGODB] CRITICAL: Failed to initialize MongoDB service after multiple attempts. Bot will run with limited functionality.");
+                    }
+                }
             }
         }
         
@@ -75,7 +146,7 @@ namespace TelegramReferralBot.Services
         /// </summary>
         public async Task InitializeAsync()
         {
-            await CreateIndexesAsync();
+            CreateIndexes();
         }
         
         /// <summary>
@@ -316,32 +387,136 @@ namespace TelegramReferralBot.Services
             return await _activities.Find(filter).ToListAsync();
         }
 
-        private async Task CreateIndexesAsync()
+        /// <summary>
+        /// Generic wrapper for database operations with improved error handling
+        /// </summary>
+        /// <typeparam name="T">The return type of the database operation</typeparam>
+        /// <param name="operation">The database operation to execute</param>
+        /// <param name="operationName">A descriptive name for the operation (for logging)</param>
+        /// <param name="defaultValue">The default value to return if the operation fails</param>
+        /// <returns>The result of the operation or the default value if it fails</returns>
+        private async Task<T> ExecuteDbOperationAsync<T>(Func<Task<T>> operation, string operationName, T defaultValue)
         {
+            if (!IsMongoDbAvailable)
+            {
+                _logger.LogWarning($"Skipping {operationName} - MongoDB connection not available");
+                Console.WriteLine($"[MONGODB] Skipping {operationName} - MongoDB connection not available");
+                return defaultValue;
+            }
+
             try
             {
-                // Create index on telegramChatId for users collection
-                var userIndexBuilder = Builders<UserModel>.IndexKeys;
-                var userIndexModel = new CreateIndexModel<UserModel>(
-                    userIndexBuilder.Ascending(u => u.TelegramId),
-                    new CreateIndexOptions { Background = true, Name = "telegramChatId_idx" }
-                );
-                await _users.Indexes.CreateOneAsync(userIndexModel);
-                
-                // Create index on referral code
-                var refLinkIndexBuilder = Builders<RefLinkModel>.IndexKeys;
-                var refLinkIndexModel = new CreateIndexModel<RefLinkModel>(
-                    refLinkIndexBuilder.Ascending(r => r.RefCode),
-                    new CreateIndexOptions { Background = true, Name = "refCode_idx" }
-                );
-                await _refLinks.Indexes.CreateOneAsync(refLinkIndexModel);
-                
-                _logger.LogInformation("MongoDB indexes created successfully");
+                _logger.LogDebug($"Executing {operationName}");
+                return await operation();
+            }
+            catch (MongoConnectionException ex)
+            {
+                _logger.LogError($"MongoDB connection error during {operationName}: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Connection error during {operationName}: {ex.Message}");
+                IsMongoDbAvailable = false; // Mark connection as unavailable
+                return defaultValue;
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogError($"Timeout during {operationName}: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Timeout during {operationName}: {ex.Message}");
+                return defaultValue;
             }
             catch (Exception ex)
             {
-                Logging.AddToLog($"Error creating MongoDB indexes: {ex.Message}");
-                Console.WriteLine($"Error creating MongoDB indexes: {ex.Message}");
+                _logger.LogError($"Error during {operationName}: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Error during {operationName}: {ex.Message}");
+                return defaultValue;
+            }
+        }
+
+        /// <summary>
+        /// Generic wrapper for database operations with improved error handling (for void operations)
+        /// </summary>
+        /// <param name="operation">The database operation to execute</param>
+        /// <param name="operationName">A descriptive name for the operation (for logging)</param>
+        /// <returns>True if the operation succeeds, false otherwise</returns>
+        private async Task<bool> ExecuteDbOperationAsync(Func<Task> operation, string operationName)
+        {
+            if (!IsMongoDbAvailable)
+            {
+                _logger.LogWarning($"Skipping {operationName} - MongoDB connection not available");
+                Console.WriteLine($"[MONGODB] Skipping {operationName} - MongoDB connection not available");
+                return false;
+            }
+
+            try
+            {
+                _logger.LogDebug($"Executing {operationName}");
+                await operation();
+                return true;
+            }
+            catch (MongoConnectionException ex)
+            {
+                _logger.LogError($"MongoDB connection error during {operationName}: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Connection error during {operationName}: {ex.Message}");
+                IsMongoDbAvailable = false; // Mark connection as unavailable
+                return false;
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogError($"Timeout during {operationName}: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Timeout during {operationName}: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error during {operationName}: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Error during {operationName}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Creates MongoDB indexes for better query performance
+        /// </summary>
+        private void CreateIndexes()
+        {
+            if (!IsMongoDbAvailable)
+            {
+                _logger.LogWarning("Skipping index creation - MongoDB connection not available");
+                Console.WriteLine("[MONGODB] Skipping index creation - MongoDB connection not available");
+                return;
+            }
+
+            try
+            {
+                // Create indexes for users collection
+                var userIndexes = new List<CreateIndexModel<UserModel>>
+                {
+                    new CreateIndexModel<UserModel>(Builders<UserModel>.IndexKeys.Ascending(u => u.TelegramId), new CreateIndexOptions { Unique = true }),
+                    new CreateIndexModel<UserModel>(Builders<UserModel>.IndexKeys.Ascending(u => u.Username))
+                };
+                _users.Indexes.CreateMany(userIndexes);
+                
+                // Create indexes for referrals collection
+                var referralIndexes = new List<CreateIndexModel<ReferralModel>>
+                {
+                    new CreateIndexModel<ReferralModel>(Builders<ReferralModel>.IndexKeys.Ascending(r => r.ReferrerId)),
+                    new CreateIndexModel<ReferralModel>(Builders<ReferralModel>.IndexKeys.Ascending(r => r.ReferredId))
+                };
+                _referrals.Indexes.CreateMany(referralIndexes);
+                
+                // Create indexes for reflinks collection
+                var refLinkIndexes = new List<CreateIndexModel<RefLinkModel>>
+                {
+                    new CreateIndexModel<RefLinkModel>(Builders<RefLinkModel>.IndexKeys.Ascending(r => r.UserId), new CreateIndexOptions { Unique = true }),
+                    new CreateIndexModel<RefLinkModel>(Builders<RefLinkModel>.IndexKeys.Ascending(r => r.RefCode), new CreateIndexOptions { Unique = true })
+                };
+                _refLinks.Indexes.CreateMany(refLinkIndexes);
+                
+                _logger.LogInformation("MongoDB indexes created successfully");
+                Console.WriteLine("[MONGODB] MongoDB indexes created successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error creating MongoDB indexes: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Error creating MongoDB indexes: {ex.Message}");
             }
         }
         
@@ -728,18 +903,52 @@ namespace TelegramReferralBot.Services
         {
             try
             {
+                Console.WriteLine($"[DEBUG] Attempting to set user {telegramId} as admin");
+                
+                // First check if the user exists
                 var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, telegramId);
+                var user = await _users.Find(filter).FirstOrDefaultAsync();
+                
+                if (user == null)
+                {
+                    Console.WriteLine($"[DEBUG] User {telegramId} not found in database, creating new admin user");
+                    
+                    // Create a new user with admin privileges
+                    user = new UserModel
+                    {
+                        TelegramId = telegramId,
+                        IsAdmin = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        Bricks = new BricksModel { Total = 0 },
+                        Balance = 0
+                    };
+                    
+                    await _users.InsertOneAsync(user);
+                    Console.WriteLine($"[DEBUG] Successfully created new admin user {telegramId}");
+                    return true;
+                }
+                
+                // User exists, update admin status
+                Console.WriteLine($"[DEBUG] User {telegramId} found, current admin status: {user.IsAdmin}, setting to true");
+                
                 var update = Builders<UserModel>.Update
                     .Set(u => u.IsAdmin, true)
                     .Set(u => u.UpdatedAt, DateTime.UtcNow);
                 
                 var result = await _users.UpdateOneAsync(filter, update);
-                return result.IsAcknowledged && result.ModifiedCount > 0;
+                Console.WriteLine($"[DEBUG] Admin update result - Acknowledged: {result.IsAcknowledged}, ModifiedCount: {result.ModifiedCount}, MatchedCount: {result.MatchedCount}");
+                
+                // Verify the update was successful
+                user = await _users.Find(filter).FirstOrDefaultAsync();
+                Console.WriteLine($"[DEBUG] User {telegramId} admin status after update: {user?.IsAdmin}");
+                
+                return user?.IsAdmin == true;
             }
             catch (Exception ex)
             {
                 Logging.AddToLog($"Error setting user as admin: {ex.Message}");
-                Console.WriteLine($"Error setting user as admin: {ex.Message}");
+                Console.WriteLine($"[DEBUG] Error setting user as admin: {ex.Message}");
                 return false;
             }
         }
@@ -786,6 +995,112 @@ namespace TelegramReferralBot.Services
             {
                 Logging.AddToLog($"Error unbanning user: {ex.Message}");
                 Console.WriteLine($"Error unbanning user: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gets a user by their Telegram ID
+        /// </summary>
+        public async Task<UserModel> GetUserByIdAsync(string telegramId)
+        {
+            try
+            {
+                var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, telegramId);
+                var user = await _users.Find(filter).FirstOrDefaultAsync();
+                
+                if (user == null)
+                {
+                    _logger.LogWarning($"User with ID {telegramId} not found");
+                    Console.WriteLine($"[MONGODB] User with ID {telegramId} not found");
+                }
+                
+                return user;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error getting user by ID: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Error getting user by ID: {ex.Message}");
+                return null;
+            }
+        }
+
+        // This method was removed to eliminate duplication with the implementation at line ~731
+
+        /// <summary>
+        /// Updates a user's username
+        /// </summary>
+        public async Task<bool> UpdateUserUsernameAsync(string telegramId, string username)
+        {
+            try
+            {
+                _logger.LogInformation($"Updating username for user {telegramId} to {username}");
+                Console.WriteLine($"[MONGODB] Updating username for user {telegramId} to {username}");
+                
+                var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, telegramId);
+                var update = Builders<UserModel>.Update
+                    .Set(u => u.Username, username)
+                    .Set(u => u.UpdatedAt, DateTime.UtcNow);
+                
+                var result = await _users.UpdateOneAsync(filter, update);
+                return result.IsAcknowledged && result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error updating user username: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Error updating user username: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Updates a user's email
+        /// </summary>
+        public async Task<bool> UpdateUserEmailAsync(string telegramId, string email)
+        {
+            try
+            {
+                _logger.LogInformation($"Updating email for user {telegramId} to {email}");
+                Console.WriteLine($"[MONGODB] Updating email for user {telegramId} to {email}");
+                
+                var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, telegramId);
+                var update = Builders<UserModel>.Update
+                    .Set(u => u.Email, email)
+                    .Set(u => u.UpdatedAt, DateTime.UtcNow);
+                
+                var result = await _users.UpdateOneAsync(filter, update);
+                return result.IsAcknowledged && result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error updating user email: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Error updating user email: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Removes admin status from a user
+        /// </summary>
+        public async Task<bool> RemoveUserAdminStatusAsync(string telegramId)
+        {
+            try
+            {
+                _logger.LogInformation($"Removing admin status from user {telegramId}");
+                Console.WriteLine($"[MONGODB] Removing admin status from user {telegramId}");
+                
+                var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, telegramId);
+                var update = Builders<UserModel>.Update
+                    .Set(u => u.IsAdmin, false)
+                    .Set(u => u.UpdatedAt, DateTime.UtcNow);
+                
+                var result = await _users.UpdateOneAsync(filter, update);
+                return result.IsAcknowledged && result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error removing admin status: {ex.Message}");
+                Console.WriteLine($"[MONGODB] Error removing admin status: {ex.Message}");
                 return false;
             }
         }
@@ -1213,5 +1528,96 @@ namespace TelegramReferralBot.Services
         }
         
         #endregion
+        
+        /// <summary>
+        /// Gets users with a specific join state
+        /// </summary>
+        public async Task<List<UserModel>> GetUsersWithStateAsync(JoinState state)
+        {
+            try
+            {
+                if (!IsMongoDbAvailable)
+                {
+                    _logger.LogWarning("MongoDB not available for GetUsersWithStateAsync");
+                    return new List<UserModel>();
+                }
+                
+                var filter = Builders<UserModel>.Filter.Eq(u => u.JoinState, state);
+                var users = await _users.Find(filter).ToListAsync();
+                
+                _logger.LogInformation($"Found {users.Count} users with join state {state}");
+                return users;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting users with join state {state}");
+                return new List<UserModel>();
+            }
+        }
+        
+        /// <summary>
+        /// Gets users who need a reminder based on their join state, first interaction date, and last reminder sent
+        /// </summary>
+        public async Task<List<UserModel>> GetUsersForReminderAsync(JoinState state, DateTime cutoffDate, TimeSpan reminderInterval)
+        {
+            try
+            {
+                if (!IsMongoDbAvailable)
+                {
+                    _logger.LogWarning("MongoDB not available for GetUsersForReminderAsync");
+                    return new List<UserModel>();
+                }
+                
+                // Find users with the specified state who interacted before the cutoff date
+                // and either never received a reminder or received one longer than the interval ago
+                var filter = Builders<UserModel>.Filter.And(
+                    Builders<UserModel>.Filter.Eq(u => u.JoinState, state),
+                    Builders<UserModel>.Filter.Lt(u => u.FirstInteractionDate, cutoffDate),
+                    Builders<UserModel>.Filter.Or(
+                        Builders<UserModel>.Filter.Eq(u => u.LastReminderSent, null),
+                        Builders<UserModel>.Filter.Lt(u => u.LastReminderSent, DateTime.UtcNow.Subtract(reminderInterval))
+                    )
+                );
+                
+                var users = await _users.Find(filter).ToListAsync();
+                
+                _logger.LogInformation($"Found {users.Count} users needing {state} reminders");
+                return users;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting users for {state} reminders");
+                return new List<UserModel>();
+            }
+        }
+        
+        /// <summary>
+        /// Updates a user's streak count and last activity date
+        /// </summary>
+        public async Task UpdateUserStreakAsync(string userId, int streakCount, DateTime lastActivityDate)
+        {
+            try
+            {
+                if (!IsMongoDbAvailable)
+                {
+                    _logger.LogWarning("MongoDB not available for UpdateUserStreakAsync");
+                    return;
+                }
+                
+                var filter = Builders<UserModel>.Filter.Eq(u => u.TelegramId, userId);
+                var update = Builders<UserModel>.Update
+                    .Set(u => u.StreakCount, streakCount)
+                    .Set(u => u.LastActivityDate, lastActivityDate)
+                    .Set(u => u.UpdatedAt, DateTime.UtcNow);
+                
+                var result = await _users.UpdateOneAsync(filter, update);
+                
+                _logger.LogInformation($"Updated streak for user {userId} to {streakCount} days. Result: {result.ModifiedCount} document(s) modified");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating streak for user {userId}");
+            }
+        }
     }
 }
