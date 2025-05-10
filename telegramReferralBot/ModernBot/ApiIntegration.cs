@@ -1,14 +1,19 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Newtonsoft.Json;
-using Telegram.Bot.Types;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Net;
+using TelegramReferralBot.Utils;
 using Polly;
 using Polly.Retry;
 using Polly.Extensions.Http;
-using System.Net;
 using System.Security.Authentication;
 using System.IO;
+using Newtonsoft.Json;
+
 
 namespace TelegramReferralBot;
 
@@ -18,7 +23,7 @@ namespace TelegramReferralBot;
 public static class ApiIntegration
 {
     private static readonly HttpClient _httpClient;
-    private static readonly string _apiBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL") ?? "https://ile-backend.onrender.com"; // Use Render backend server
+    private static readonly string _apiBaseUrl = Environment.GetEnvironmentVariable("BACKEND_URL") ?? "http://localhost:3000"; // Use Render backend server
     private static readonly string _apiKey;
     private static readonly AsyncRetryPolicy<HttpResponseMessage> _retryPolicy;
     
@@ -122,16 +127,16 @@ public static class ApiIntegration
             var referrals = new List<object>();
             
             // Add referrals from the bot's data
-            foreach (KeyValuePair<string, string> entry in Program.ReferredBy)
+            foreach (KeyValuePair<string, string> entry in State.ReferredBy)
             {
                 string referredId = entry.Key;
                 string referrerId = entry.Value;
                 
                 // Get points earned if available
                 int points = 0;
-                if (Program.ReferralPoints.ContainsKey(referrerId))
+                if (State.ReferralPoints.ContainsKey(referrerId))
                 {
-                    points = Program.ReferralPoints[referrerId];
+                    points = State.ReferralPoints[referrerId];
                 }
                 
                 referrals.Add(new {
@@ -144,7 +149,7 @@ public static class ApiIntegration
             }
             
             // Add group join events
-            foreach (KeyValuePair<string, bool> entry in Program.JoinedReferrals)
+            foreach (KeyValuePair<string, bool> entry in State.JoinedReferrals)
             {
                 string userId = entry.Key;
                 bool joined = entry.Value;
@@ -162,7 +167,7 @@ public static class ApiIntegration
             }
             
             // Add group activity points
-            foreach (KeyValuePair<string, Dictionary<string, int>> userActivity in Program.UserActivity)
+            foreach (KeyValuePair<string, Dictionary<string, int>> userActivity in State.UserActivity)
             {
                 string userId = userActivity.Key;
                 
@@ -191,11 +196,9 @@ public static class ApiIntegration
             // For now, we'll leave this as a placeholder
             
             // Create request content
-            var content = new StringContent(
-                JsonConvert.SerializeObject(new { referrals = referrals }),
-                Encoding.UTF8,
-                "application/json"
-            );
+            var jsonContent = JsonConvert.SerializeObject(new { referrals = referrals });
+            var content = new StringContent(jsonContent, Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             
             // Send to main system with retry policy
             var response = await _retryPolicy.ExecuteAsync(async () => 
@@ -407,7 +410,11 @@ public static class ApiIntegration
             
             try
             {
-                var response = await _httpClient.GetAsync(authTestUrl);
+                var payload = new { };
+                var jsonContent = JsonConvert.SerializeObject(payload);
+                var content = new StringContent(jsonContent, Encoding.UTF8);
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                var response = await _httpClient.PostAsync(authTestUrl, content);
                 
                 Logging.AddToLog($"TEST: Auth test response: {response.StatusCode}");
                 Console.WriteLine($"TEST: Auth test response: {response.StatusCode}");

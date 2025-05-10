@@ -7,196 +7,147 @@ using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
-using System.Security.Cryptography;
 using Polly;
 using Polly.Extensions.Http;
 using System.Globalization;
 using File = System.IO.File;
 using TelegramReferralBot.Services;
-using TelegramReferralBot.Models;
+using TelegramReferralBot.Utils;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace TelegramReferralBot;
 
 class Program
 {
     // Static variables
-    public static TelegramBotClient BotClient = null!;
+    private static TelegramBotClient _botClient = null!;
     private static readonly CancellationTokenSource _cts = new();
-    private static System.Timers.Timer _apiSyncTimer = null!;
-    private static readonly List<string> _awaitingReply = new();
-    private static int _networkErrorRetryCount = 0;
     private static readonly HashSet<int> _recentlyProcessedMessageIds = new HashSet<int>();
     private static readonly object _messageIdsLock = new object();
-    private static DateTime _lastUpdateTime = DateTime.MinValue;
     private static HttpListener _listener = null!;
-    private static readonly char[] _chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".ToCharArray();
     
-    // MongoDB service
-    public static MongoDbService? MongoDb { get; private set; }
+    // Services
+    private static IServiceProvider _services = null!;
+    private static IBotLogger _logger = null!;
     
-    // Data dictionaries
-    public static Dictionary<string, bool> ShowWelcome { get; set; } = new();
-    public static Dictionary<string, string> RefLinks { get; set; } = new();
-    public static Dictionary<string, int> PasswordAttempts { get; set; } = new();
-    public static Dictionary<string, Dictionary<string, int>> UserActivity { get; set; } = new();
-    public static Dictionary<string, string> ReferredBy { get; set; } = new();
-    public static Dictionary<string, int> PointTotals { get; set; } = new();
-    public static Dictionary<string, int> UserPointOffset { get; set; } = new();
-    public static Dictionary<string, int> PointsByReferrer { get; set; } = new();
-    public static Dictionary<string, bool> JoinedReferrals { get; set; } = new();
-    public static Dictionary<string, int> ReferralPoints { get; set; } = new();
-    public static Dictionary<int, Dictionary<string, string>> InteractedUser { get; set; } = new();
-    public static List<string> CampaignDays { get; set; } = new();
-    public static List<string> DisableNotice { get; set; } = new();
+    // Service accessors
+    public static MongoDbService MongoDb => _services.GetRequiredService<MongoDbService>();
+    public static MessageProcessor MessageProcessor => _services.GetRequiredService<MessageProcessor>();
+    public static TelegramBotClient BotClient => _services.GetRequiredService<TelegramBotClient>();
 
-    public static async Task Main(string[] args)
+    static async Task Main(string[] args)
     {
+        // Test runner functionality has been moved to a separate class
+        // Commenting out to fix build error
+        //if (args.Length > 0 && args[0] == "test")
+        //{
+        //    await TestRunner.RunTests();
+        //    return;
+        //}
         try
         {
-            Console.WriteLine("Starting bot...");
-            Logging.AddToLog("Bot starting...");
+            // Load environment variables
+            DotEnv.Load(".env.local");
             
-            // Load configuration from environment variables
-            LoadData.LoadFromEnvironment();
+            // Initialize logger
+            var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+            var msLogger = loggerFactory.CreateLogger<Program>();
+            _logger = new LoggerAdapter(msLogger);
+            _logger.Log("Starting bot...");
+
+            // Setup dependency injection
+            var services = new ServiceCollection();
             
-            string path = Directory.GetCurrentDirectory();
-            Console.WriteLine($"Found path: {path}");
+            // Add configuration
+            string? connectionString = Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING");
+            string? databaseName = Environment.GetEnvironmentVariable("MONGODB_DATABASE_NAME");
+            string? botToken = Environment.GetEnvironmentVariable("BOT_TOKEN");
             
-            // Initialize MongoDB service
-            try
+            if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(databaseName))
             {
-                // Debug logging for MongoDB configuration
-                Console.WriteLine($"DEBUG: MongoDB Connection String: {(string.IsNullOrEmpty(Config.MongoDbConnectionString) ? "Not found" : "Found (length: " + Config.MongoDbConnectionString.Length + ")")}");
-                Console.WriteLine($"DEBUG: MongoDB Database Name: {(string.IsNullOrEmpty(Config.MongoDbDatabaseName) ? "Not found" : Config.MongoDbDatabaseName)}");
-                
-                // Add fallback MongoDB connection string if not found in config
-                if (string.IsNullOrEmpty(Config.MongoDbConnectionString))
-                {
-                    Config.MongoDbConnectionString = "mongodb+srv://Ile-admin:EQ3fMy8uu@clusterile.aqtxsry.mongodb.net/ileDB?retryWrites=true&w=majority";
-                    Console.WriteLine("Using fallback MongoDB connection string");
-                }
-                
-                // Set default database name if not found in config
-                if (string.IsNullOrEmpty(Config.MongoDbDatabaseName))
-                {
-                    Config.MongoDbDatabaseName = "ileDB";
-                    Console.WriteLine("Using fallback MongoDB database name: ileDB");
-                }
-                
-                if (string.IsNullOrEmpty(Config.MongoDbConnectionString) || string.IsNullOrEmpty(Config.MongoDbDatabaseName))
-                {
-                    Console.WriteLine("MongoDB connection string or database name not found in config or environment variables. Using file storage as fallback.");
-                    Logging.AddToLog("MongoDB connection string or database name not found in config or environment variables. Using file storage as fallback.");
-                }
-                else
-                {
-                    Console.WriteLine($"Initializing MongoDB connection with database: {Config.MongoDbDatabaseName}...");
-                    Logging.AddToLog($"Initializing MongoDB connection with database: {Config.MongoDbDatabaseName}...");
-                    
-                    // Create MongoDB service instance
-                    MongoDb = new MongoDbService(Config.MongoDbConnectionString, Config.MongoDbDatabaseName);
-                    
-                    // Test connection by getting a document count
-                    var isConnected = await MongoDb.TestConnectionAsync();
-                    if (isConnected)
-                    {
-                        Console.WriteLine("MongoDB connection initialized successfully.");
-                        Logging.AddToLog("MongoDB connection initialized successfully.");
-                        
-                        // Load data from MongoDB
-                        await LoadDataFromMongoDbAsync();
-                    }
-                    else
-                    {
-                        Console.WriteLine("Failed to connect to MongoDB. Using file storage as fallback.");
-                        Logging.AddToLog("Failed to connect to MongoDB. Using file storage as fallback.");
-                        MongoDb = null;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error initializing MongoDB: {ex.Message}");
-                Logging.AddToLog($"Error initializing MongoDB: {ex.Message}");
-                Console.WriteLine("Using file storage as fallback.");
-                Logging.AddToLog("Using file storage as fallback.");
+                _logger.Log("Missing MongoDB configuration!");
+                return;
             }
             
-            // Initialize bot client with maximum resilience to network issues
-            var httpClientHandler = new HttpClientHandler
+            if (string.IsNullOrEmpty(botToken))
             {
-                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
-            };
+                _logger.Log("Missing bot token!");
+                return;
+            }
             
-            var httpClient = new HttpClient(new SuperRetryHandler(httpClientHandler))
+            // Add services
+            services.AddSingleton<ILoggerFactory>(loggerFactory);
+            
+            services.AddSingleton<MongoDbService>(sp => {
+                var mongo = new MongoDbService(
+                    connectionString,
+                    databaseName,
+                    sp.GetRequiredService<ILoggerFactory>().CreateLogger<MongoDbService>());
+                mongo.InitializeAsync().Wait();
+                return mongo;
+            });
+            
+            var botClient = new TelegramBotClient(botToken);
+            services.AddSingleton<ITelegramBotClient>(botClient);
+            services.AddSingleton<TelegramBotClient>(botClient);
+            services.AddSingleton<IBotLogger>(_logger);
+            services.AddSingleton<MessageProcessor>();
+            
+            // Add app settings
+            var appSettings = new AppSettings
             {
-                Timeout = TimeSpan.FromMinutes(2)
+                LinkGroup = Environment.GetEnvironmentVariable("LINK_GROUP") ?? "https://telegram.me/aisolae",
+                LinkBot = Environment.GetEnvironmentVariable("LINK_BOT") ?? "https://telegram.me/iletesbot",
+                JoinReward = int.Parse(Environment.GetEnvironmentVariable("JOIN_REWARD") ?? "30"),
+                ReferralReward = int.Parse(Environment.GetEnvironmentVariable("REFERRAL_REWARD") ?? "150"),
+                StreakReward = int.Parse(Environment.GetEnvironmentVariable("STREAK_REWARD") ?? "300")
             };
+            services.AddSingleton(appSettings);
             
-            BotClient = new TelegramBotClient(Config.BotAccessToken, httpClient);
+            // Add reminder service
+            services.AddSingleton<ReminderService>();
             
-            // Get bot info to verify connection
-            var me = await BotClient.GetMeAsync();
-            Console.WriteLine($"Bot successfully connected to Telegram API.");
-            Console.WriteLine($"Bot Name: {me.FirstName}");
-            Console.WriteLine($"Bot Username: @{me.Username}");
-            Console.WriteLine($"Bot ID: {me.Id}");
+            // Build service provider
+            _services = services.BuildServiceProvider();
             
-            // Update Config.LinkToBot to use the bot's username
-            Config.LinkToBot = $"https://telegram.me/{me.Username}";
-            Console.WriteLine($"Using referral link format: {Config.LinkToBot}?start=XXXXX");
+            // Get required services
+            _botClient = BotClient;
+            var messageProcessor = MessageProcessor;
             
-            Logging.AddToLog($"Bot successfully connected to Telegram API. Name: {me.FirstName}, Username: @{me.Username}, ID: {me.Id}");
-            Logging.AddToLog($"Using referral link format: {Config.LinkToBot}?start=XXXXX");
-            
-            // Test API connection to backend
-            Console.WriteLine("Testing connection to backend API...");
-            Logging.AddToLog("Testing connection to backend API...");
-            await ApiIntegration.TestApiConnectionAsync();
-            
-            // Start API sync timer
-            StartApiSyncTimer();
-            
-            // Start MongoDB save timer
-            StartMongoDbSaveTimer();
-            
-            // Start the health check server
-            StartHealthCheckServer();
-            
-            // Set up polling with retry logic
+            _logger.Log("Services initialized");
+
+            // Start receiving updates
+            using var cts = new CancellationTokenSource();
             var receiverOptions = new ReceiverOptions
             {
-                AllowedUpdates = new[] { UpdateType.Message, UpdateType.CallbackQuery },
-                ThrowPendingUpdates = true,
-                Limit = 100
+                AllowedUpdates = Array.Empty<UpdateType>(),
+                ThrowPendingUpdates = true
             };
-            
-            // Start receiving updates
-            BotClient.StartReceiving(
+
+            _botClient.StartReceiving(
                 updateHandler: HandleUpdateAsync,
                 pollingErrorHandler: HandlePollingErrorAsync,
                 receiverOptions: receiverOptions,
-                cancellationToken: _cts.Token
+                cancellationToken: cts.Token
             );
-            
-            Console.WriteLine("Bot is running. Press Ctrl+C to exit.");
-            
+
+            var me = await _botClient.GetMeAsync();
+            _logger.Log($"Bot started successfully: @{me.Username}");
+
+            // Start health check server
+            await StartHealthCheckServer();
+
             // Keep the application running
-            await Task.Delay(Timeout.Infinite, _cts.Token);
+            await Task.Delay(-1);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Startup error: {ex.Message}");
-            Logging.AddToLog($"Startup error: {ex.Message}");
-            
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                Logging.AddToLog($"Inner exception: {ex.InnerException.Message}");
-            }
+            _logger.Log($"Fatal error: {ex.Message}");
+            Environment.Exit(1);
         }
     }
+<<<<<<< HEAD
     
     private static void StartHealthCheckServer()
     {
@@ -276,788 +227,97 @@ class Program
     /// <summary>
     /// Handles incoming updates from Telegram
     /// </summary>
+=======
+
+>>>>>>> mongodb-improvements
     private static async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
         try
         {
-            // Extract the message from the update
-            Message? message = update.Message;
-            
-            if (update.Type == UpdateType.CallbackQuery)
+            // Ignore duplicate messages
+            if (update.Message?.MessageId != null)
             {
-                if (update.CallbackQuery != null)
+                lock (_messageIdsLock)
                 {
-                    await MessageProcessor.ProcessCallbackQueryAsync(update.CallbackQuery, cancellationToken);
+                    if (_recentlyProcessedMessageIds.Contains(update.Message.MessageId))
+                        return;
+                    _recentlyProcessedMessageIds.Add(update.Message.MessageId);
                 }
-                return;
             }
-            
-            if (message == null)
-                return;
-            
-            // Deduplicate messages by ID to prevent processing the same message multiple times
-            bool isDuplicate = false;
-            lock (_messageIdsLock)
+
+            // Process update based on type
+            switch (update.Type)
             {
-                if (_recentlyProcessedMessageIds.Contains(message.MessageId))
-                {
-                    isDuplicate = true;
-                    Logging.AddToLog($"Skipping duplicate message ID: {message.MessageId}");
-                }
-                else
-                {
-                    _recentlyProcessedMessageIds.Add(message.MessageId);
-                    if (_recentlyProcessedMessageIds.Count > 1000)
+                case UpdateType.Message:
+                    if (update.Message != null)
                     {
-                        _recentlyProcessedMessageIds.Clear();
-                        Logging.AddToLog("Cleared message ID cache (exceeded limit)");
+                        await MessageProcessor.ProcessMessageAsync(update.Message, cancellationToken);
                     }
+                    break;
+
+                case UpdateType.CallbackQuery:
+                    if (update.CallbackQuery != null)
+                    {
+                        await MessageProcessor.ProcessCallbackQueryAsync(update.CallbackQuery, cancellationToken);
+                    }
+                    break;
+            }
+
+            // Clean up old message IDs periodically
+            if (_recentlyProcessedMessageIds.Count > 1000)
+            {
+                lock (_messageIdsLock)
+                {
+                    _recentlyProcessedMessageIds.Clear();
                 }
             }
-            
-            if (isDuplicate)
-                return;
-            
-            // Process the message
-            await ProcessMessageAsync(message, cancellationToken);
-            _lastUpdateTime = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error handling update: {ex.Message}");
-            Logging.AddToLog($"Error handling update: {ex.Message}");
+            _logger.Log($"Error handling update: {ex.Message}");
         }
     }
-    
-    /// <summary>
-    /// Processes a message from Telegram
-    /// </summary>
-    private static async Task ProcessMessageAsync(Message message, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (message.From == null)
-                return;
-            
-            string? messageText = message.Text;
-            if (string.IsNullOrEmpty(messageText))
-                return;
-            
-            // Log the message
-            string userId = message.From.Id.ToString();
-            string username = message.From.Username ?? "Unknown";
-            Logging.AddToLog($"Message from {username} ({userId}): {messageText}");
-            
-            // Process the message with the message processor
-            await MessageProcessor.ProcessMessageAsync(message, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error processing message: {ex.Message}");
-            Logging.AddToLog($"Error processing message: {ex.Message}");
-        }
-    }
-    
-    /// <summary>
-    /// Handles errors that occur during polling
-    /// </summary>
-    private static async Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+
+    private static Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
     {
         var errorMessage = exception switch
         {
-            ApiRequestException apiRequestException => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
+            ApiRequestException apiRequestException
+                => $"Telegram API Error: [{apiRequestException.ErrorCode}] {apiRequestException.Message}",
             _ => exception.ToString()
         };
 
-        Logging.AddToLog(errorMessage);
+        _logger.Log($"Polling error: {errorMessage}");
+        return Task.CompletedTask;
+    }
 
-        // Handle specific error codes
-        if (exception is ApiRequestException apiEx && apiEx.ErrorCode == 409)
+    private static async Task StartHealthCheckServer()
+    {
+        try
         {
-            Logging.AddToLog("Conflict detected. Waiting longer to allow other instances to time out...");
-            await Task.Delay(60000, cancellationToken); // Wait a full minute
-            await ClearWebhook(botClient);
-            Logging.AddToLog("Attempting to restart receiving updates after conflict...");
-            return;
-        }
+            _listener = new HttpListener();
+            _listener.Prefixes.Add("http://localhost:8080/");
+            _listener.Start();
 
-        if (exception is HttpRequestException || exception is TaskCanceledException ||
-            (exception is ApiRequestException apiEx2 && (apiEx2.ErrorCode == 429 || apiEx2.ErrorCode >= 500)))
-        {
-            int retryCount = _networkErrorRetryCount++;
-            int delaySeconds = Math.Min(30, (int)Math.Pow(2, Math.Min(retryCount, 5)));
-            
-            Logging.AddToLog($"Connection issue detected. Waiting {delaySeconds} seconds before attempting to reconnect... (Attempt {retryCount})");
-            
-            await Task.Delay(delaySeconds * 1000, cancellationToken);
-            
-            try
+            _logger.Log("Health check server started on port 8080");
+
+            // Handle health check requests
+            while (true)
             {
-                await ClearWebhook(botClient);
-                Logging.AddToLog("Webhook cleared successfully.");
-            }
-            catch (Exception ex)
-            {
-                Logging.AddToLog($"Error clearing webhook: {ex.Message}");
-            }
-            
-            Logging.AddToLog("Attempting to restart receiving updates...");
-        }
-        else
-        {
-            Logging.AddToLog($"Unhandled error: {errorMessage}");
-        }
-    }
-    
-    /// <summary>
-    /// Creates a user activity dictionary for a user
-    /// </summary>
-    public static Dictionary<string, int>? CreateUserActivityDictionary(string userId)
-    {
-        Logging.AddToLog("Creating user activity dictionary for " + userId);
-        
-        if (UserActivity.ContainsKey(userId))
-        {
-            Logging.AddToLog("User activity dictionary already exists for " + userId);
-            return UserActivity[userId];
-        }
-        else
-        {
-            Dictionary<string, int> perDay = new();
-            
-            if (DateTime.TryParse(Config.StartDate, out DateTime startDate))
-            {
-                for (int i = 0; i < Config.NumberOfDays; i++)
-                {
-                    DateTime dateTime = startDate.AddDays(i);
-                    string date = dateTime.ToString("MM/dd/yyyy");
-                    perDay.Add(date, 0);
-                }
+                var context = await _listener.GetContextAsync();
+                var response = context.Response;
+                var responseString = "OK";
+                var buffer = Encoding.UTF8.GetBytes(responseString);
                 
-                UserActivity.Add(userId, perDay);
-                Logging.AddToLog("Added new user activity dictionary for " + userId);
-                
-                bool saved = SaveMethods.SaveUserActivity();
-                if (saved)
-                {
-                    string message = "UserActivity saved.";
-                    Logging.AddToLog(message);
-                    Console.WriteLine(message);
-                    return UserActivity[userId];
-                }
-                else
-                {
-                    string message = "Error! UserActivity not saved.";
-                    Logging.AddToLog(message);
-                    Console.WriteLine(message);
-                    return null;
-                }
-            }
-            else
-            {
-                string message = "Error parsing start date.";
-                Logging.AddToLog(message);
-                Console.WriteLine(message);
-                return null;
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Generates or retrieves a referral link for a user
-    /// </summary>
-    public static string GetRefLink(User user)
-    {
-        Logging.AddToLog("Getting reflink for " + user.Id.ToString());
-        
-        string userId = user.Id.ToString();
-        
-        // Check if user already has a referral link
-        if (RefLinks.ContainsKey(userId))
-        {
-            Logging.AddToLog("Reflink already exists for " + userId);
-            // Ensure we're using the correct link format from config
-            string link = Config.LinkToBot + "?start=" + RefLinks[userId];
-            
-            // Log the link for debugging
-            Logging.AddToLog($"Retrieved existing referral link: {link}");
-            Console.WriteLine($"Retrieved existing referral link: {link}");
-            
-            return link;
-        }
-        else
-        {
-            // Generate a new referral link
-            var inputBytes = Encoding.UTF8.GetBytes(userId);
-            
-            // Special "url-safe" base64 encode
-            string base64String = Convert.ToBase64String(inputBytes)
-                .Replace('+', '-') // replace URL unsafe characters with safe ones
-                .Replace('/', '_') // replace URL unsafe characters with safe ones
-                .Replace("=", ""); // no padding
-            
-            // Check if this base64 string is already used
-            if (RefLinks.Values.Contains(base64String))
-            {
-                // Generate a random string instead
-                byte[] randomBytes = new byte[8];
-                using var rng = RandomNumberGenerator.Create();
-                rng.GetBytes(randomBytes);
-                
-                base64String = Convert.ToBase64String(randomBytes)
-                    .Replace('+', '-')
-                    .Replace('/', '_')
-                    .Replace("=", "");
-            }
-            
-            // Add to dictionary and save
-            RefLinks.Add(userId, base64String);
-            bool saved = SaveMethods.SaveRefLinks();
-            
-            if (saved)
-            {
-                string message = "RefLinks saved.";
-                Logging.AddToLog(message);
-                Console.WriteLine(message);
-            }
-            else
-            {
-                string message = "Error! RefLinks not saved.";
-                Logging.AddToLog(message);
-                Console.WriteLine(message);
-            }
-            
-            // Ensure we're using the correct link format from config
-            string link = Config.LinkToBot + "?start=" + base64String;
-            
-            // Log the link for debugging
-            Logging.AddToLog($"Generated referral link: {link}");
-            Console.WriteLine($"Generated referral link: {link}");
-            
-            return link;
-        }
-    }
-    
-    /// <summary>
-    /// Updates Point totals for all users
-    /// </summary>
-    public static async void UpdatePointTotals()
-    {
-        foreach (string userId in UserActivity.Keys)
-        {
-            int points = 0;
-            
-            // Add points from referrals
-            if (PointsByReferrer.ContainsKey(userId))
-            {
-                points += PointsByReferrer[userId];
-            }
-            
-            // Apply any point offset
-            if (UserPointOffset.ContainsKey(userId))
-            {
-                points += UserPointOffset[userId];
-            }
-            
-            // Update in-memory cache
-            PointTotals[userId] = points;
-            
-            // Update MongoDB if available
-            if (MongoDb != null)
-            {
-                try
-                {
-                    // Use the dedicated method for updating bricks
-                    await MongoDb.UpdateUserBricksAsync(userId, points);
-                }
-                catch (Exception ex)
-                {
-                    Logging.AddToLog($"Error updating user points in MongoDB: {ex.Message}");
-                }
-            }
-        }
-        
-        // Save to file
-        SaveMethods.SavePointsByReferrer();
-    }
-    
-    /// <summary>
-    /// Checks if a password is valid for admin access
-    /// </summary>
-    public static string? CheckPassword(string text, string userId)
-    {
-        string message = "Beginning check password.";
-        Logging.AddToLog(message);
-        Console.WriteLine(message);
-        
-        try
-        {
-            int attempts = 0;
-            if (PasswordAttempts.ContainsKey(userId))
-            {
-                attempts = PasswordAttempts[userId];
-            }
-            
-            // Check if user is banned from admin access
-            if (attempts >= 11)
-            {
-                return string.Empty;
-            }
-            
-            // Check password
-            if (text != Config.AdminPassword)
-            {
-                attempts++;
-                
-                if (PasswordAttempts.ContainsKey(userId))
-                {
-                    PasswordAttempts[userId] = attempts;
-                }
-                else
-                {
-                    PasswordAttempts.Add(userId, attempts);
-                }
-                
-                bool saved = SaveMethods.SavePasswordAttempts();
-                if (saved)
-                {
-                    string text1 = "PasswordAttempts was saved.";
-                    Logging.AddToLog(text1);
-                    Console.WriteLine(text1);
-                }
-                else
-                {
-                    string text1 = "Could not save passwordAttempts.";
-                    Logging.AddToLog(text1);
-                    Console.WriteLine(text1);
-                }
-                
-                if (attempts < 10)
-                {
-                    return "wrong_" + attempts.ToString();
-                }
-                else if (attempts == 11)
-                {
-                    return "banned";
-                }
-                else
-                {
-                    return null;
-                }
-            }
-            else
-            {
-                // Password is correct, mark user as admin
-                if (PasswordAttempts.ContainsKey(userId))
-                {
-                    PasswordAttempts[userId] = -1; // -1 indicates confirmed admin
-                }
-                else
-                {
-                    PasswordAttempts.Add(userId, -1);
-                }
-                
-                SaveMethods.SavePasswordAttempts();
-                return "confirmed";
+                response.ContentLength64 = buffer.Length;
+                var output = response.OutputStream;
+                await output.WriteAsync(buffer);
+                output.Close();
             }
         }
         catch (Exception ex)
         {
-            string errorMessage = $"Error in CheckPassword: {ex.Message}";
-            Logging.AddToLog(errorMessage);
-            Console.WriteLine(errorMessage);
-            return null;
-        }
-    }
-    
-    /// <summary>
-    /// List of users awaiting a reply (for password verification)
-    /// </summary>
-    public static List<string> AwaitingReply => _awaitingReply;
-    
-    private static System.Timers.Timer? _mongoDbSaveTimer;
-    
-    private static void StartApiSyncTimer()
-    {
-        _apiSyncTimer = new System.Timers.Timer(15 * 60 * 1000); // 15 minutes
-        _apiSyncTimer.Elapsed += async (sender, e) => await ApiIntegration.SyncReferralsAsync();
-        _apiSyncTimer.AutoReset = true;
-        _apiSyncTimer.Start();
-        
-        Console.WriteLine("API sync timer started. Will sync with backend every 15 minutes.");
-    }
-    
-    /// <summary>
-    /// Starts a timer to periodically save data to MongoDB
-    /// </summary>
-    private static void StartMongoDbSaveTimer()
-    {
-        if (MongoDb == null)
-        {
-            Console.WriteLine("MongoDB not initialized. Not starting MongoDB save timer.");
-            return;
-        }
-        
-        _mongoDbSaveTimer = new System.Timers.Timer(5 * 60 * 1000); // 5 minutes
-        _mongoDbSaveTimer.Elapsed += async (sender, e) => await SaveDataToMongoDbAsync();
-        _mongoDbSaveTimer.AutoReset = true;
-        _mongoDbSaveTimer.Start();
-        
-        Console.WriteLine("MongoDB save timer started. Will save data to MongoDB every 5 minutes.");
-    }
-    
-    /// <summary>
-    /// Saves all in-memory data to MongoDB
-    /// </summary>
-    private static async Task SaveDataToMongoDbAsync()
-    {
-        if (MongoDb == null)
-        {
-            Logging.AddToLog("MongoDB not available for saving data");
-            return;
-        }
-        
-        try
-        {
-            Logging.AddToLog("Saving data to MongoDB...");
-            
-            // Save users and their points
-            foreach (var entry in PointTotals)
-            {
-                var userId = entry.Key;
-                var points = entry.Value;
-                
-                // Get or create user
-                var user = await MongoDb.GetUserAsync(userId);
-                if (user == null)
-                {
-                    // Create new user with proper nested bricks structure
-                    user = new Models.UserModel
-                    {
-                        TelegramId = userId,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    
-                    // Set bricks using the property that handles the nested structure
-                    user.BricksTotal = points;
-                    
-                    await MongoDb.CreateUserAsync(user);
-                    Logging.AddToLog($"Created user in MongoDB: {userId}");
-                }
-                else
-                {
-                    // Update bricks directly using the UpdateUserBricksAsync method
-                    await MongoDb.UpdateUserBricksAsync(userId, points);
-                    Logging.AddToLog($"Updated user bricks in MongoDB: {userId}");
-                }
-            }
-            
-            // Save referrals
-            if (MongoDb != null)
-            {
-                foreach (var entry in ReferredBy)
-                {
-                    var referredId = entry.Key;
-                    var referrerId = entry.Value;
-                    
-                    // Check if referral already exists
-                    var existingReferral = await MongoDb.GetReferralByReferredIdAsync(referredId);
-                    if (existingReferral == null)
-                    {
-                        // Create the referral document
-                        var referral = new Models.ReferralModel
-                        {
-                            ReferrerId = referrerId,
-                            ReferredId = referredId,
-                            Points = Config.ReferralReward,
-                            Timestamp = DateTime.UtcNow,
-                            Type = "referral"
-                        };
-                        
-                        await MongoDb.CreateReferralAsync(referral);
-                        
-                        // Also add to the user's referrals array
-                        // Get the referred user to get their name
-                        var referredUser = await MongoDb.GetUserAsync(referredId);
-                        string referredName = "Telegram User";
-                        if (referredUser != null && !string.IsNullOrEmpty(referredUser.FirstName))
-                        {
-                            referredName = referredUser.FirstName;
-                            if (!string.IsNullOrEmpty(referredUser.LastName))
-                                referredName += " " + referredUser.LastName;
-                        }
-                        
-                        // Add to referrer's referrals array
-                        await MongoDb.AddReferralToUserAsync(
-                            referrerId,
-                            referredId,
-                            referredName,
-                            Config.ReferralReward);
-                        
-                        Logging.AddToLog($"Created referral in MongoDB: {referredId} referred by {referrerId}");
-                    }
-                }
-            }
-            
-            // Save referral links
-            if (MongoDb != null)
-            {
-                var refLinks = await MongoDb.GetAllRefLinksAsync();
-                if (refLinks != null && refLinks.Count > 0)
-                {
-                    RefLinks = refLinks;
-                    Console.WriteLine($"Loaded {refLinks.Count} referral links from MongoDB");
-                    Logging.AddToLog($"Loaded {refLinks.Count} referral links from MongoDB");
-                }
-            }
-            
-            // Save users and their data
-            if (MongoDb != null)
-            {
-                var users = await MongoDb.GetAllUsersAsync();
-                if (users != null && users.Count > 0)
-                {
-                    Console.WriteLine($"Loaded {users.Count} users from MongoDB");
-                    Logging.AddToLog($"Loaded {users.Count} users from MongoDB");
-                    
-                    // Process user data
-                    foreach (var user in users)
-                    {
-                        // Load password attempts
-                        if (!string.IsNullOrEmpty(user.TelegramId))
-                        {
-                            PasswordAttempts[user.TelegramId] = user.IsAdmin ? -1 : user.PasswordAttempts;
-                        }
-                        
-                        // Load show welcome flag
-                        if (!string.IsNullOrEmpty(user.TelegramId))
-                        {
-                            ShowWelcome[user.TelegramId] = user.ShowWelcome;
-                        }
-                    }
-                }
-            }
-            
-            // Save referrals
-            if (MongoDb != null)
-            {
-                var referrals = await MongoDb.GetAllReferralsAsync();
-                if (referrals != null && referrals.Count > 0)
-                {
-                    Console.WriteLine($"Loaded {referrals.Count} referrals from MongoDB");
-                    Logging.AddToLog($"Loaded {referrals.Count} referrals from MongoDB");
-                    
-                    // Process referral data
-                    foreach (var referral in referrals)
-                    {
-                        if (referral.ReferredId != null && referral.ReferrerId != null)
-                        {
-                            // Load referred by relationships
-                            if (!string.IsNullOrEmpty(referral.ReferredId) && !string.IsNullOrEmpty(referral.ReferrerId))
-                            {
-                                ReferredBy[referral.ReferredId] = referral.ReferrerId;
-                                
-                                // Load referral points
-                                if (ReferralPoints.ContainsKey(referral.ReferrerId))
-                                {
-                                    ReferralPoints[referral.ReferrerId] += referral.Points;
-                                }
-                                else
-                                {
-                                    ReferralPoints[referral.ReferrerId] = referral.Points;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Load user activities
-            if (MongoDb != null)
-            {
-                var userList = await MongoDb.GetAllUsersAsync();
-                if (userList != null && userList.Count > 0)
-                {
-                    foreach (var user in userList)
-                    {
-                        if (user.TelegramId != null)
-                        {
-                            var activities = await MongoDb.GetAllUserActivitiesAsync(user.TelegramId);
-                            if (activities != null && activities.Count > 0 && !string.IsNullOrEmpty(user.TelegramId))
-                            {
-                                UserActivity[user.TelegramId] = activities;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Update point totals
-            UpdatePointTotals();
-            
-            Logging.AddToLog("Data saved to MongoDB successfully");
-        }
-        catch (Exception ex)
-        {
-            Logging.AddToLog($"Error saving data to MongoDB: {ex.Message}");
-            Console.WriteLine($"Error saving data to MongoDB: {ex.Message}");
-        }
-    }
-    
-    /// <summary>
-    /// Loads data from MongoDB into memory
-    /// </summary>
-    private static async Task LoadDataFromMongoDbAsync()
-    {
-        try
-        {
-            Console.WriteLine("Loading data from MongoDB...");
-            Logging.AddToLog("Loading data from MongoDB...");
-            
-            // Load referral links
-            if (MongoDb != null)
-            {
-                var refLinks = await MongoDb.GetAllRefLinksAsync();
-                if (refLinks != null && refLinks.Count > 0)
-                {
-                    RefLinks = refLinks;
-                    Console.WriteLine($"Loaded {refLinks.Count} referral links from MongoDB");
-                    Logging.AddToLog($"Loaded {refLinks.Count} referral links from MongoDB");
-                }
-            }
-            
-            // Load users and their data
-            if (MongoDb != null)
-            {
-                var users = await MongoDb.GetAllUsersAsync();
-                if (users != null && users.Count > 0)
-                {
-                    Console.WriteLine($"Loaded {users.Count} users from MongoDB");
-                    Logging.AddToLog($"Loaded {users.Count} users from MongoDB");
-                    
-                    // Process user data
-                    foreach (var user in users)
-                    {
-                        // Load password attempts
-                        if (!string.IsNullOrEmpty(user.TelegramId))
-                        {
-                            PasswordAttempts[user.TelegramId] = user.IsAdmin ? -1 : user.PasswordAttempts;
-                        }
-                        
-                        // Load show welcome flag
-                        if (!string.IsNullOrEmpty(user.TelegramId))
-                        {
-                            ShowWelcome[user.TelegramId] = user.ShowWelcome;
-                        }
-                    }
-                }
-            }
-            
-            // Load referrals
-            if (MongoDb != null)
-            {
-                var referrals = await MongoDb.GetAllReferralsAsync();
-                if (referrals != null && referrals.Count > 0)
-                {
-                    Console.WriteLine($"Loaded {referrals.Count} referrals from MongoDB");
-                    Logging.AddToLog($"Loaded {referrals.Count} referrals from MongoDB");
-                    
-                    // Process referral data
-                    foreach (var referral in referrals)
-                    {
-                        if (referral.ReferredId != null && referral.ReferrerId != null)
-                        {
-                            // Load referred by relationships
-                            if (!string.IsNullOrEmpty(referral.ReferredId) && !string.IsNullOrEmpty(referral.ReferrerId))
-                            {
-                                ReferredBy[referral.ReferredId] = referral.ReferrerId;
-                                
-                                // Load referral points
-                                if (ReferralPoints.ContainsKey(referral.ReferrerId))
-                                {
-                                    ReferralPoints[referral.ReferrerId] += referral.Points;
-                                }
-                                else
-                                {
-                                    ReferralPoints[referral.ReferrerId] = referral.Points;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Load user activities
-            if (MongoDb != null)
-            {
-                var userList = await MongoDb.GetAllUsersAsync();
-                if (userList != null && userList.Count > 0)
-                {
-                    foreach (var user in userList)
-                    {
-                        if (user.TelegramId != null)
-                        {
-                            var activities = await MongoDb.GetAllUserActivitiesAsync(user.TelegramId);
-                            if (activities != null && activities.Count > 0 && !string.IsNullOrEmpty(user.TelegramId))
-                            {
-                                UserActivity[user.TelegramId] = activities;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Update point totals
-            UpdatePointTotals();
-            
-            Console.WriteLine("Data loaded from MongoDB successfully");
-            Logging.AddToLog("Data loaded from MongoDB successfully");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading data from MongoDB: {ex.Message}");
-            Logging.AddToLog($"Error loading data from MongoDB: {ex.Message}");
-            
-            // Fallback to file storage
-            Console.WriteLine("Falling back to file storage");
-            Logging.AddToLog("Falling back to file storage");
-            
-            // Load data from files instead
-            LoadAllData();
-        }
-    }
-    
-    /// <summary>
-    /// Load all data from files
-    /// </summary>
-    private static void LoadAllData()
-    {
-        try
-        {
-            // Load configuration
-            LoadData.LoadConf();
-            Console.WriteLine("Configuration loaded successfully.");
-            
-            // Initialize collections if they're null
-            if (UserActivity == null) UserActivity = new Dictionary<string, Dictionary<string, int>>();
-            if (RefLinks == null) RefLinks = new Dictionary<string, string>();
-            if (ReferredBy == null) ReferredBy = new Dictionary<string, string>();
-            if (PasswordAttempts == null) PasswordAttempts = new Dictionary<string, int>();
-            if (ShowWelcome == null) ShowWelcome = new Dictionary<string, bool>();
-            if (ReferralPoints == null) ReferralPoints = new Dictionary<string, int>();
-            if (PointsByReferrer == null) PointsByReferrer = new Dictionary<string, int>();
-            if (UserPointOffset == null) UserPointOffset = new Dictionary<string, int>();
-            if (JoinedReferrals == null) JoinedReferrals = new Dictionary<string, bool>();
-            
-            // Log that we're using MongoDB instead of file storage
-            Console.WriteLine("Using MongoDB for data persistence. File loading skipped.");
-            Logging.AddToLog("Using MongoDB for data persistence. File loading skipped.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading configuration: {ex.Message}");
-            Logging.AddToLog($"Error loading configuration: {ex.Message}");
+            _logger.Log($"Health check server error: {ex.Message}");
         }
     }
 }

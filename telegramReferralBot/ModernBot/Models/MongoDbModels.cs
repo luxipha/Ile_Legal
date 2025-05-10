@@ -6,6 +6,16 @@ using System.Collections.Generic;
 namespace TelegramReferralBot.Models
 {
     /// <summary>
+    /// Enum representing the user's join state in the group
+    /// </summary>
+    public enum JoinState
+    {
+        NotJoined,        // User has not joined the group yet
+        JoinedNotActive,  // User has joined but not active
+        Active            // User is active in the group
+    }
+
+    /// <summary>
     /// User model aligned with backend User schema
     /// </summary>
     [BsonIgnoreExtraElements]
@@ -85,19 +95,24 @@ namespace TelegramReferralBot.Models
         // Helper property to get ReferralsCount
         [BsonIgnore]
         public int ReferralsCount => Referrals?.Count ?? 0;
-    }
-    
-    /// <summary>
-    /// Bricks model to match the nested bricks object in the backend schema
-    /// </summary>
-    [BsonIgnoreExtraElements]
-    public class BricksModel
-    {
-        [BsonElement("total")]
-        public int Total { get; set; }
         
-        [BsonElement("lastRedeemTime")]
-        public DateTime? LastRedeemTime { get; set; }
+        // Group join state tracking
+        [BsonElement("joinState")]
+        public JoinState JoinState { get; set; } = JoinState.NotJoined;
+        
+        // Daily streak tracking
+        [BsonElement("streakCount")]
+        public int StreakCount { get; set; } = 0;
+        
+        [BsonElement("lastActivityDate")]
+        public DateTime? LastActivityDate { get; set; }
+        
+        // Reminder system tracking
+        [BsonElement("lastReminderSent")]
+        public DateTime? LastReminderSent { get; set; }
+        
+        [BsonElement("firstInteractionDate")]
+        public DateTime? FirstInteractionDate { get; set; }
     }
     
     /// <summary>
@@ -111,7 +126,6 @@ namespace TelegramReferralBot.Models
         public string? Id { get; set; }
         
         [BsonElement("userId")]
-        [BsonRepresentation(BsonType.ObjectId)]
         public string? UserId { get; set; }
         
         [BsonElement("name")]
@@ -148,6 +162,9 @@ namespace TelegramReferralBot.Models
         [BsonElement("timestamp")]
         public DateTime Timestamp { get; set; }
         
+        [BsonElement("status")]
+        public string? Status { get; set; }
+        
         [BsonElement("type")]
         public string? Type { get; set; } // "referral", "join_group", "group_activity"
         
@@ -155,47 +172,9 @@ namespace TelegramReferralBot.Models
         public DateTime CreatedAt { get; set; }
     }
     
-    /// <summary>
-    /// User activity stored in MongoDB
-    /// </summary>
-    public class ActivityModel
-    {
-        [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string? Id { get; set; }
-        
-        [BsonElement("userId")]
-        public string? UserId { get; set; }
-        
-        [BsonElement("date")]
-        public string? Date { get; set; } // Format: MM/dd/yyyy
-        
-        [BsonElement("points")]
-        public int Points { get; set; }
-        
-        [BsonElement("timestamp")]
-        public DateTime Timestamp { get; set; }
-        
-        [BsonElement("count")]
-        public int Count { get; set; }
-    }
+
     
     /// <summary>
     /// Referral link mapping stored in MongoDB
     /// </summary>
-    public class RefLinkModel
-    {
-        [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string? Id { get; set; }
-        
-        [BsonElement("userId")]
-        public string? UserId { get; set; }
-        
-        [BsonElement("refCode")]
-        public string? RefCode { get; set; }
-        
-        [BsonElement("createdAt")]
-        public DateTime CreatedAt { get; set; }
-    }
 }
