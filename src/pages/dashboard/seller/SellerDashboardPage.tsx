@@ -194,10 +194,10 @@ const SellerDashboardPage: React.FC = () => {
                   Bid placed on: {new Date(bid.bidDate).toLocaleDateString()}
                 </div>
                 <div className="mt-4 flex justify-end space-x-3">
-                  <button className="btn-ghost text-sm py-1 px-3">
+                  <Link to={`/seller/bid/${bid.id}/edit/${bid.id}`} className="btn-ghost text-sm py-1 px-3">
                     Edit Bid
-                  </button>
-                  <Link to={`/gigs/${bid.id}`} className="btn-ghost text-sm py-1 px-3">
+                  </Link>
+                  <Link to={`/gigs/${bid.id}?tab=details`} className="btn-ghost text-sm py-1 px-3">
                     View Details
                   </Link>
                 </div>
@@ -254,12 +254,12 @@ const SellerDashboardPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end space-x-3">
-                  <button className="btn-outline text-sm py-1 px-3">
+                  <Link to={`/seller/gig/${gig.id}/submit`} className="btn-outline text-sm py-1 px-3">
                     Submit Work
-                  </button>
-                  <button className="btn-ghost text-sm py-1 px-3">
+                  </Link>
+                  <Link to={`/seller/messages/conv-${gig.id}`} className="btn-ghost text-sm py-1 px-3">
                     Message Client
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))

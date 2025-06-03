@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { PlusCircle, Clock, CheckCircle, AlertCircle, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useMockDataStore } from '../../../store/mockData';
 
 // Dummy data for demonstration
 const ACTIVE_GIGS = [
@@ -34,18 +35,14 @@ const ONGOING_GIGS = [
   },
 ];
 
-const COMPLETED_GIGS = [
-  { 
-    id: '4', 
-    title: 'Regulatory Compliance Check - Ikoyi Project', 
-    provider: 'John Smith',
-    budget: '₦55,000',
-    completedDate: '2025-04-20',
-  },
-];
+// Completed gigs will be loaded from the mock data store
 
 const BuyerDashboardPage: React.FC = () => {
   const { user } = useAuth();
+  const { gigs } = useMockDataStore();
+  
+  // Filter gigs by status
+  const completedGigs = gigs.filter(gig => gig.status === 'completed');
   
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -105,7 +102,7 @@ const BuyerDashboardPage: React.FC = () => {
             </div>
             <div className="ml-4">
               <h2 className="text-lg font-semibold text-gray-800">Completed</h2>
-              <p className="text-3xl font-bold text-success-500">{COMPLETED_GIGS.length}</p>
+              <p className="text-3xl font-bold text-success-500">{completedGigs.length}</p>
             </div>
           </div>
         </div>
@@ -143,9 +140,9 @@ const BuyerDashboardPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end space-x-3">
-                  <button className="btn-outline text-sm py-1 px-3">
+                  <Link to={`/gigs/${gig.id}?tab=bids`} className="btn-outline text-sm py-1 px-3">
                     View Bids
-                  </button>
+                  </Link>
                   <Link to={`/gigs/${gig.id}`} className="btn-ghost text-sm py-1 px-3">
                     View Details
                   </Link>
@@ -209,9 +206,9 @@ const BuyerDashboardPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end space-x-3">
-                  <button className="btn-ghost text-sm py-1 px-3">
+                  <Link to={`/buyer/messages/conv-${gig.id}`} className="btn-ghost text-sm py-1 px-3">
                     Message Provider
-                  </button>
+                  </Link>
                   <Link to={`/gigs/${gig.id}`} className="btn-ghost text-sm py-1 px-3">
                     View Details
                   </Link>
@@ -224,6 +221,60 @@ const BuyerDashboardPage: React.FC = () => {
               <h3 className="mt-2 text-sm font-medium text-gray-900">No ongoing gigs</h3>
               <p className="mt-1 text-sm text-gray-500">
                 When you assign a gig to a provider, it will appear here.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Completed Gigs */}
+      <div className="bg-white shadow-card rounded-lg overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-200 sm:px-8">
+          <h2 className="text-lg font-medium text-gray-800">Completed Gigs</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Gigs that have been successfully completed
+          </p>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {completedGigs.length > 0 ? (
+            completedGigs.map((gig) => (
+              <div key={gig.id} className="px-6 py-5 hover:bg-gray-50 sm:px-8">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                  <div className="mb-2 sm:mb-0">
+                    <Link to={`/gigs/${gig.id}`} className="text-lg font-medium text-primary-500 hover:text-primary-600">
+                      {gig.title}
+                    </Link>
+                    <div className="mt-1 text-sm text-gray-500">
+                      Provider: {gig.assignedTo?.name || 'Unknown Provider'}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-lg font-bold text-gray-700">₦{gig.budget.toLocaleString()}</span>
+                    <span className="text-sm text-gray-500">Completed: {new Date(gig.completedDate || '').toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end space-x-3">
+                  <Link to={`/gigs/${gig.id}?tab=deliverables`} className="btn-ghost text-sm py-1 px-3">
+                    View Deliverables
+                  </Link>
+                  {!gig.feedback ? (
+                    <Link to={`/buyer/feedback/${gig.id}`} className="btn-outline text-sm py-1 px-3">
+                      Leave Feedback
+                    </Link>
+                  ) : (
+                    <span className="text-sm text-success-500 flex items-center">
+                      <CheckCircle className="h-4 w-4 mr-1" /> Feedback Submitted
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-6 py-10 text-center sm:px-8">
+              <CheckCircle className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No completed gigs</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                When a gig is completed, it will appear here.
               </p>
             </div>
           )}

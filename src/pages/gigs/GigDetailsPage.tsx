@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, Calendar, DollarSign, MessageSquare, FileText, Clock, Shield, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -13,7 +13,18 @@ const GigDetailsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('details');
   const [gig, setGig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [acceptingBid, setAcceptingBid] = useState(false);
+  const [acceptedBidId, setAcceptedBidId] = useState<string | null>(null);
   const { getGigById } = useMockDataStore();
+  
+  // Check for tab query parameter
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const tabParam = queryParams.get('tab');
+    if (tabParam && ['details', 'bids', 'messages', 'deliverables'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, []);
   
   useEffect(() => {
     if (gigId) {
@@ -70,13 +81,13 @@ const GigDetailsPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto animate-fadeIn">
       <div className="mb-6">
-        <button
-          onClick={() => navigate(-1)}
+        <Link
+          to={`/${user?.role}/dashboard`}
           className="flex items-center text-primary-500 hover:text-primary-600 mb-4"
         >
           <ArrowLeft className="h-5 w-5 mr-1" />
-          Back
-        </button>
+          Back to Dashboard
+        </Link>
       </div>
       
       <div className="bg-white shadow-card rounded-lg overflow-hidden">
@@ -117,7 +128,10 @@ const GigDetailsPage: React.FC = () => {
               className={`border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
                 activeTab === 'details' ? 'border-primary-500 text-primary-500' : ''
               }`}
-              onClick={() => setActiveTab('details')}
+              onClick={() => {
+                setActiveTab('details');
+                navigate(`/gigs/${gigId}?tab=details`, { replace: true });
+              }}
             >
               Details
             </button>
@@ -125,7 +139,10 @@ const GigDetailsPage: React.FC = () => {
               className={`border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
                 activeTab === 'bids' ? 'border-primary-500 text-primary-500' : ''
               }`}
-              onClick={() => setActiveTab('bids')}
+              onClick={() => {
+                setActiveTab('bids');
+                navigate(`/gigs/${gigId}?tab=bids`, { replace: true });
+              }}
             >
               Bids ({gig.bids.length})
             </button>
@@ -134,7 +151,10 @@ const GigDetailsPage: React.FC = () => {
                 className={`border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
                   activeTab === 'deliverables' ? 'border-primary-500 text-primary-500' : ''
                 }`}
-                onClick={() => setActiveTab('deliverables')}
+                onClick={() => {
+                  setActiveTab('deliverables');
+                  navigate(`/gigs/${gigId}?tab=deliverables`, { replace: true });
+                }}
               >
                 Deliverables
               </button>
@@ -143,7 +163,10 @@ const GigDetailsPage: React.FC = () => {
               className={`border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm ${
                 activeTab === 'messages' ? 'border-primary-500 text-primary-500' : ''
               }`}
-              onClick={() => setActiveTab('messages')}
+              onClick={() => {
+                setActiveTab('messages');
+                navigate(`/gigs/${gigId}?tab=messages`, { replace: true });
+              }}
             >
               Messages
             </button>
@@ -289,12 +312,44 @@ const GigDetailsPage: React.FC = () => {
                       {/* Bid actions for buyer */}
                       {isOwner && gig.status === 'active' && (
                         <div className="mt-6 flex justify-end space-x-3">
-                          <button className="btn-primary">
-                            Accept Bid
-                          </button>
-                          <button className="btn-ghost">
+                          {acceptedBidId === bid.id ? (
+                            <div className="text-success-500 font-medium flex items-center">
+                              <CheckCircle className="h-5 w-5 mr-1" />
+                              Bid Accepted
+                            </div>
+                          ) : acceptedBidId ? (
+                            <button className="btn-disabled" disabled>
+                              Accept Bid
+                            </button>
+                          ) : (
+                            <button 
+                              className={`btn-primary ${acceptingBid ? 'opacity-75 cursor-wait' : ''}`}
+                              disabled={acceptingBid}
+                              onClick={() => {
+                                setAcceptingBid(true);
+                                // Simulate API call to accept bid
+                                setTimeout(() => {
+                                  setAcceptedBidId(bid.id);
+                                  setAcceptingBid(false);
+                                  // Update gig status
+                                  setGig((prev: any) => ({
+                                    ...prev,
+                                    status: 'in-progress',
+                                    assignedProvider: bid.provider.name,
+                                    acceptedBid: bid
+                                  }));
+                                }, 1000);
+                              }}
+                            >
+                              {acceptingBid ? 'Processing...' : 'Accept Bid'}
+                            </button>
+                          )}
+                          <Link 
+                            to={`/buyer/messages/conv-${bid.id}`}
+                            className="btn-ghost"
+                          >
                             Message
-                          </button>
+                          </Link>
                         </div>
                       )}
                     </div>
@@ -333,9 +388,12 @@ const GigDetailsPage: React.FC = () => {
                   Start a conversation about this gig.
                 </p>
                 <div className="mt-6">
-                  <button className="btn-primary">
+                  <Link 
+                    to={`/${user?.role || 'buyer'}/messages/conv-${gig.id}`} 
+                    className="btn-primary"
+                  >
                     Send Message
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

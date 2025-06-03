@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -87,13 +87,13 @@ const SubmitWorkPage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto animate-fadeIn">
       <div className="mb-6">
-        <button
-          onClick={() => navigate(-1)}
+        <Link
+          to="/seller/dashboard"
           className="flex items-center text-primary-500 hover:text-primary-600 mb-4"
         >
           <ArrowLeft className="h-5 w-5 mr-1" />
-          Back
-        </button>
+          Back to Dashboard
+        </Link>
         <h1 className="text-2xl font-bold text-gray-800">Submit Work</h1>
       </div>
 
@@ -171,13 +171,12 @@ const SubmitWorkPage: React.FC = () => {
           )}
 
           <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="btn-ghost"
+            <Link
+              to="/seller/dashboard"
+              className="btn-ghost flex items-center justify-center"
             >
               Cancel
-            </button>
+            </Link>
             <button
               type="submit"
               disabled={isSubmitting}
