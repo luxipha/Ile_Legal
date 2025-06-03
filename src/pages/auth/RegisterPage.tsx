@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,6 +38,44 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 const RegisterPage: React.FC = () => {
+  // Animation styles for the form elements
+  const animationStyles = `
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fadeIn {
+    animation: fadeInUp 0.5s ease-out forwards;
+  }
+
+  .animate-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animate-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animate-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animate-delay-500 {
+    animation-delay: 500ms;
+  }
+  `;
+
   const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -46,18 +84,38 @@ const RegisterPage: React.FC = () => {
     }
   });
   
-  const { register: registerUser, isLoading } = useAuth();
+  const { register: registerUser } = useAuth();
+  // Navigate will be used after successful registration
   const navigate = useNavigate();
-  const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [formProgress, setFormProgress] = useState(0);
   
+  // Watch password field for strength calculation and validation
   const password = watch('password');
-  const passwordScore = password ? zxcvbn(password).score : 0;
+  const passwordStrength = password ? zxcvbn(password).score : 0;
+  
+  // Create a style element to inject the animation styles
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = animationStyles;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
+  
+  // Update progress when form values change
+  useEffect(() => {
+    updateFormProgress();
+  }, [watch('name'), watch('email'), watch('password'), watch('role'), watch('termsAccepted')]);
+  
   
   const getPasswordStrengthColor = () => {
-    switch (passwordScore) {
+    switch (passwordStrength) {
       case 0: return 'bg-error-500';
       case 1: return 'bg-error-500';
       case 2: return 'bg-warning-500';
@@ -68,7 +126,7 @@ const RegisterPage: React.FC = () => {
   };
 
   const getPasswordStrengthText = () => {
-    switch (passwordScore) {
+    switch (passwordStrength) {
       case 0: return 'Very Weak';
       case 1: return 'Weak';
       case 2: return 'Fair';
@@ -78,9 +136,39 @@ const RegisterPage: React.FC = () => {
     }
   };
   
+  // Update form progress whenever form values change
+  const updateFormProgress = () => {
+    const formValues = watch();
+    let completedFields = 0;
+    let totalFields = 5; // name, email, password, role, terms
+    
+    if (formValues.name && formValues.name.length >= 2) completedFields++;
+    if (formValues.email && formValues.email.includes('@')) completedFields++;
+    if (formValues.password && formValues.password.length >= 8) completedFields++;
+    if (formValues.role) completedFields++;
+    if (formValues.termsAccepted) completedFields++;
+    
+    const progress = Math.round((completedFields / totalFields) * 100);
+    setFormProgress(progress);
+  };
+  
+  const getPasswordRequirements = () => {
+    if (!password) return [];
+    
+    return [
+      { met: password.length >= 8, text: 'At least 8 characters' },
+      { met: /[A-Z]/.test(password), text: 'Contains uppercase letter' },
+      { met: /[a-z]/.test(password), text: 'Contains lowercase letter' },
+      { met: /[0-9]/.test(password), text: 'Contains number' },
+      { met: /[^A-Za-z0-9]/.test(password), text: 'Contains special character' }
+    ];
+  };
+  
   const onSubmit = async (data: RegisterFormData) => {
     try {
       await registerUser(data.name, data.email, data.password, data.role);
+      // Navigate to dashboard or confirmation page after successful registration
+      navigate('/dashboard');
     } catch (error: any) {
       setServerError(error.message || 'Registration failed. Please try again.');
     }
@@ -90,7 +178,31 @@ const RegisterPage: React.FC = () => {
 
   return (
     <div>
-      <h3 className="text-xl font-semibold text-gray-800 mb-6">Create your account</h3>
+      <div className="text-center mb-8">
+        <img src="https://ile.africa/images/logo.png" alt="Ile Logo" className="h-16 mx-auto mb-4" />
+        <p className="text-gray-500 mt-1">Professional Registration</p>
+      </div>
+      
+      {/* Progress bar */}
+      <div className="mb-6">
+        <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <span>Registration Progress</span>
+          <span>{formProgress}% Complete</span>
+        </div>
+        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-primary-500 transition-all duration-500 ease-out"
+            style={{ width: `${formProgress}%` }}
+          />
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2 text-green-600 text-sm font-medium mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+        </svg>
+        <span>256-bit SSL Encrypted</span>
+      </div>
       
       {serverError && (
         <div className="mb-6 p-4 bg-error-50 border border-error-200 rounded-lg flex items-start">
@@ -99,22 +211,28 @@ const RegisterPage: React.FC = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div>
+      <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+        <div className="mb-6 animate-fadeIn">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">Personal Information</h2>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Full name
+            Full name <span className="text-error-500">*</span>
           </label>
           <div className="mt-1 relative">
             <input
               id="name"
               type="text"
-              className={`input pl-10 ${errors.name ? 'border-error-500 focus:ring-error-500 focus:border-error-500' : ''}`}
+              className={`input pl-10 ${errors.name ? 'border-error-500 focus:ring-error-500 focus:border-error-500' : watch('name')?.length >= 2 ? 'border-success-500 focus:ring-success-500 focus:border-success-500' : ''}`}
               placeholder="John Doe"
               {...register('name')}
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <User className="h-5 w-5 text-gray-400" />
             </div>
+            {watch('name')?.length >= 2 && !errors.name && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <CheckCircle2 className="h-5 w-5 text-success-500" />
+              </div>
+            )}
           </div>
           {errors.name && (
             <p className="mt-2 text-sm text-error-500 flex items-center">
@@ -132,15 +250,24 @@ const RegisterPage: React.FC = () => {
             <input
               id="email"
               type="email"
-              autoComplete="email"
-              className={`input pl-10 ${errors.email ? 'border-error-500 focus:ring-error-500 focus:border-error-500' : ''}`}
+              className={`input pl-10 ${errors.email ? 'border-error-500 focus:ring-error-500 focus:border-error-500' : watch('email')?.includes('@') ? 'border-success-500 focus:ring-success-500 focus:border-success-500' : ''}`}
               placeholder="you@example.com"
               {...register('email')}
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Mail className="h-5 w-5 text-gray-400" />
             </div>
+            {watch('email')?.includes('@') && !errors.email && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <CheckCircle2 className="h-5 w-5 text-success-500" />
+              </div>
+            )}
           </div>
+          {!errors.email && watch('email') && (
+            <p className="mt-1 text-xs text-gray-500">
+              We'll send a verification link to this email address
+            </p>
+          )}
           {errors.email && (
             <p className="mt-2 text-sm text-error-500 flex items-center">
               <XCircle className="h-4 w-4 mr-1" />
@@ -149,9 +276,10 @@ const RegisterPage: React.FC = () => {
           )}
         </div>
         
-        <div>
+        <div className="mb-6 animate-fadeIn animate-delay-200">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">Account Security</h2>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
+            Password <span className="text-error-500">*</span>
           </label>
           <div className="mt-1 relative">
             <input
@@ -193,6 +321,20 @@ const RegisterPage: React.FC = () => {
                   className={`h-full transition-all duration-300 ${getPasswordStrengthColor()}`}
                   style={{ width: `${(passwordScore + 1) * 20}%` }}
                 />
+              </div>
+              
+              {/* Password requirements checklist */}
+              <div className="mt-3 space-y-1">
+                {getPasswordRequirements().map((req, index) => (
+                  <div key={index} className="flex items-center text-xs">
+                    {req.met ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success-500 mr-1.5" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-gray-400 mr-1.5" />
+                    )}
+                    <span className={req.met ? 'text-success-700' : 'text-gray-500'}>{req.text}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -238,16 +380,17 @@ const RegisterPage: React.FC = () => {
           )}
         </div>
         
-        <div>
+        <div className="mb-6 animate-fadeIn animate-delay-300">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">Professional Profile</h2>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            I am a
+            Account Type <span className="text-error-500">*</span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label
-              className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`flex flex-col items-center p-6 border-2 rounded-lg cursor-pointer transition-all ${
                 selectedRole === 'buyer' 
-                  ? 'border-primary-500 bg-primary-50 text-primary-700' 
-                  : 'border-gray-300 hover:border-primary-300'
+                  ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' 
+                  : 'border-gray-200 hover:border-primary-300 bg-gray-50 hover:bg-blue-50'
               }`}
             >
               <input
@@ -256,20 +399,29 @@ const RegisterPage: React.FC = () => {
                 className="sr-only"
                 {...register('role')}
               />
-              <Building2 className={`h-6 w-6 ${
-                selectedRole === 'buyer' ? 'text-primary-500' : 'text-gray-400'
-              }`} />
-              <div className="ml-3">
-                <p className="font-medium">Property Developer/Investor</p>
-                <p className="text-sm text-gray-500">Post tasks and hire legal professionals</p>
+              <div className="text-center">
+                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-3 ${
+                  selectedRole === 'buyer' ? 'bg-primary-100' : 'bg-gray-100'
+                }`}>
+                  <Building2 className={`h-8 w-8 ${
+                    selectedRole === 'buyer' ? 'text-primary-600' : 'text-gray-500'
+                  }`} />
+                </div>
+                <p className="font-semibold text-lg mb-1">Property Developer/Investor</p>
+                <p className="text-sm text-gray-500 leading-snug">Access legal services and post verification requests</p>
               </div>
+              {selectedRole === 'buyer' && (
+                <div className="absolute top-3 right-3">
+                  <CheckCircle2 className="h-5 w-5 text-primary-500" />
+                </div>
+              )}
             </label>
             
             <label
-              className={`flex items-center p-4 border rounded-lg cursor-pointer transition-all ${
+              className={`flex flex-col items-center p-6 border-2 rounded-lg cursor-pointer transition-all ${
                 selectedRole === 'seller' 
-                  ? 'border-primary-500 bg-primary-50 text-primary-700' 
-                  : 'border-gray-300 hover:border-primary-300'
+                  ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' 
+                  : 'border-gray-200 hover:border-primary-300 bg-gray-50 hover:bg-blue-50'
               }`}
             >
               <input
@@ -278,13 +430,22 @@ const RegisterPage: React.FC = () => {
                 className="sr-only"
                 {...register('role')}
               />
-              <Scale className={`h-6 w-6 ${
-                selectedRole === 'seller' ? 'text-primary-500' : 'text-gray-400'
-              }`} />
-              <div className="ml-3">
-                <p className="font-medium">Legal Professional</p>
-                <p className="text-sm text-gray-500">Offer your legal services</p>
+              <div className="text-center">
+                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-3 ${
+                  selectedRole === 'seller' ? 'bg-primary-100' : 'bg-gray-100'
+                }`}>
+                  <Scale className={`h-8 w-8 ${
+                    selectedRole === 'seller' ? 'text-primary-600' : 'text-gray-500'
+                  }`} />
+                </div>
+                <p className="font-semibold text-lg mb-1">Legal Professional</p>
+                <p className="text-sm text-gray-500 leading-snug">Provide legal services and respond to client needs</p>
               </div>
+              {selectedRole === 'seller' && (
+                <div className="absolute top-3 right-3">
+                  <CheckCircle2 className="h-5 w-5 text-primary-500" />
+                </div>
+              )}
             </label>
           </div>
           {errors.role && (
@@ -295,59 +456,67 @@ const RegisterPage: React.FC = () => {
           )}
         </div>
         
-        <div className="flex items-start">
-          <div className="flex items-center h-5">
-            <input
-              id="termsAccepted"
-              type="checkbox"
-              className="h-4 w-4 text-primary-500 focus:ring-primary-500 border-gray-300 rounded"
-              {...register('termsAccepted')}
-            />
+        <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 mb-6 animate-fadeIn animate-delay-400">
+          <div className="flex items-start">
+            <div className="flex items-center h-5 mt-0.5">
+              <input
+                id="termsAccepted"
+                type="checkbox"
+                className="h-5 w-5 text-primary-500 focus:ring-primary-500 border-gray-300 rounded accent-primary-500"
+                {...register('termsAccepted')}
+              />
+            </div>
+            <div className="ml-3">
+              <label htmlFor="termsAccepted" className="text-sm text-gray-700 leading-relaxed">
+                I acknowledge that I have read, understood, and agree to be bound by the{' '}
+                <button
+                  type="button"
+                  className="text-primary-500 hover:text-primary-600 font-medium underline"
+                  onClick={() => setIsTermsModalOpen(true)}
+                >
+                  Terms of Service
+                </button>
+                {' '}and{' '}
+                <button
+                  type="button"
+                  className="text-primary-500 hover:text-primary-600 font-medium underline"
+                  onClick={() => setIsTermsModalOpen(true)}
+                >
+                  Privacy Policy
+                </button>
+                . I confirm that the information provided is accurate and complete.
+              </label>
+            </div>
           </div>
-          <div className="ml-3">
-            <label htmlFor="termsAccepted" className="text-sm text-gray-700">
-              I agree to the{' '}
-              <button
-                type="button"
-                className="text-primary-500 hover:text-primary-600 font-medium"
-                onClick={() => setIsTermsModalOpen(true)}
-              >
-                terms and conditions
-              </button>
-              {' '}and{' '}
-              <button
-                type="button"
-                className="text-primary-500 hover:text-primary-600 font-medium"
-                onClick={() => setIsTermsModalOpen(true)}
-              >
-                privacy policy
-              </button>
-            </label>
-          </div>
+          {errors.termsAccepted && (
+            <p className="text-sm text-error-500 flex items-center mt-2 ml-8">
+              <XCircle className="h-4 w-4 mr-1" />
+              {errors.termsAccepted.message}
+            </p>
+          )}
         </div>
-        {errors.termsAccepted && (
-          <p className="text-sm text-error-500 flex items-center mt-2">
-            <XCircle className="h-4 w-4 mr-1" />
-            {errors.termsAccepted.message}
-          </p>
-        )}
         
-        <div>
+        <div className="animate-fadeIn animate-delay-500">
           <button
             type="submit"
+            className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
             disabled={isSubmitting}
-            className="btn-primary w-full flex justify-center py-2 px-4"
           >
             {isSubmitting ? (
               <div className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white\" xmlns="http://www.w3.org/2000/svg\" fill="none\" viewBox="0 0 24 24">
-                  <circle className="opacity-25\" cx="12\" cy="12\" r="10\" stroke="currentColor\" strokeWidth="4"></circle>
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Creating your account...
               </div>
             ) : (
-              'Create Account'
+              <div className="flex items-center">
+                <span>Create Account</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
             )}
           </button>
         </div>
