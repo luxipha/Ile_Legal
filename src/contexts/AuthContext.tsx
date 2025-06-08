@@ -103,6 +103,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  async function signUpNewUser() {
+    const { data, error } = await supabase.auth.signUp({
+      email: 'valid.email@supabase.io',
+      password: 'example-password',
+      options: {
+        emailRedirectTo: 'https://example.com/welcome',
+      },
+    })
+  }
+
   // Mock register function
   const register = async (name: string, email: string, password: string, role: UserRole) => {
     setIsLoading(true);
