@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, MapPin, FileText, Award, Shield, Clock, AlertTriangle, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,7 +7,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDropzone } from 'react-dropzone';
+import { createClient } from '@supabase/supabase-js';
 
+const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ');
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
@@ -21,7 +23,7 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateProfile, setUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -31,12 +33,36 @@ const ProfilePage: React.FC = () => {
   // Determine if the current user is a seller
   const isSeller = user?.role === 'seller';
   
+  // Fetch the latest user data from Supabase when the component mounts and whenever the user changes
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error fetching session:', error);
+        return;
+      }
+      if (session) {
+        const userData = {
+          id: session.user.id,
+          name: session.user.user_metadata.name,
+          email: session.user.email || '',
+          role: session.user.user_metadata.role,
+          isVerified: session.user.user_metadata.email_verified,
+          user_metadata: session.user.user_metadata
+        };
+        setUser(userData);
+      }
+    };
+    fetchUserData();
+  }, [user, setUser]);
+  
   // Dummy profile data based on user role
   const getBuyerProfile = () => ({
+    
     name: user?.name || 'John Buyer',
     email: user?.email || 'buyer@example.com',
-    phone: '+234 123 456 7890',
-    address: '123 Victoria Island, Lagos',
+    phone: user?.user_metadata?.phone || 'none',
+    address: user?.user_metadata?.address || 'none',
     company: 'Lagos Properties Ltd.',
     about: 'Property developer focused on residential and commercial projects in Lagos.',
     projects: [
@@ -101,6 +127,9 @@ const ProfilePage: React.FC = () => {
       // Here you would typically make an API call to update the profile
       console.log('Updating profile:', data);
       console.log('Profile picture:', profilePicture);
+      
+      // Call updateProfile from AuthContext to update the profile in Supabase
+      await updateProfile(data);
       
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));

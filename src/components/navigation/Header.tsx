@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
 import { Menu, Bell, User, CreditCard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 type HeaderProps = {
   setSidebarOpen: (open: boolean) => void;
 };
 
 const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
-  const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    navigate('/');
+    logout();
+    
+  };
+
   // Mock notifications
   const notifications = [
     {
@@ -137,7 +143,7 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
                   </Link>
                   <button
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => {/* Handle logout */}}
+                    onClick={() => {handleLogout();}}
                   >
                     Sign out
                   </button>
