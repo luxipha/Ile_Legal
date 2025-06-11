@@ -63,10 +63,10 @@ export default function App() {
     return () => subscription.unsubscribe()    
   }, [])    
   if (!session) {   
-    console.log("not logged in")   
+    // console.log("not logged in")   
     // return (<Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} />)    
   }    else {    
-    console.log("logged in")  
+    // console.log("logged in")  
     // return (<div>Logged in!</div>)    
   }
   return (
