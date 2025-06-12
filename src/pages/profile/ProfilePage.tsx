@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDropzone } from 'react-dropzone';
 import { createClient } from '@supabase/supabase-js';
+import { api } from '../../services/api';
 
 const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ');
 const profileSchema = z.object({
@@ -23,7 +24,7 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 const ProfilePage: React.FC = () => {
-  const { user, updateProfile, setUser } = useAuth();
+  const { user, updateProfile, setUser, getUser } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -35,26 +36,14 @@ const ProfilePage: React.FC = () => {
   
   // Fetch the latest user data from Supabase when the component mounts and whenever the user changes
   useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error fetching session:', error);
-        return;
-      }
-      if (session) {
-        const userData = {
-          id: session.user.id,
-          name: session.user.user_metadata.name,
-          email: session.user.email || '',
-          role: session.user.user_metadata.role,
-          isVerified: session.user.user_metadata.email_verified,
-          user_metadata: session.user.user_metadata
-        };
+    const loadUserData = async () => {
+      const userData = await getUser();
+      if (userData) {
         setUser(userData);
       }
     };
-    fetchUserData();
-  }, [user, setUser]);
+    loadUserData();
+  }, [setUser, getUser]);
   
   // Dummy profile data based on user role
   const getBuyerProfile = () => ({

@@ -123,25 +123,4 @@ export const api = {
 
   },
 
-  users: {
-    getUser: async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error fetching session:', error);
-        return null;
-      }
-      if (session) {
-        return {
-          id: session.user.id,
-          name: session.user.user_metadata.name,
-          email: session.user.email || '',
-          role: session.user.user_metadata.role,
-          isVerified: session.user.user_metadata.email_verified,
-          user_metadata: session.user.user_metadata
-        };
-      }
-      return null;
-    }
-  }
-
 };
