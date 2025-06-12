@@ -3,10 +3,6 @@ import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared'
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
@@ -47,28 +43,7 @@ import PaymentCompletePage from './pages/payments/PaymentCompletePage';
 import GigDetailsPage from './pages/gigs/GigDetailsPage';
 import PostGigPage from './pages/gigs/PostGigPage';
 
-const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ');
-
-export default function App() {
-  const [session, setSession] = useState(null)    
-  useEffect(() => {      
-    supabase.auth.getSession().then(({ data: { session } }) => {        
-      setSession(session)      
-    })      
-    const {        
-      data: { subscription },      
-    } = supabase.auth.onAuthStateChange((_event, session) => {        
-      setSession(session)      
-    })      
-    return () => subscription.unsubscribe()    
-  }, [])    
-  if (!session) {   
-    console.log("not logged in")   
-    // return (<Auth supabaseClient={supabase} appearance={{ theme: ThemeSupa }} />)    
-  }    else {    
-    console.log("logged in")  
-    // return (<div>Logged in!</div>)    
-  }
+export default function App() {  
   return (
     <ThemeProvider>
       <Routes>
