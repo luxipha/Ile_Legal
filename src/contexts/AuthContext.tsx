@@ -25,6 +25,7 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (profileData: Partial<User>) => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  getUser: () => Promise<User | null>;
 }
 
 // Mock users for demo
@@ -87,13 +88,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // New function to fetch current user from Supabase
   async function getCurrentUser() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const userData = await getUser();
+    if (userData) {
+      setUser(userData);
+      setToken(session?.access_token || null);
+      localStorage.setItem('ileUser', JSON.stringify(userData));
+      localStorage.setItem('ileToken', session?.access_token || '');
+    } else {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('ileUser');
+      localStorage.removeItem('ileToken');
+    }
+  }
+
+  // Function to get user data from session
+  async function getUser() {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error) {
       console.error('Error fetching session:', error);
-      return;
+      return null;
     }
     if (session) {
-      const userData = {
+      return {
         id: session.user.id,
         name: session.user.user_metadata.name,
         email: session.user.email || '',
@@ -101,16 +119,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isVerified: session.user.user_metadata.email_verified,
         user_metadata: session.user.user_metadata
       };
-      setUser(userData);
-      setToken(session.access_token);
-      localStorage.setItem('ileUser', JSON.stringify(userData));
-      localStorage.setItem('ileToken', session.access_token);
-    } else {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('ileUser');
-      localStorage.removeItem('ileToken');
     }
+    return null;
   }
 
   // Call getCurrentUser on mount and when session changes
@@ -263,7 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, updateProfile, setUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, updateProfile, setUser, getUser }}>
       {children}
     </AuthContext.Provider>
   );
