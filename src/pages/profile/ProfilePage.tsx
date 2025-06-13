@@ -40,6 +40,10 @@ const ProfilePage: React.FC = () => {
       const userData = await getUser();
       if (userData) {
         setUser(userData);
+        // Set profile picture preview if it exists in user metadata
+        if (userData.user_metadata?.user_metadata?.profile_picture) {
+          setProfilePicturePreview(userData.user_metadata.user_metadata.profile_picture);
+        }
       }
     };
     loadUserData();
@@ -114,11 +118,14 @@ const ProfilePage: React.FC = () => {
   const onSubmit = async (data: ProfileFormData) => {
     try {
       // Here you would typically make an API call to update the profile
-      console.log('Updating profile:', data);
-      console.log('Profile picture:', profilePicture);
+      // console.log('Updating profile:', data);
+      // console.log('Profile picture:', profilePicture);
       
       // Call updateProfile from AuthContext to update the profile in Supabase
-      await updateProfile(data);
+      await updateProfile({
+        ...data,
+        profile_picture: profilePicture || undefined
+      });
       
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
