@@ -46,6 +46,7 @@ const PostGigPage: React.FC = () => {
 
   const onSubmit = async (data: GigFormData) => {
     try {
+      console.log('data:', data)
       const { error } = await api.gigs.createGig({
         ...data,
         buyer_id: user?.id

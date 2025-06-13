@@ -59,9 +59,36 @@ export const api = {
       categories: string[];
       budget: string;
       deadline: string;
-      attachments?: any;
+      attachments?: FileList | File[];
       buyer_id: string | undefined;
     }) => {
+      let attachmentUrls: string[] = [];
+      
+      // Upload files if they exist
+      if (gigData.attachments && gigData.buyer_id) {
+        // Convert FileList to array of Files
+        const files = Array.from(gigData.attachments);
+        console.log('files:', files);
+        
+        const uploadPromises = files.map(async (file) => {
+          const filePath = `${gigData.buyer_id}/${file.name}`;
+          console.log('filePath:', filePath);
+          
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(filePath, file);
+            
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw uploadError;
+          }
+          
+          return file.name;
+        });
+        
+        attachmentUrls = await Promise.all(uploadPromises);
+      }
+
       const { data, error } = await supabase
         .from('Gigs')
         .insert({
@@ -70,7 +97,7 @@ export const api = {
           categories: gigData.categories,
           budget: gigData.budget,
           deadline: gigData.deadline,
-          attachments: gigData.attachments,
+          attachments: attachmentUrls,
           buyer_id: gigData.buyer_id,
           status: 'active'
         });

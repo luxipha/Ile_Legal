@@ -13,6 +13,7 @@ export interface User {
   user_metadata: {
     phone?: string;
     address?: string;
+    profile_picture?: string;
   };
 }
 
@@ -23,7 +24,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
-  updateProfile: (profileData: Partial<User>) => Promise<void>;
+  updateProfile: (profileData: Partial<User> & { profile_picture?: File }) => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   getUser: () => Promise<User | null>;
 }
@@ -111,14 +112,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
     if (session) {
-      return {
-        id: session.user.id,
-        name: session.user.user_metadata.name,
-        email: session.user.email || '',
-        role: session.user.user_metadata.role,
-        isVerified: session.user.user_metadata.email_verified,
-        user_metadata: session.user.user_metadata
-      };
+      if (session.user.user_metadata.user_metadata) {
+        const { data, error } = await supabase
+        .storage
+        .from('profile-pictures')
+        .getPublicUrl(`profile_pictures/${session.user.id}.jpg`)
+        return {
+          id: session.user.id,
+          name: session.user.user_metadata.name,
+          email: session.user.email || '',
+          role: session.user.user_metadata.role,
+          isVerified: session.user.user_metadata.email_verified,
+          user_metadata: session.user.user_metadata,
+          profile_picture: data
+        };
+      } else {
+        return {
+          id: session.user.id,
+          name: session.user.user_metadata.name,
+          email: session.user.email || '',
+          role: session.user.user_metadata.role,
+          isVerified: session.user.user_metadata.email_verified,
+          user_metadata: session.user.user_metadata,
+          profile_picture: null
+        };
+      }
     }
     return null;
   }
@@ -239,8 +257,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   // Updated updateProfile function
-  async function updateProfile(profileData: Partial<User>) {
-    console.log('Updating profile with data:', profileData);
+  async function updateProfile(profileData: Partial<User> & { profile_picture?: File }) {
+    const userData = await getUser();
+    // Handle profile picture upload if provided
+    if (profileData.profile_picture) {
+      const file = profileData.profile_picture;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userData?.id}.${fileExt}`;
+      const filePath = `profile_pictures/${fileName}`;
+
+      // Upload the file to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-pictures')
+        .update(filePath, file, {
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Error uploading profile picture:', uploadError);
+        throw uploadError;
+      }
+
+      // Get the public URL for the uploaded file
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-pictures')
+        .getPublicUrl(filePath);
+
+      // Add the profile picture URL to the user metadata
+      profileData.user_metadata = {
+        ...profileData,
+        profile_picture: publicUrl
+      };
+
+      // Remove the File object from profileData as it can't be stored in user metadata
+      delete profileData.profile_picture;
+    }
+
     const { data: { user }, error } = await supabase.auth.updateUser({
       data: profileData
     });
@@ -248,7 +300,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error updating profile:', error);
       throw error;
     }
-    console.log('Profile update response:', user);
     if (user) {
       const updatedUser = {
         id: user.id,
