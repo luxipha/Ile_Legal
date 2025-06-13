@@ -49,6 +49,7 @@ const PostGigPage: React.FC = () => {
       console.log('data:', data)
       const { error } = await api.gigs.createGig({
         ...data,
+        budget: Number(data.budget.replace(/,/g, '')),
         buyer_id: user?.id
       });
       
