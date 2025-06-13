@@ -1,15 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { useMockDataStore } from '../../store/mockData';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../services/api';
 
 const MyGigsPage: React.FC = () => {
   const { user } = useAuth();
-  const { gigs } = useMockDataStore();
-  
-  // Filter gigs for the current user
-  const myGigs = gigs.filter(gig => gig.client.id === user?.id);
+  const [myGigs, setMyGigs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMyGigs = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const data = await api.gigs.getMyGigs(user.id);
+        setMyGigs(data);
+      } catch (err) {
+        console.error('Error fetching gigs:', err);
+        setError('Failed to load your gigs. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMyGigs();
+  }, [user?.id]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -23,6 +40,44 @@ const MyGigsPage: React.FC = () => {
         return <span className="badge-error">Cancelled</span>;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">My Gigs</h1>
+          <Link to="/buyer/post-gig" className="btn-primary">
+            Post New Gig
+          </Link>
+        </div>
+        <div className="bg-white shadow-card rounded-lg p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">My Gigs</h1>
+          <Link to="/buyer/post-gig" className="btn-primary">
+            Post New Gig
+          </Link>
+        </div>
+        <div className="bg-white shadow-card rounded-lg p-6 text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-error-500" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Error Loading Gigs</h3>
+          <p className="mt-1 text-sm text-gray-500">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -48,7 +103,7 @@ const MyGigsPage: React.FC = () => {
                   <div className="mt-2 flex items-center space-x-2">
                     {getStatusBadge(gig.status)}
                     <span className="text-sm text-gray-500">
-                      Posted: {new Date(gig.createdAt).toLocaleDateString()}
+                      Posted: {new Date(gig.created_at).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
@@ -64,13 +119,13 @@ const MyGigsPage: React.FC = () => {
                 {gig.status === 'active' && (
                   <div className="flex items-center text-sm text-gray-500">
                     <Clock className="h-4 w-4 mr-1" />
-                    {gig.bids.length} bids received
+                    {gig.bids?.length || 0} bids received
                   </div>
                 )}
-                {gig.status === 'assigned' && gig.assignedTo && (
+                {gig.status === 'assigned' && gig.assigned_to && (
                   <div className="flex items-center text-sm text-gray-500">
                     <CheckCircle className="h-4 w-4 mr-1 text-success-500" />
-                    Assigned to: {gig.assignedTo.name}
+                    Assigned to: {gig.assigned_to}
                   </div>
                 )}
               </div>
@@ -83,14 +138,20 @@ const MyGigsPage: React.FC = () => {
                   View Details
                 </Link>
                 {gig.status === 'active' && (
-                  <button className="btn-ghost text-sm">
+                  <Link
+                    to={`/gigs/${gig.id}?tab=bids`}
+                    className="btn-ghost text-sm"
+                  >
                     View Bids
-                  </button>
+                  </Link>
                 )}
                 {gig.status === 'assigned' && (
-                  <button className="btn-ghost text-sm">
+                  <Link
+                    to={`/messages/conv-${gig.id}`}
+                    className="btn-ghost text-sm"
+                  >
                     Message Provider
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>

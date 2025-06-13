@@ -307,20 +307,20 @@ const RegisterPage: React.FC = () => {
             <div className="mt-2">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-sm text-gray-600">Password strength:</div>
-                <div className={`text-sm font-medium ${
+                {/* <div className={`text-sm font-medium ${
                   passwordScore <= 1 ? 'text-error-500' :
                   passwordScore === 2 ? 'text-warning-500' :
                   passwordScore === 3 ? 'text-secondary-500' :
                   'text-success-500'
                 }`}>
                   {getPasswordStrengthText()}
-                </div>
+                </div> */}
               </div>
               <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                <div
+                {/* <div
                   className={`h-full transition-all duration-300 ${getPasswordStrengthColor()}`}
                   style={{ width: `${(passwordScore + 1) * 20}%` }}
-                />
+                /> */}
               </div>
               
               {/* Password requirements checklist */}

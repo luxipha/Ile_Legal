@@ -13,8 +13,9 @@ const Navbar: React.FC = () => {
   };
 
   const handleLogout = () => {
-    logout();
     navigate('/');
+    logout();
+    
   };
 
   const getDashboardLink = () => {

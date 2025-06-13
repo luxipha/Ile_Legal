@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, Calendar, DollarSign, MessageSquare, FileText, Clock, Shield, CheckCircle } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '../../contexts/AuthContext';
-
-// Import mock data store
-import { useMockDataStore } from '../../store/mockData';
+import { api } from '../../services/api';
+const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ');
 
 const GigDetailsPage: React.FC = () => {
   const { gigId } = useParams<{ gigId: string }>();
@@ -15,7 +15,6 @@ const GigDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [acceptingBid, setAcceptingBid] = useState(false);
   const [acceptedBidId, setAcceptedBidId] = useState<string | null>(null);
-  const { getGigById } = useMockDataStore();
   
   // Check for tab query parameter
   useEffect(() => {
@@ -28,12 +27,32 @@ const GigDetailsPage: React.FC = () => {
   
   useEffect(() => {
     if (gigId) {
-      // Fetch gig data from mock store
-      const gigData = getGigById(gigId);
-      setGig(gigData);
-      setLoading(false);
+      const fetchGig = async () => {
+        try {
+          const gigData = await api.gigs.getGigById(gigId);
+          if (gigData && gigData.length > 0) {
+            // Add default client values if not present
+            const gigWithClient = {
+              ...gigData[0],
+              client: gigData[0].client || {
+                name: 'Not Assigned',
+                rating: 0,
+                projectsPosted: 0
+              }
+            };
+            setGig(gigWithClient);
+          }
+        } catch (error) {
+          console.error('Error fetching gig:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      fetchGig();
     }
-  }, [gigId, getGigById]);
+  }, [gigId]);
+
   
   // Determine if the current user is the gig owner (buyer)
   const isOwner = user?.role === 'buyer';
@@ -96,6 +115,14 @@ const GigDetailsPage: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-800 font-serif">{gig.title}</h1>
+              <button className="btn-primary" onClick={() => {
+                api.gigs.updateGig(gig.id, {
+                  ...gig,
+                  status: 'active'
+                });
+              }}>
+                Complete Gig
+              </button>
               <div className="mt-2 flex flex-wrap items-center gap-4">
                 <div className="flex items-center text-sm text-gray-500">
                   <Calendar className="mr-1 h-4 w-4 text-gray-400" />
