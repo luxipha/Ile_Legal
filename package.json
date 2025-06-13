@@ -14,6 +14,7 @@
     "@hookform/resolvers": "^3.3.4",
     "@stripe/react-stripe-js": "^2.5.1",
     "@stripe/stripe-js": "^2.4.0",
+    "@supabase/supabase-js": "^2.50.0",
     "@tanstack/react-query": "^5.24.1",
     "@tanstack/react-query-devtools": "^5.24.1",
     "clsx": "^2.1.0",
