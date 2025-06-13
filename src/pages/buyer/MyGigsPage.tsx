@@ -15,7 +15,7 @@ const MyGigsPage: React.FC = () => {
       if (!user?.id) return;
       
       try {
-        const data = await api.gigs.getMyGigs(user.id, {deadline: {start: new Date(2025, 5, 11 ).getTime(), end: new Date(2025, 5, 12).getTime()}});
+        const data = await api.gigs.getMyGigs(user.id);
         setMyGigs(data);
       } catch (err) {
         console.error('Error fetching gigs:', err);
