@@ -414,11 +414,12 @@ export const Login = (): JSX.Element => {
                       const result = await testDirectLogin("admin.test@ile-legal.com", "password123");
                       console.log('Direct login result:', result);
                       
-                      if (result.success) {
+                      if (result.data?.user) {
                         alert('Direct login successful! Redirecting to dashboard...');
                         navigate('/admin/dashboard');
                       } else {
-                        alert(`Direct login failed: ${result.message}`);
+                        const errorMessage = result.error ? result.error.message : 'Unknown error';
+                        alert(`Direct login failed: ${errorMessage}`);
                       }
                     } catch (error: any) {
                       console.error('Error in direct login:', error);
