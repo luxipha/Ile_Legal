@@ -1,10 +1,14 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { EyeIcon, EyeOffIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon, ArrowLeftIcon } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { testDirectLogin } from "../../lib/supabase";
 
 export const Login = (): JSX.Element => {
+  const { login, user, isLoading, createTestUser, signInWithGoogle, signInWithMetaMask } = useAuth();
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -13,6 +17,8 @@ export const Login = (): JSX.Element => {
     rememberMe: false,
   });
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -22,9 +28,39 @@ export const Login = (): JSX.Element => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect based on user role when authenticated
+  useEffect(() => {
+    if (user) {
+      switch (user.role) {
+        case 'admin':
+          navigate('/admin-dashboard');
+          break;
+        case 'seller':
+          navigate('/seller-dashboard');
+          break;
+        case 'buyer':
+          navigate('/buyer-dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt:', formData);
+    setLoginError('');
+    setIsSubmitting(true);
+    
+    try {
+      await login(formData.email, formData.password);
+      // Redirection will be handled by the useEffect above
+    } catch (error) {
+      console.error('Login error:', error);
+      setLoginError('Invalid email or password. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleForgotPasswordSubmit = (e: React.FormEvent) => {
@@ -38,16 +74,19 @@ export const Login = (): JSX.Element => {
     }
   };
 
-  const handleMetaMaskLogin = async () => {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        console.log('MetaMask login successful:', accounts[0]);
-      } catch (error) {
-        console.error('Error connecting to MetaMask:', error);
-      }
-    } else {
-      alert('MetaMask is not installed. Please install MetaMask to continue.');
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail) {
+      alert('Please enter your email address.');
+      return;
+    }
+
+    // Here you would typically call an API to send a password reset email
+    // For demo purposes, we'll just show a success message
+    if (forgotPasswordEmail) {
+      // Show success message
+      alert('Password reset link has been sent to your email address.');
+      setShowForgotPassword(false);
+      setForgotPasswordEmail("");
     }
   };
 
@@ -264,12 +303,18 @@ export const Login = (): JSX.Element => {
                   </button>
                 </div>
 
+                {/* Error Message */}
+                {loginError && (
+                  <div className="text-red-500 text-sm">{loginError}</div>
+                )}
+                
                 {/* Submit Button */}
                 <Button
                   type="submit"
                   className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-lg"
+                  disabled={isSubmitting || isLoading}
                 >
-                  Sign In
+                  {isSubmitting ? 'Signing In...' : 'Sign In'}
                 </Button>
               </form>
 
@@ -279,25 +324,145 @@ export const Login = (): JSX.Element => {
                 <span className="px-4 text-sm text-gray-500">or</span>
                 <div className="flex-1 border-t border-gray-300"></div>
               </div>
-
+              
               {/* Social Login */}
               <div className="space-y-3">
                 <Button
                   type="button"
-                  onClick={handleMetaMaskLogin}
                   variant="outline"
                   className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 hover:border-[#FEC85F]"
+                  onClick={async () => {
+                    try {
+                      setLoginError('');
+                      console.log('Initiating MetaMask sign in...');
+                      await signInWithMetaMask();
+                      // User will be redirected based on role after successful login
+                    } catch (error: any) {
+                      console.error('MetaMask login error:', error);
+                      setLoginError(error.message || 'Failed to connect with MetaMask');
+                    }
+                  }}
+                  disabled={isSubmitting || isLoading}
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-3" />
-                  Continue with MetaMask
+                  {isLoading ? 'Connecting...' : 'Continue with MetaMask'}
                 </Button>
+                
                 <Button
                   type="button"
                   variant="outline"
                   className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50"
+                  onClick={async () => {
+                    try {
+                      setLoginError('');
+                      console.log('Initiating Google sign in...');
+                      await signInWithGoogle();
+                      // User will be redirected to Google for authentication
+                    } catch (error: any) {
+                      console.error('Google login error:', error);
+                      setLoginError('Failed to initiate Google login');
+                    }
+                  }}
+                  disabled={isSubmitting || isLoading}
                 >
                   <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
-                  Continue with Google
+                  {isLoading ? 'Connecting...' : 'Continue with Google'}
+                </Button>
+
+                {/* Test Admin Login Button */}
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setIsSubmitting(true);
+                      // Fill the form
+                      const testCredentials = {
+                        email: "admin.test@ile-legal.com",
+                        password: "password123",
+                        rememberMe: true
+                      };
+                      setFormData(testCredentials);
+                      
+                      // Directly login
+                      console.log('Logging in with test credentials...');
+                      await login(testCredentials.email, testCredentials.password);
+                      // Redirection will be handled by the useEffect
+                    } catch (error) {
+                      console.error('Test login error:', error);
+                      setLoginError('Failed to login with test credentials');
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  variant="outline"
+                  className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 bg-blue-50"
+                  disabled={isSubmitting || isLoading}
+                >
+                  {isSubmitting ? 'Logging in...' : 'Test Admin Login'}
+                </Button>
+
+                {/* Direct Test Login Button */}
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setIsSubmitting(true);
+                      console.log('Attempting direct login...');
+                      
+                      const result = await testDirectLogin("admin.test@ile-legal.com", "password123");
+                      console.log('Direct login result:', result);
+                      
+                      if (result.success) {
+                        alert('Direct login successful! Redirecting to dashboard...');
+                        navigate('/admin/dashboard');
+                      } else {
+                        alert(`Direct login failed: ${result.message}`);
+                      }
+                    } catch (error: any) {
+                      console.error('Error in direct login:', error);
+                      alert(`Error in direct login: ${error?.message || 'Unknown error'}`);
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  variant="outline"
+                  className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 bg-yellow-50"
+                  disabled={isSubmitting || isLoading}
+                >
+                  {isSubmitting ? 'Logging in...' : 'Direct Test Login'}
+                </Button>
+                
+                {/* Create Test User Button */}
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setIsSubmitting(true);
+                      console.log('Creating test user...');
+                      
+                      const result = await createTestUser();
+                      console.log('Test user creation result:', result);
+                      
+                      alert(result.message);
+                      if (result.success) {
+                        setFormData({
+                          email: "admin.test@ile-legal.com",
+                          password: "password123",
+                          rememberMe: true
+                        });
+                      }
+                    } catch (error: any) {
+                      console.error('Error creating test user:', error);
+                      alert(`Error creating test user: ${error?.message || 'Unknown error'}`);
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  variant="outline"
+                  className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 bg-green-50"
+                  disabled={isSubmitting || isLoading}
+                >
+                  {isSubmitting ? 'Creating...' : 'Create Test Admin User'}
                 </Button>
               </div>
 
