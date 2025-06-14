@@ -23,19 +23,19 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
+  ethAddress: string | null;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
-  updateProfile: (data: any) => Promise<void>;
-  isLoading: boolean;
-  createTestUser: () => Promise<{ success: boolean; message: string }>;
+  updateProfile: (userData: Partial<User>) => Promise<void>;
+  createTestUser: (role: UserRole) => Promise<void>;
+  signInWithGoogle: (role?: UserRole) => Promise<void>;
+  signInWithMetaMask: (role?: UserRole) => Promise<void>;
   uploadProfilePicture: (file: File) => Promise<string>;
-  signInWithGoogle: () => Promise<void>;
-  signInWithMetaMask: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   getUser: () => Promise<User | null>;
-  token: string | null;
-  ethAddress: string | null;
 }
 
 // Mock users for demo
@@ -73,54 +73,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 import { supabase } from '../lib/supabase';
 
 // Function to create a test user for development purposes
-async function createTestUser(): Promise<{ success: boolean; message: string }> {
-  console.log('createTestUser function called');
+const createTestUser = async (role: UserRole = 'buyer'): Promise<void> => {
+  console.log('createTestUser function called with role:', role);
   
   try {
-    // First try to sign in to see if user exists
-    try {
-      const { data } = await supabase.auth.signInWithPassword({
-        email: 'admin.test@ile-legal.com',
-        password: 'password123',
-      });
-      
-      if (data && data.user) {
-        console.log('Test user already exists, user:', data.user);
-        return { success: true, message: 'Test user already exists' };
-      }
-    } catch (signInError) {
-      console.log('Sign in failed, user probably doesn\'t exist:', signInError);
-      // Continue to create user
-    }
+    // Generate random email
+    const randomEmail = `test${Math.floor(Math.random() * 10000)}@example.com`;
+    const randomPassword = 'Password123!';
     
-    // User doesn't exist, create it
-    console.log('Creating new test user...');
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: 'admin.test@ile-legal.com',
-      password: 'password123',
+    // Create user with Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email: randomEmail,
+      password: randomPassword,
       options: {
         data: {
-          name: 'Admin User',
-          role: 'admin',
-          role_title: 'System Administrator',
-          clearance_level: '5',
-          email_verified: true
+          name: `Test User ${Math.floor(Math.random() * 1000)}`,
+          role: role
         }
       }
     });
     
-    if (signUpError) {
-      console.error('Error creating test user:', signUpError);
-      return { success: false, message: `Error: ${signUpError.message}` };
+    if (error) {
+      console.error('Error creating test user:', error.message);
+      return;
     }
     
-    console.log('Test user created successfully:', data);
-    return { success: true, message: 'Test user created successfully' };
+    console.log('Test user created:', data);
   } catch (error: any) {
-    console.error('Unexpected error in createTestUser:', error);
-    return { success: false, message: `Unexpected error: ${error?.message || 'Unknown'}` };
+    console.error('Error creating test user:', error.message);
   }
-}
+};
 
 // Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -412,7 +394,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Sign in with MetaMask
-  const signInWithMetaMask = async (): Promise<void> => {
+  const signInWithMetaMask = async (role: UserRole = 'buyer'): Promise<void> => {
     try {
       setIsLoading(true);
       
@@ -495,39 +477,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.setItem('ileEthAddress', address);
         } else {
           // Create new user with ETH address
-          const { data: newUser, error: createError } = await supabase.auth.signUp({
-            email: `${address.toLowerCase()}@ethereum.ile`,
-            password: ethers.utils.id(address + Date.now()), // Generate a random password
-            options: {
-              data: {
-                name: `ETH User ${address.substring(0, 6)}`,
-                role_title: 'buyer',
-                eth_address: address
-              }
-            }
-          });
-          
-          if (createError) {
-            throw createError;
-          }
-          
-          if (newUser?.user) {
-            const createdUser: User = {
-              id: newUser.user.id,
-              name: `ETH User ${address.substring(0, 6)}`,
-              email: newUser.user.email || '',
-              role: 'buyer',
-              isVerified: true,
-              user_metadata: {
-                ...newUser.user.user_metadata,
-                eth_address: address
-              }
-            };
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('eth_address', address)
+            .single();
+
+          if (!userProfile) {
+            // Create a new user if not exists
+            const randomPassword = Math.random().toString(36).slice(-8);
             
-            setUser(createdUser);
-            setEthAddress(address);
-            localStorage.setItem('ileUser', JSON.stringify(createdUser));
-            localStorage.setItem('ileEthAddress', address);
+            const { data: newUser, error: signUpError } = await supabase.auth.signUp({
+              email: `eth_${address.toLowerCase()}@example.com`,
+              password: randomPassword,
+              options: {
+                data: {
+                  eth_address: address,
+                  name: `Ethereum User ${address.slice(0, 6)}`,
+                  role: role, // Use the provided role
+                  email_verified: true // Consider Ethereum users as verified
+                }
+              }
+            });
+            
+            if (signUpError) {
+              throw signUpError;
+            }
+            
+            if (newUser?.user) {
+              const createdUser: User = {
+                id: newUser.user.id,
+                name: `Ethereum User ${address.slice(0, 6)}`,
+                email: newUser.user.email || '',
+                role: role,
+                isVerified: true,
+                user_metadata: {
+                  ...newUser.user.user_metadata,
+                  eth_address: address
+                }
+              };
+              
+              setUser(createdUser);
+              setEthAddress(address);
+              localStorage.setItem('ileUser', JSON.stringify(createdUser));
+              localStorage.setItem('ileEthAddress', address);
+            }
           }
         }
         
@@ -544,18 +538,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   // Sign in with Google
-  const signInWithGoogle = async (): Promise<void> => {
+  const signInWithGoogle = async (role: UserRole = 'buyer'): Promise<void> => {
     try {
       setIsLoading(true);
+      
+      // Store the selected role in localStorage to retrieve after OAuth redirect
+      localStorage.setItem('pendingUserRole', role);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/auth/callback',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
       });
       
       if (error) throw error;
