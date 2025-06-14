@@ -3,10 +3,11 @@ import { Button } from "../ui/button";
 import { 
   BellIcon,
   UserIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  LogOutIcon
 } from "lucide-react";
-import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 type ViewMode = "dashboard" | "verify-user" | "manage-gigs" | "disputes" | "settings" | "profile" | "view-gig-details" | "view-user-details";
 
@@ -116,11 +117,16 @@ export const AdminHeaderMenu = ({ title, onNavigate }: AdminHeaderMenuProps) => 
                 </button>
                 <button 
                   onClick={async () => {
-                    await logout();
-                    navigate('/login');
-                  }}
-                  className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
+                    try {
+                      await logout();
+                      navigate('/login');
+                    } catch (error) {
+                      console.error('Error signing out:', error);
+                    }
+                  }} 
+                  className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
+                  <LogOutIcon className="w-4 h-4" />
                   Sign out
                 </button>
               </div>
