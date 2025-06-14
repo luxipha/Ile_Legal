@@ -1,13 +1,19 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { EyeIcon, EyeOffIcon, CheckIcon, UserIcon, BriefcaseIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { UserRole } from "../../types";
 
 export const Register = (): JSX.Element => {
+  const { register, signInWithMetaMask, signInWithGoogle, user, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userType, setUserType] = useState<"client" | "professional">("client");
+  const [registrationError, setRegistrationError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -27,23 +33,67 @@ export const Register = (): JSX.Element => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Registration attempt:', { ...formData, userType });
+    setRegistrationError("");
+    
+    // Validate form
+    if (formData.password !== formData.confirmPassword) {
+      setRegistrationError("Passwords don't match");
+      return;
+    }
+    
+    if (!formData.agreeToTerms) {
+      setRegistrationError("You must agree to the Terms of Service");
+      return;
+    }
+    
+    // Map userType to UserRole
+    const role: UserRole = userType === "professional" ? "seller" : "buyer";
+    
+    try {
+      setIsSubmitting(true);
+      const fullName = `${formData.firstName} ${formData.lastName}`;
+      await register(fullName, formData.email, formData.password, role);
+      // Navigation will be handled by the useEffect in the component
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setRegistrationError(error.message || 'Failed to register');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleMetaMaskRegister = async () => {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        console.log('MetaMask registration successful:', accounts[0]);
-      } catch (error) {
-        console.error('Error connecting to MetaMask:', error);
-      }
-    } else {
-      alert('MetaMask is not installed. Please install MetaMask to continue.');
+    try {
+      setRegistrationError("");
+      console.log('Initiating MetaMask registration...');
+      await signInWithMetaMask();
+      // User will be redirected based on role after successful login
+    } catch (error: any) {
+      console.error('MetaMask registration error:', error);
+      setRegistrationError(error.message || 'Failed to register with MetaMask');
     }
   };
+  
+  // Redirect based on user role when authenticated
+  useEffect(() => {
+    if (user) {
+      switch (user.role) {
+        case 'admin':
+          navigate('/admin-dashboard');
+          break;
+        case 'seller':
+          navigate('/seller-dashboard');
+          break;
+        case 'buyer':
+          navigate('/buyer-dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    }
+  }, [user, navigate]);
 
   const passwordRequirements = [
     { text: "At least 8 characters", met: formData.password.length >= 8 },
@@ -238,6 +288,11 @@ export const Register = (): JSX.Element => {
                 <div className="flex-1 border-t border-gray-300"></div>
               </div>
 
+              {/* Error Message */}
+              {registrationError && (
+                <div className="text-red-500 text-sm mb-4">{registrationError}</div>
+              )}
+              
               {/* Social Registration */}
               <div className="space-y-3">
                 <Button
@@ -245,17 +300,30 @@ export const Register = (): JSX.Element => {
                   onClick={handleMetaMaskRegister}
                   variant="outline"
                   className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 hover:border-[#FEC85F] transition-all"
+                  disabled={isSubmitting || isLoading}
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-3" />
-                  Continue with MetaMask
+                  {isLoading ? 'Connecting...' : 'Continue with MetaMask'}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 transition-all"
+                  onClick={async () => {
+                    try {
+                      setRegistrationError('');
+                      console.log('Initiating Google sign in...');
+                      await signInWithGoogle();
+                      // User will be redirected to Google for authentication
+                    } catch (error: any) {
+                      console.error('Google login error:', error);
+                      setRegistrationError('Failed to initiate Google login');
+                    }
+                  }}
+                  disabled={isSubmitting || isLoading}
                 >
                   <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
-                  Continue with Google
+                  {isLoading ? 'Connecting...' : 'Continue with Google'}
                 </Button>
               </div>
 
