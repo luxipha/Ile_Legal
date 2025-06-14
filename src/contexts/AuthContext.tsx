@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { ethers } from 'ethers';
 
 // User types
 type UserRole = 'buyer' | 'seller' | 'admin';
@@ -13,18 +13,30 @@ export interface User {
   user_metadata: {
     phone?: string;
     address?: string;
+    profile_picture?: string;
+    role_title?: string;
+    clearance_level?: string;
+    email_verified?: boolean;
+    eth_address?: string;
   };
 }
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
   token: string | null;
+  ethAddress: string | null;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
-  logout: () => void;
-  updateProfile: (profileData: Partial<User>) => Promise<void>;
+  updateProfile: (userData: Partial<User>) => Promise<void>;
+  createTestUser: (role: UserRole) => Promise<void>;
+  signInWithGoogle: (role?: UserRole) => Promise<void>;
+  signInWithMetaMask: (role?: UserRole) => Promise<void>;
+  uploadProfilePicture: (file: File) => Promise<string>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  getUser: () => Promise<User | null>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 // Mock users for demo
@@ -58,59 +70,125 @@ const DEMO_USERS = [
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ');
+// Import the Supabase client from our lib/supabase.ts file
+import { supabase } from '../lib/supabase';
 
+// Function to create a test user for development purposes
+const createTestUser = async (role: UserRole = 'buyer'): Promise<void> => {
+  console.log('createTestUser function called with role:', role);
+  
+  try {
+    // Generate random email
+    const randomEmail = `test${Math.floor(Math.random() * 10000)}@example.com`;
+    const randomPassword = 'Password123!';
+    
+    // Create user with Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email: randomEmail,
+      password: randomPassword,
+      options: {
+        data: {
+          name: `Test User ${Math.floor(Math.random() * 1000)}`,
+          role: role
+        }
+      }
+    });
+    
+    if (error) {
+      console.error('Error creating test user:', error.message);
+      return;
+    }
+    
+    console.log('Test user created:', data);
+  } catch (error: any) {
+    console.error('Error creating test user:', error.message);
+  }
+};
 
 // Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [ethAddress, setEthAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Check for existing session on mount
   useEffect(() => {
     const storedUser = localStorage.getItem('ileUser');
     const storedToken = localStorage.getItem('ileToken');
+    const storedEthAddress = localStorage.getItem('ileEthAddress');
     
-    if (storedUser && storedToken) {
-      try {
+    try {
+      if (storedUser) {
         setUser(JSON.parse(storedUser));
-        setToken(storedToken);
-      } catch (error) {
-        console.error('Failed to parse stored user', error);
-        localStorage.removeItem('ileUser');
-        localStorage.removeItem('ileToken');
       }
+      if (storedToken) {
+        setToken(storedToken);
+      }
+      if (storedEthAddress) {
+        setEthAddress(storedEthAddress);
+      }
+    } catch (error) {
+      console.error('Failed to parse stored user', error);
+      localStorage.removeItem('ileUser');
+      localStorage.removeItem('ileToken');
+      localStorage.removeItem('ileEthAddress');
     }
     setIsLoading(false);
   }, []);
 
   // New function to fetch current user from Supabase
   async function getCurrentUser() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('Error fetching session:', error);
-      return;
-    }
-    if (session) {
-      const userData = {
-        id: session.user.id,
-        name: session.user.user_metadata.name,
-        email: session.user.email || '',
-        role: session.user.user_metadata.role,
-        isVerified: session.user.user_metadata.email_verified,
-        user_metadata: session.user.user_metadata
-      };
+    const { data: { session } } = await supabase.auth.getSession();
+    const userData = await getUser();
+    if (userData) {
       setUser(userData);
-      setToken(session.access_token);
+      setToken(session?.access_token || null);
       localStorage.setItem('ileUser', JSON.stringify(userData));
-      localStorage.setItem('ileToken', session.access_token);
+      localStorage.setItem('ileToken', session?.access_token || '');
     } else {
       setUser(null);
       setToken(null);
       localStorage.removeItem('ileUser');
       localStorage.removeItem('ileToken');
     }
+  }
+
+  // Function to get user data from session
+  async function getUser() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Error fetching session:', error);
+      return null;
+    }
+    if (session) {
+      if (session.user.user_metadata.user_metadata) {
+        const { data } = await supabase
+        .storage
+        .from('profile-pictures')
+        .getPublicUrl(`profile_pictures/${session.user.id}.jpg`)
+        return {
+          id: session.user.id,
+          name: session.user.user_metadata.name,
+          email: session.user.email || '',
+          role: session.user.user_metadata.role,
+          isVerified: session.user.user_metadata.email_verified,
+          user_metadata: session.user.user_metadata,
+          profile_picture: data
+        };
+      } else {
+        return {
+          id: session.user.id,
+          name: session.user.user_metadata.name,
+          email: session.user.email || '',
+          role: session.user.user_metadata.role,
+          isVerified: session.user.user_metadata.email_verified,
+          user_metadata: session.user.user_metadata,
+          profile_picture: null
+        };
+      }
+    }
+    return null;
   }
 
   // Call getCurrentUser on mount and when session changes
@@ -138,14 +216,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const data = await signInWithEmail(email, password)
-      const user = {
-        id: data.user?.id,
-        name: data.user?.user_metadata.name,
-        email: data.user?.email,
-        password: '',
-        role: data.user?.user_metadata.role,
-        isVerified: data.user?.user_metadata.email_verified,
-        user_metadata: data.user?.user_metadata
+      // Make sure we have valid data before setting the user
+      if (!data.user?.id) {
+        throw new Error('Invalid user data received');
+      }
+      
+      const user: User = {
+        id: data.user.id,
+        name: data.user.user_metadata.name || '',
+        email: data.user.email || '',
+        role: data.user.user_metadata.role as UserRole,
+        isVerified: !!data.user.user_metadata.email_verified,
+        user_metadata: data.user.user_metadata
       }
       // Simulate API delay
       // await new Promise(resolve => setTimeout(resolve, 500));
@@ -172,23 +254,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  
+
   async function signUpNewUser(email: string, name: string, password: string, role: UserRole) {
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password,
       options: {
-        emailRedirectTo: 'https://example.com/welcome',
+        emailRedirectTo: window.location.origin + '/auth/callback',
         data: {
           name: name,
-          role: role
+          role_title: role,
+          email_verified: false
         }
       },
-    })
-
-
+    });
+    
+    if (error) {
+      console.error('Error signing up:', error);
+      throw error;
+    }
+    
+    return data;
   }
 
-  // Mock register function
+  // Register function
   const register = async (name: string, email: string, password: string, role: UserRole) => {
     setIsLoading(true);
     try {
@@ -224,29 +314,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  async function signOut() {
-    const { error } = await supabase.auth.signOut({scope: 'local'});
-  }
+  // This function is now replaced by the logout function below
+  // Keeping it commented for reference
+  // async function signOut(): Promise<void> {
+  //   await supabase.auth.signOut({scope: 'local'});
+  // }
 
   // Updated updateProfile function
-  async function updateProfile(profileData: Partial<User>) {
-    console.log('Updating profile with data:', profileData);
-    const { data: { user }, error } = await supabase.auth.updateUser({
-      data: profileData
+  async function updateProfile(updatedData: Partial<User> & { profile_picture?: File }) {
+    const userData = await getUser();
+    
+    // Handle profile picture upload if provided
+    if (updatedData.profile_picture) {
+      const file = updatedData.profile_picture;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userData?.id}-${Math.random()}.${fileExt}`;
+      const filePath = `profile-pictures/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+        
+      if (uploadError) {
+        console.error('Error uploading profile picture:', uploadError);
+        throw uploadError;
+      }
+      
+      // Get public URL for the uploaded file
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      
+      // Add the profile picture URL to the user metadata
+      updatedData.user_metadata = {
+        ...updatedData.user_metadata,
+        profile_picture: data.publicUrl
+      };
+      
+      // Remove the file object as it can't be sent to Supabase API
+      delete updatedData.profile_picture;
+    }
+
+    const { data, error } = await supabase.auth.updateUser({
+      data: updatedData.user_metadata || {}
     });
+    
+    const authUser = data?.user;
     if (error) {
       console.error('Error updating profile:', error);
       throw error;
     }
-    console.log('Profile update response:', user);
-    if (user) {
-      const updatedUser = {
-        id: user.id,
-        name: user.user_metadata.name,
-        email: user.email || '',
-        role: user.user_metadata.role,
-        isVerified: user.user_metadata.email_verified,
-        user_metadata: user.user_metadata
+    if (authUser) {
+      const updatedUser: User = {
+        id: authUser.id,
+        name: authUser.user_metadata?.name || '',
+        email: authUser.email || '',
+        role: (authUser.user_metadata?.role_title as UserRole) || 'buyer',
+        isVerified: authUser.user_metadata?.email_verified === true,
+        user_metadata: authUser.user_metadata || {}
       };
       setUser(updatedUser);
       localStorage.setItem('ileUser', JSON.stringify(updatedUser));
@@ -254,16 +377,239 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   // Logout function
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('ileUser');
-    localStorage.removeItem('ileToken');
-    signOut();
+  const logout = async (): Promise<void> => {
+    try {
+      // Call Supabase signOut directly
+      await supabase.auth.signOut({scope: 'local'});
+      
+      // Clear local state
+      setUser(null);
+      setToken(null);
+      setEthAddress(null);
+      localStorage.removeItem('ileUser');
+      localStorage.removeItem('ileToken');
+      localStorage.removeItem('ileEthAddress');
+      
+      console.log('User logged out successfully');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  // Sign in with MetaMask
+  const signInWithMetaMask = async (role: UserRole = 'buyer'): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      // Check if ethereum object exists
+      if (!(window as any).ethereum) {
+        throw new Error('No Ethereum wallet detected. Please install MetaMask to continue.');
+      }
+      
+      // Directly access MetaMask if available
+      const ethereum = (window as any).ethereum;
+      
+      // Check specifically for MetaMask
+      if (!ethereum.isMetaMask) {
+        throw new Error('Please use MetaMask for authentication. Other wallets are not supported.');
+      }
+      
+      // Force MetaMask to be the provider even if it's not the default
+      let provider;
+      if (ethereum.providers) {
+        // Find MetaMask in the list of providers
+        const metaMaskProvider = ethereum.providers.find((p: any) => p.isMetaMask);
+        if (metaMaskProvider) {
+          provider = new ethers.providers.Web3Provider(metaMaskProvider);
+        } else {
+          throw new Error('MetaMask not found among available providers.');
+        }
+      } else {
+        // If there's only one provider and it's MetaMask
+        provider = new ethers.providers.Web3Provider(ethereum);
+      }
+      
+      // Request account access specifically from MetaMask
+      await provider.send('eth_requestAccounts', []);
+      const signer = provider.getSigner();
+      const address = await signer.getAddress();
+      
+      // Get a signature from the user to verify they own the address
+      const message = `Sign this message to authenticate with Ile Legal: ${Date.now()}`;
+      const signature = await signer.signMessage(message);
+      
+      // Verify the signature on the backend via Supabase
+      const { data, error } = await supabase.functions.invoke('verify-ethereum-signature', {
+        body: { address, message, signature }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // If verification is successful, create or update user
+      if (data?.verified) {
+        // Check if user exists with this ETH address
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('eth_address', address)
+          .single();
+        
+        if (userError && userError.code !== 'PGRST116') { // PGRST116 is 'no rows returned'
+          throw userError;
+        }
+        
+        if (userData) {
+          // User exists, update session
+          const updatedUser: User = {
+            id: userData.id,
+            name: userData.name || `ETH User ${address.substring(0, 6)}`,
+            email: userData.email || '',
+            role: (userData.role_title as UserRole) || 'buyer',
+            isVerified: true, // ETH users are considered verified
+            user_metadata: {
+              ...userData,
+              eth_address: address
+            }
+          };
+          
+          setUser(updatedUser);
+          setEthAddress(address);
+          localStorage.setItem('ileUser', JSON.stringify(updatedUser));
+          localStorage.setItem('ileEthAddress', address);
+        } else {
+          // Create new user with ETH address
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('eth_address', address)
+            .single();
+
+          if (!userProfile) {
+            // Create a new user if not exists
+            const randomPassword = Math.random().toString(36).slice(-8);
+            
+            const { data: newUser, error: signUpError } = await supabase.auth.signUp({
+              email: `eth_${address.toLowerCase()}@example.com`,
+              password: randomPassword,
+              options: {
+                data: {
+                  eth_address: address,
+                  name: `Ethereum User ${address.slice(0, 6)}`,
+                  role: role, // Use the provided role
+                  email_verified: true // Consider Ethereum users as verified
+                }
+              }
+            });
+            
+            if (signUpError) {
+              throw signUpError;
+            }
+            
+            if (newUser?.user) {
+              const createdUser: User = {
+                id: newUser.user.id,
+                name: `Ethereum User ${address.slice(0, 6)}`,
+                email: newUser.user.email || '',
+                role: role,
+                isVerified: true,
+                user_metadata: {
+                  ...newUser.user.user_metadata,
+                  eth_address: address
+                }
+              };
+              
+              setUser(createdUser);
+              setEthAddress(address);
+              localStorage.setItem('ileUser', JSON.stringify(createdUser));
+              localStorage.setItem('ileEthAddress', address);
+            }
+          }
+        }
+        
+        console.log('Successfully authenticated with MetaMask:', address);
+      } else {
+        throw new Error('Failed to verify Ethereum signature');
+      }
+    } catch (error) {
+      console.error('Error signing in with MetaMask:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Sign in with Google
+  const signInWithGoogle = async (role: UserRole = 'buyer'): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      // Store the selected role in localStorage to retrieve after OAuth redirect
+      localStorage.setItem('pendingUserRole', role);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) throw error;
+      
+      // The user will be redirected to Google for authentication
+      console.log('Google sign in initiated:', data);
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Password reset function
+  const resetPassword = async (email: string): Promise<void> => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error sending password reset:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, updateProfile, setUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        login,
+        register,
+        logout,
+        updateProfile,
+        createTestUser,
+        setUser,
+        getUser,
+        token,
+        ethAddress,
+        signInWithGoogle,
+        signInWithMetaMask,
+        resetPassword,
+        uploadProfilePicture: async (file: File): Promise<string> => {
+          if (!user) return '';
+          await updateProfile({ profile_picture: file });
+          return user.user_metadata?.profile_picture || '';
+        }
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

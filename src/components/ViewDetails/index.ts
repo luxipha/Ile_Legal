@@ -1,0 +1,1 @@
+export { ViewDetails } from "./ViewDetails";
