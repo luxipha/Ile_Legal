@@ -36,6 +36,7 @@ interface AuthContextType {
   uploadProfilePicture: (file: File) => Promise<string>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   getUser: () => Promise<User | null>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 // Mock users for demo
@@ -252,6 +253,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
   };
+
+  
 
   async function signUpNewUser(email: string, name: string, password: string, role: UserRole) {
     const { data, error } = await supabase.auth.signUp({
@@ -564,6 +567,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Password reset function
+  const resetPassword = async (email: string): Promise<void> => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error sending password reset:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -580,6 +602,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ethAddress,
         signInWithGoogle,
         signInWithMetaMask,
+        resetPassword,
         uploadProfilePicture: async (file: File): Promise<string> => {
           if (!user) return '';
           await updateProfile({ profile_picture: file });

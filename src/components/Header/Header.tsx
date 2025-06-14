@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { 
   BellIcon,
@@ -7,6 +7,7 @@ import {
   UserIcon,
   ChevronDownIcon
 } from "lucide-react";
+import { useAuth } from '../../contexts/AuthContext';
 
 interface HeaderProps {
   title: string;
@@ -19,6 +20,8 @@ export const Header: React.FC<HeaderProps> = ({
   userName = "Demo Seller", 
   userType = "seller"
 }) => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
@@ -136,7 +139,13 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {userType === 'buyer' ? 'Payments' : 'Earnings'}
                 </Link>
-                <button className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50">
+                <button 
+                  onClick={async () => {
+                    await logout();
+                    navigate('/login');
+                  }}
+                  className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
+                >
                   Sign out
                 </button>
               </div>
