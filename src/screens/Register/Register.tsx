@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { EyeIcon, EyeOffIcon, CheckIcon, UserIcon, BriefcaseIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon } from "lucide-react";
-import { useAuth } from "../../contexts/AuthContext";
-import { UserRole } from "../../types";
+import { EyeIcon, EyeOffIcon, UserIcon, BriefcaseIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon } from "lucide-react";
+import { useAuth } from '../../contexts/AuthContext';
+import { UserRole } from '../../types/index';
 
 export const Register = (): JSX.Element => {
   const { register, signInWithMetaMask, signInWithGoogle, user, isLoading } = useAuth();
@@ -64,11 +64,24 @@ export const Register = (): JSX.Element => {
     }
   };
 
+  // Modified to include role selection
   const handleMetaMaskRegister = async () => {
     try {
       setRegistrationError("");
-      console.log('Initiating MetaMask registration...');
-      await signInWithMetaMask();
+      
+      // Map userType to UserRole
+      const role: UserRole = userType === "professional" ? "seller" : "buyer";
+      
+      // Confirm role selection
+      if (!window.confirm(`You're registering as a ${userType}. Continue?`)) {
+        return;
+      }
+      
+      console.log(`Initiating MetaMask registration as ${userType}...`);
+      await signInWithMetaMask(role);
+      
+      console.log(`User registered with MetaMask as ${userType} (${role})`);
+      
       // User will be redirected based on role after successful login
     } catch (error: any) {
       console.error('MetaMask registration error:', error);
@@ -312,8 +325,20 @@ export const Register = (): JSX.Element => {
                   onClick={async () => {
                     try {
                       setRegistrationError('');
-                      console.log('Initiating Google sign in...');
-                      await signInWithGoogle();
+                      
+                      // Map userType to UserRole
+                      const role: UserRole = userType === "professional" ? "seller" : "buyer";
+                      
+                      // Confirm role selection
+                      if (!window.confirm(`You're registering as a ${userType}. Continue?`)) {
+                        return;
+                      }
+                      
+                      console.log(`Initiating Google sign in as ${userType}...`);
+                      await signInWithGoogle(role);
+                      
+                      console.log(`User registered with Google as ${userType} (${role})`);
+                      
                       // User will be redirected to Google for authentication
                     } catch (error: any) {
                       console.error('Google login error:', error);

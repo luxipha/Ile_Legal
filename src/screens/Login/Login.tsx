@@ -335,7 +335,8 @@ export const Login = (): JSX.Element => {
                     try {
                       setLoginError('');
                       console.log('Initiating MetaMask sign in...');
-                      await signInWithMetaMask();
+                      // Default to 'buyer' role for login
+                      await signInWithMetaMask('buyer');
                       // User will be redirected based on role after successful login
                     } catch (error: any) {
                       console.error('MetaMask login error:', error);
@@ -356,7 +357,8 @@ export const Login = (): JSX.Element => {
                     try {
                       setLoginError('');
                       console.log('Initiating Google sign in...');
-                      await signInWithGoogle();
+                      // Default to 'buyer' role for login
+                      await signInWithGoogle('buyer');
                       // User will be redirected to Google for authentication
                     } catch (error: any) {
                       console.error('Google login error:', error);
@@ -440,17 +442,16 @@ export const Login = (): JSX.Element => {
                       setIsSubmitting(true);
                       console.log('Creating test user...');
                       
-                      const result = await createTestUser();
-                      console.log('Test user creation result:', result);
+                      await createTestUser('buyer');
+                      console.log('Test user created successfully');
                       
-                      alert(result.message);
-                      if (result.success) {
-                        setFormData({
-                          email: "admin.test@ile-legal.com",
-                          password: "password123",
-                          rememberMe: true
-                        });
-                      }
+                      alert('Test user created successfully');
+                      // Always proceed since the function doesn't return success status anymore
+                      setFormData({
+                        email: "admin.test@ile-legal.com",
+                        password: "password123",
+                        rememberMe: true
+                      });
                     } catch (error: any) {
                       console.error('Error creating test user:', error);
                       alert(`Error creating test user: ${error?.message || 'Unknown error'}`);
