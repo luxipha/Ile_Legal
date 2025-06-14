@@ -3,8 +3,11 @@ import { Button } from "../ui/button";
 import { 
   BellIcon,
   UserIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  LogOutIcon
 } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 type ViewMode = "dashboard" | "verify-user" | "manage-gigs" | "disputes" | "settings" | "profile" | "view-gig-details" | "view-user-details";
 
@@ -23,6 +26,8 @@ type Notification = {
 export const AdminHeaderMenu = ({ title, onNavigate }: AdminHeaderMenuProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   // Sample notifications - in a real app, these would come from props or context
   const notifications: Notification[] = [
@@ -110,7 +115,18 @@ export const AdminHeaderMenu = ({ title, onNavigate }: AdminHeaderMenuProps) => 
                 >
                   Settings
                 </button>
-                <button className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50">
+                <button 
+                  onClick={async () => {
+                    try {
+                      await logout();
+                      navigate('/login');
+                    } catch (error) {
+                      console.error('Error signing out:', error);
+                    }
+                  }} 
+                  className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <LogOutIcon className="w-4 h-4" />
                   Sign out
                 </button>
               </div>
