@@ -74,21 +74,7 @@ export const Login = (): JSX.Element => {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!forgotPasswordEmail) {
-      alert('Please enter your email address.');
-      return;
-    }
-
-    // Here you would typically call an API to send a password reset email
-    // For demo purposes, we'll just show a success message
-    if (forgotPasswordEmail) {
-      // Show success message
-      alert('Password reset link has been sent to your email address.');
-      setShowForgotPassword(false);
-      setForgotPasswordEmail("");
-    }
-  };
+  // The password reset functionality is handled by handleForgotPasswordSubmit
 
   if (showForgotPassword) {
     return (
@@ -414,11 +400,12 @@ export const Login = (): JSX.Element => {
                       const result = await testDirectLogin("admin.test@ile-legal.com", "password123");
                       console.log('Direct login result:', result);
                       
-                      if (result.success) {
+                      if (result.data?.user) {
                         alert('Direct login successful! Redirecting to dashboard...');
                         navigate('/admin/dashboard');
                       } else {
-                        alert(`Direct login failed: ${result.message}`);
+                        const errorMessage = result.error ? result.error.message : 'Unknown error';
+                        alert(`Direct login failed: ${errorMessage}`);
                       }
                     } catch (error: any) {
                       console.error('Error in direct login:', error);
