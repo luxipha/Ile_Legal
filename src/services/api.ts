@@ -150,4 +150,58 @@ export const api = {
 
   },
 
+  feedback: {
+    createFeedback: async (feedbackData: {
+      free_response: string;
+      rating: number;
+      gig_id: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('Feedback')
+        .insert({
+          free_response: feedbackData.free_response,
+          rating: feedbackData.rating,
+          gig_id: feedbackData.gig_id
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    getFeedbackByGigId: async (gigId: string) => {
+      const { data, error } = await supabase
+        .from('Feedback')
+        .select('*')
+        .eq('gig_id', gigId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
+    },
+
+    getAverageRating: async (gigId: string) => {
+      const { data, error } = await supabase
+        .from('Feedback')
+        .select('rating')
+        .eq('gig_id', gigId);
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        return 0;
+      }
+
+      const sum = data.reduce((acc, curr) => acc + curr.rating, 0);
+      return sum / data.length;
+    },
+  },
+
 };
