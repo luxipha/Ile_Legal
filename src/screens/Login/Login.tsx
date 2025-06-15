@@ -32,6 +32,7 @@ export const Login = (): JSX.Element => {
   // Redirect based on user role when authenticated
   useEffect(() => {
     if (user) {
+      console.log('user:', user);
       // Get the redirect path from location state or default to role-based dashboard
       const from = (location.state as any)?.from?.pathname;
       if (from) {
@@ -380,7 +381,7 @@ export const Login = (): JSX.Element => {
                       // Fill the form
                       const testCredentials = {
                         email: "admin.test@ile-legal.com",
-                        password: "password123",
+                        password: "Password123!",
                         rememberMe: true
                       };
                       setFormData(testCredentials);
@@ -411,12 +412,12 @@ export const Login = (): JSX.Element => {
                       setIsSubmitting(true);
                       console.log('Attempting direct login...');
                       
-                      const result = await testDirectLogin("admin.test@ile-legal.com", "password123");
+                      const result = await testDirectLogin("admin.test@ile-legal.com", "Password123!");
                       console.log('Direct login result:', result);
                       
                       if (result.data?.user) {
                         alert('Direct login successful! Redirecting to dashboard...');
-                        navigate('/admin/dashboard');
+                        navigate('/admin-dashboard');
                       } else {
                         const errorMessage = result.error ? result.error.message : 'Unknown error';
                         alert(`Direct login failed: ${errorMessage}`);
@@ -443,14 +444,14 @@ export const Login = (): JSX.Element => {
                       setIsSubmitting(true);
                       console.log('Creating test user...');
                       
-                      await createTestUser('buyer');
+                      await createTestUser('admin');
                       console.log('Test user created successfully');
                       
                       alert('Test user created successfully');
                       // Always proceed since the function doesn't return success status anymore
                       setFormData({
                         email: "admin.test@ile-legal.com",
-                        password: "password123",
+                        password: "Password123!",
                         rememberMe: true
                       });
                     } catch (error: any) {
