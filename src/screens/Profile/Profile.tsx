@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { 
@@ -26,6 +26,7 @@ import {
   MinusIcon,
   ChevronDownIcon
 } from "lucide-react";
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Education {
   degree: string;
@@ -47,6 +48,8 @@ interface ProfileData {
 type ViewMode = "profile" | "edit-profile";
 
 export const Profile = (): JSX.Element => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "cases">("overview");
   const [showNotifications, setShowNotifications] = useState(false);
@@ -502,7 +505,13 @@ export const Profile = (): JSX.Element => {
                       >
                         Wallet & Payments
                       </Link>
-                      <button className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50">
+                      <button 
+                        onClick={async () => {
+                          await logout();
+                          navigate('/login');
+                        }}
+                        className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
+                      >
                         Sign out
                       </button>
                     </div>
@@ -944,7 +953,13 @@ export const Profile = (): JSX.Element => {
                     >
                       Wallet & Payments
                     </Link>
-                    <button className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50">
+                    <button 
+                      onClick={async () => {
+                        await logout();
+                        navigate('/login');
+                      }}
+                      className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
+                    >
                       Sign out
                     </button>
                   </div>
