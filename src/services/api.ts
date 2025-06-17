@@ -6,6 +6,8 @@ const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhb
 export const api = {
   
 
+  
+
   payments: {
     createPaymentIntent: async (amount: number) => {
       // Simulate API delay
