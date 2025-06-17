@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
+import { api } from "../../services/api";
 import { 
   ArrowLeftIcon,
   StarIcon,
@@ -10,21 +11,32 @@ import {
 } from "lucide-react";
 
 interface Gig {
-  id: number;
+  id: string;
   title: string;
-  company: string;
-  price: string;
-  deadline: string;
-  category?: string;
   description: string;
-  location?: string;
-  posted?: string;
-  postedDate: string;
-  budget: string;
-  deliveryTime: string;
-  requirements: string[];
-  companyRating: number;
-  projectsPosted: number;
+  categories: string[];
+  budget: number;
+  deadline: string;
+  status: string;
+  buyer_id: string;
+  created_at: string;
+  attachments?: string[];
+}
+
+interface Bid {
+  id: string;
+  gig_id: string;
+  seller_id: string;
+  amount: number;
+  description: string;
+  status: string;
+  created_at: string;
+  seller?: {
+    full_name: string;
+    rating: number;
+    completed_jobs: number;
+    avatar?: string;
+  };
 }
 
 /**
@@ -38,7 +50,6 @@ interface ViewDetailsProps {
   onPlaceBid: (gig: Gig) => void;
   backButtonText?: string;
   showPlaceBid?: boolean; // Controls Place Bid button visibility (true for sellers, false for buyers)
-  bidCount?: number; // Number of bids received for the gig
 }
 
 export const ViewDetails: React.FC<ViewDetailsProps> = ({ 
@@ -47,25 +58,32 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
   onPlaceBid,
   backButtonText = "Back",
   showPlaceBid = true, // Default to true for backward compatibility
-  bidCount = 1 // Default bid count
 }) => {
   const [activeTab, setActiveTab] = useState<"details" | "bids" | "messages">("details");
   const [newMessage, setNewMessage] = useState("");
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const otherBids = [
-    {
-      id: 1,
-      name: "Chioma Okonkwo",
-      title: "Property Lawyer",
-      rating: 4.9,
-      completedJobs: 24,
-      amount: "₦65,000",
-      deliveryTime: "5 days",
-      submittedDate: "21/04/2025",
-      proposal: "I have over 10 years of experience in title verification in Lagos State, particularly in Victoria Island. I have established connections with the land registry and can complete this task efficiently and accurately.",
-      avatar: "CO"
-    }
-  ];
+  useEffect(() => {
+    const fetchBids = async () => {
+      if (activeTab === "bids") {
+        try {
+          setLoading(true);
+          setError(null);
+          const data = await api.bids.getBidsByGigId(gig.id);
+          setBids(data);
+        } catch (err) {
+          console.error('Error fetching bids:', err);
+          setError('Failed to load bids. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchBids();
+  }, [activeTab, gig.id]);
 
   const messages = [
     {
@@ -114,13 +132,13 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{gig.title}</h1>
           <div className="flex items-center gap-6 text-gray-600">
-            <span>Posted {gig.postedDate}</span>
-            <span>Deadline {gig.deadline}</span>
-            <span>Budget {gig.budget}</span>
+            <span>Posted {new Date(gig.created_at).toLocaleDateString()}</span>
+            <span>Deadline {new Date(gig.deadline).toLocaleDateString()}</span>
+            <span>Budget ₦{gig.budget.toLocaleString()}</span>
           </div>
         </div>
         <span className="bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium">
-          Open for Bids
+          {gig.status === 'active' ? 'Open for Bids' : 'Closed'}
         </span>
       </div>
 
@@ -129,7 +147,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
         <nav className="flex gap-8">
           {[
             { id: "details", label: "Details" },
-            { id: "bids", label: `Bids (${bidCount})` }, // Use bidCount prop
+            { id: "bids", label: `Bids (${bids.length})` },
             { id: "messages", label: "Messages" }
           ].map((tab) => (
             <button
@@ -156,58 +174,83 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Description</h3>
               <p className="text-gray-600 mb-6 leading-relaxed">{gig.description}</p>
               
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">The verification should include:</h4>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600 mb-6">
-                {gig.requirements.map((req, index) => (
-                  <li key={index}>{req}</li>
-                ))}
-              </ol>
-              
-              <p className="text-gray-600">
-                The property is a 1,000 sqm commercial plot with existing development. 
-                All necessary documents will be provided upon assignment.
-              </p>
+              {gig.categories.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Categories</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {gig.categories.map((category, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                      >
+                        {category.replace('-', ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {activeTab === "bids" && (
             <div className="space-y-6">
-              {otherBids.map((bid) => (
-                <Card key={bid.id} className="border border-gray-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-                        {bid.avatar}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{bid.name}</h4>
-                            <p className="text-gray-600">{bid.title}</p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-gray-900">{bid.amount}</div>
-                            <div className="text-sm text-gray-500">{bid.deliveryTime}</div>
-                          </div>
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B1828] mx-auto"></div>
+                  <p className="mt-4 text-gray-600">Loading bids...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-red-600 mb-4">{error}</p>
+                  <Button onClick={() => setActiveTab("bids")}>Try Again</Button>
+                </div>
+              ) : bids.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No bids have been placed yet.</p>
+                </div>
+              ) : (
+                bids.map((bid) => (
+                  <Card key={bid.id} className="border border-gray-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
+                          {bid.seller?.avatar || bid.seller?.full_name?.charAt(0) || 'S'}
                         </div>
-                        <div className="flex items-center gap-4 mb-3">
-                          <div className="flex items-center gap-1">
-                            {renderStars(Math.floor(bid.rating))}
-                            <span className="text-sm text-gray-600 ml-1">{bid.rating}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{bid.seller?.full_name || 'Anonymous'}</h4>
+                              <p className="text-gray-600">Legal Professional</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-gray-900">₦{bid.amount.toLocaleString()}</div>
+                              <div className="text-sm text-gray-500">
+                                Submitted: {new Date(bid.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-sm text-gray-600">{bid.completedJobs} jobs completed</span>
-                          <span className="text-sm text-gray-500">Submitted: {bid.submittedDate}</span>
+                          {bid.seller && (
+                            <div className="flex items-center gap-4 mb-3">
+                              <div className="flex items-center gap-1">
+                                {renderStars(Math.floor(bid.seller.rating || 0))}
+                                <span className="text-sm text-gray-600 ml-1">{bid.seller.rating || 0}</span>
+                              </div>
+                              <span className="text-sm text-gray-600">
+                                {bid.seller.completed_jobs || 0} jobs completed
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <h5 className="font-medium text-gray-900 mb-2">Proposal</h5>
-                      <p className="text-gray-600">{bid.proposal}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      
+                      <div className="mb-4">
+                        <h5 className="font-medium text-gray-900 mb-2">Proposal</h5>
+                        <p className="text-gray-600">{bid.description}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           )}
 
@@ -269,21 +312,24 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
         {/* Sidebar - 1/3 width */}
         <div className="col-span-1">
           <Card className="border border-gray-200 mb-6">
-            <CardContent className="p-6 text-center">
-              <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <BuildingIcon className="w-8 h-8 text-gray-600" />
+            <CardContent className="p-6">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <BuildingIcon className="w-8 h-8 text-gray-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Gig Details</h3>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>Status: <span className="font-medium">{gig.status}</span></p>
+                  <p>Posted: <span className="font-medium">{new Date(gig.created_at).toLocaleDateString()}</span></p>
+                  <p>Deadline: <span className="font-medium">{new Date(gig.deadline).toLocaleDateString()}</span></p>
+                  <p>Budget: <span className="font-medium">₦{gig.budget.toLocaleString()}</span></p>
+                </div>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">{gig.company}</h3>
-              <div className="flex items-center justify-center gap-1 mb-2">
-                {renderStars(Math.floor(gig.companyRating))}
-                <span className="text-sm text-gray-600 ml-1">{gig.companyRating}</span>
-              </div>
-              <p className="text-sm text-gray-600">{gig.projectsPosted} projects posted</p>
             </CardContent>
           </Card>
 
           {/* Only show Place Bid button if showPlaceBid is true */}
-          {showPlaceBid && (
+          {showPlaceBid && gig.status === 'active' && (
             <Button
               onClick={() => onPlaceBid(gig)}
               className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 mb-4"

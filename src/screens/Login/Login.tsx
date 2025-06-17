@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { EyeIcon, EyeOffIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon, ArrowLeftIcon } from "lucide-react";
@@ -7,8 +7,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { testDirectLogin } from "../../lib/supabase";
 
 export const Login = (): JSX.Element => {
-  const { login, user, isLoading, createTestUser, signInWithGoogle, signInWithMetaMask } = useAuth();
+  const { login, user, isLoading, createTestUser, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -31,21 +32,28 @@ export const Login = (): JSX.Element => {
   // Redirect based on user role when authenticated
   useEffect(() => {
     if (user) {
-      switch (user.role) {
-        case 'admin':
-          navigate('/admin-dashboard');
-          break;
-        case 'seller':
-          navigate('/seller-dashboard');
-          break;
-        case 'buyer':
-          navigate('/buyer-dashboard');
-          break;
-        default:
-          navigate('/');
+      console.log('user:', user);
+      // Get the redirect path from location state or default to role-based dashboard
+      const from = (location.state as any)?.from?.pathname;
+      if (from) {
+        navigate(from);
+      } else {
+        switch (user.role) {
+          case 'admin':
+            navigate('/admin-dashboard');
+            break;
+          case 'seller':
+            navigate('/seller-dashboard');
+            break;
+          case 'buyer':
+            navigate('/buyer-dashboard');
+            break;
+          default:
+            navigate('/');
+        }
       }
     }
-  }, [user, navigate]);
+  }, [user, navigate, location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,18 +71,24 @@ export const Login = (): JSX.Element => {
     }
   };
 
-  const handleForgotPasswordSubmit = (e: React.FormEvent) => {
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (forgotPasswordEmail.trim()) {
-      console.log('Password reset requested for:', forgotPasswordEmail);
-      // Show success message
-      alert('Password reset link has been sent to your email address.');
-      setShowForgotPassword(false);
-      setForgotPasswordEmail("");
+      try {
+        setIsSubmitting(true);
+        await resetPassword(forgotPasswordEmail);
+        // Show success message
+        alert('Password reset link has been sent to your email address.');
+        setShowForgotPassword(false);
+        setForgotPasswordEmail("");
+      } catch (error: any) {
+        console.error('Password reset error:', error);
+        alert(error.message || 'Failed to send password reset email. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
-
-  // The password reset functionality is handled by handleForgotPasswordSubmit
 
   if (showForgotPassword) {
     return (
@@ -131,8 +145,9 @@ export const Login = (): JSX.Element => {
                   <Button
                     type="submit"
                     className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-lg"
+                    disabled={isSubmitting}
                   >
-                    Send Reset Link
+                    {isSubmitting ? 'Sending...' : 'Send Reset Link'}
                   </Button>
                 </form>
 
@@ -353,7 +368,7 @@ export const Login = (): JSX.Element => {
                   }}
                   disabled={isSubmitting || isLoading}
                 >
-                  <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
+                  <img src="/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
                   {isLoading ? 'Connecting...' : 'Continue with Google'}
                 </Button>
 
@@ -366,7 +381,7 @@ export const Login = (): JSX.Element => {
                       // Fill the form
                       const testCredentials = {
                         email: "admin.test@ile-legal.com",
-                        password: "password123",
+                        password: "Password123!",
                         rememberMe: true
                       };
                       setFormData(testCredentials);
@@ -397,12 +412,12 @@ export const Login = (): JSX.Element => {
                       setIsSubmitting(true);
                       console.log('Attempting direct login...');
                       
-                      const result = await testDirectLogin("admin.test@ile-legal.com", "password123");
+                      const result = await testDirectLogin("admin.test@ile-legal.com", "Password123!");
                       console.log('Direct login result:', result);
                       
                       if (result.data?.user) {
                         alert('Direct login successful! Redirecting to dashboard...');
-                        navigate('/admin/dashboard');
+                        navigate('/admin-dashboard');
                       } else {
                         const errorMessage = result.error ? result.error.message : 'Unknown error';
                         alert(`Direct login failed: ${errorMessage}`);
@@ -429,14 +444,14 @@ export const Login = (): JSX.Element => {
                       setIsSubmitting(true);
                       console.log('Creating test user...');
                       
-                      await createTestUser('buyer');
+                      await createTestUser('admin');
                       console.log('Test user created successfully');
                       
                       alert('Test user created successfully');
                       // Always proceed since the function doesn't return success status anymore
                       setFormData({
                         email: "admin.test@ile-legal.com",
-                        password: "password123",
+                        password: "Password123!",
                         rememberMe: true
                       });
                     } catch (error: any) {
