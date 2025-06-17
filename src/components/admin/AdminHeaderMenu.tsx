@@ -24,10 +24,10 @@ type Notification = {
 };
 
 export const AdminHeaderMenu = ({ title, onNavigate }: AdminHeaderMenuProps) => {
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   // Sample notifications - in a real app, these would come from props or context
   const notifications: Notification[] = [

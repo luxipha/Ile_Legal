@@ -36,6 +36,7 @@ interface AuthContextType {
   uploadProfilePicture: (file: File) => Promise<string>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   getUser: () => Promise<User | null>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 // Mock users for demo
@@ -72,37 +73,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Import the Supabase client from our lib/supabase.ts file
 import { supabase } from '../lib/supabase';
 
-// Function to create a test user for development purposes
-const createTestUser = async (role: UserRole = 'buyer'): Promise<void> => {
-  console.log('createTestUser function called with role:', role);
-  
-  try {
-    // Generate random email
-    const randomEmail = `test${Math.floor(Math.random() * 10000)}@example.com`;
-    const randomPassword = 'Password123!';
-    
-    // Create user with Supabase
-    const { data, error } = await supabase.auth.signUp({
-      email: randomEmail,
-      password: randomPassword,
-      options: {
-        data: {
-          name: `Test User ${Math.floor(Math.random() * 1000)}`,
-          role: role
-        }
-      }
-    });
-    
-    if (error) {
-      console.error('Error creating test user:', error.message);
-      return;
-    }
-    
-    console.log('Test user created:', data);
-  } catch (error: any) {
-    console.error('Error creating test user:', error.message);
-  }
-};
+
 
 // Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -215,16 +186,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const data = await signInWithEmail(email, password)
+      console.log('data:', data);
       // Make sure we have valid data before setting the user
       if (!data.user?.id) {
         throw new Error('Invalid user data received');
       }
-      
+
       const user: User = {
         id: data.user.id,
         name: data.user.user_metadata.name || '',
         email: data.user.email || '',
-        role: data.user.user_metadata.role as UserRole,
+        role: data.user.user_metadata.role_title as UserRole,
         isVerified: !!data.user.user_metadata.email_verified,
         user_metadata: data.user.user_metadata
       }
@@ -250,6 +222,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to create a test user for development purposes
+  const createTestUser = async (role: UserRole = 'admin'): Promise<void> => {
+    console.log('createTestUser function called with role:', role);
+    
+    try {
+      // Generate random email
+      const randomEmail = `test${Math.floor(Math.random() * 10000)}@example.com`;
+      const randomPassword = 'Password123!';
+      
+      // Create user with Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email: randomEmail,
+        password: randomPassword,
+        options: {
+          emailRedirectTo: window.location.origin + '/auth/callback',
+          data: {
+            name: `Test User ${Math.floor(Math.random() * 1000)}`,
+            role_title: role,
+            email_verified: true,
+          }
+        }
+      });
+
+      const newUser = {
+        id: `${Date.now()}`,
+        name: `Test User ${Math.floor(Math.random() * 1000)}`,
+        email: randomEmail,
+        role: role,
+        isVerified: false,
+        user_metadata: {}
+      };
+
+      console.log('newUser:', newUser);
+
+      const mockToken = `mock-token-${Date.now()}`;
+
+      setUser(newUser);
+      setToken(mockToken);
+      localStorage.setItem('ileUser', JSON.stringify(newUser));
+      localStorage.setItem('ileToken', mockToken);
+      
+      if (error) {
+        console.error('Error creating test user:', error.message);
+        return;
+      }
+      
+      console.log('Test user created:', data);
+    } catch (error: any) {
+      console.error('Error creating test user:', error.message);
     }
   };
 
@@ -564,6 +588,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Password reset function
+  const resetPassword = async (email: string): Promise<void> => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error sending password reset:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -580,6 +623,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ethAddress,
         signInWithGoogle,
         signInWithMetaMask,
+        resetPassword,
         uploadProfilePicture: async (file: File): Promise<string> => {
           if (!user) return '';
           await updateProfile({ profile_picture: file });
