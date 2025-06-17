@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Calendar, FileText } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../services/api';
 
 // Form validation schema
 const gigSchema = z.object({
@@ -33,6 +35,7 @@ const CATEGORIES = [
 ];
 
 const PostGigPage: React.FC = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<GigFormData>({
     resolver: zodResolver(gigSchema),
@@ -43,11 +46,17 @@ const PostGigPage: React.FC = () => {
 
   const onSubmit = async (data: GigFormData) => {
     try {
-      // In a real application, this would call an API to create the gig
-      console.log(data);
+      console.log('data:', data)
+      const { error } = await api.gigs.createGig({
+        ...data,
+        budget: Number(data.budget.replace(/,/g, '')),
+        buyer_id: user?.id
+      });
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (error) {
+        console.error('Error creating gig:', error);
+        return;
+      }
       
       // Navigate to dashboard after successful creation
       navigate('/buyer/dashboard');
@@ -192,7 +201,6 @@ const PostGigPage: React.FC = () => {
                         <span>Upload files</span>
                         <input
                           id="file-upload"
-                          name="file-upload"
                           type="file"
                           className="sr-only"
                           multiple
