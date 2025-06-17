@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 
 
@@ -218,10 +217,9 @@ export const api = {
         const uploadPromises = files.map(async (file) => {
           const filePath = `${gigData.buyer_id}/${file.name}`;
           console.log('filePath:', filePath);
-          
           const { error: uploadError } = await supabase.storage
             .from('documents')
-            .upload(filePath, file);
+            .upload(filePath, file, { contentType: file.type });
             
           if (uploadError) {
             console.error('Upload error:', uploadError);
@@ -502,7 +500,7 @@ export const api = {
           
           const { error: uploadError } = await supabase.storage
             .from('deliverables')
-            .upload(filePath, file);
+            .upload(filePath, file, { contentType: file.type });
             
           if (uploadError) {
             console.error('Upload error:', uploadError);
