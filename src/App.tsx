@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Home } from "./screens/Home";
 import { Login } from "./screens/Login";
 import { Register } from "./screens/Register";
@@ -16,27 +16,85 @@ import { Earnings } from "./screens/Earnings";
 import { Profile } from "./screens/Profile";
 import { Messages } from "./screens/Messages";
 import { AdminDashboard } from "./screens/AdminDashboard";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ResetPassword } from "./screens/ResetPassword/ResetPassword";
 
 function App() {
   return (
     <Router>
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/seller-dashboard" element={<SellerDashboard />} />
-        <Route path="/buyer-dashboard" element={<BuyerDashboard />} />
-        <Route path="/buyer-messages" element={<BuyerMessages />} />
-        <Route path="/payments" element={<BuyerPayments />} />
-        <Route path="/buyer-profile" element={<BuyerProfile />} />
-        <Route path="/my-gigs" element={<MyGigs />} />
-        <Route path="/post-gig" element={<PostGig />} />
-        <Route path="/find-gigs" element={<FindGigs />} />
-        <Route path="/active-bids" element={<ActiveBids />} />
-        <Route path="/earnings" element={<Earnings />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/messages" element={<Messages />} />
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Protected Routes */}
+        <Route path="/seller-dashboard" element={
+          <ProtectedRoute>
+            <SellerDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/buyer-dashboard" element={
+          <ProtectedRoute>
+            <BuyerDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/buyer-messages" element={
+          <ProtectedRoute>
+            <BuyerMessages />
+          </ProtectedRoute>
+        } />
+        <Route path="/payments" element={
+          <ProtectedRoute>
+            <BuyerPayments />
+          </ProtectedRoute>
+        } />
+        <Route path="/buyer-profile" element={
+          <ProtectedRoute>
+            <BuyerProfile />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-gigs" element={
+          <ProtectedRoute>
+            <MyGigs />
+          </ProtectedRoute>
+        } />
+        <Route path="/post-gig" element={
+          <ProtectedRoute>
+            <PostGig />
+          </ProtectedRoute>
+        } />
+        <Route path="/find-gigs" element={
+          <ProtectedRoute>
+            <FindGigs />
+          </ProtectedRoute>
+        } />
+        <Route path="/active-bids" element={
+          <ProtectedRoute>
+            <ActiveBids />
+          </ProtectedRoute>
+        } />
+        <Route path="/earnings" element={
+          <ProtectedRoute>
+            <Earnings />
+          </ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        } />
+        <Route path="/messages" element={
+          <ProtectedRoute>
+            <Messages />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin-dashboard" element={
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
       </Routes>
     </Router>
   );

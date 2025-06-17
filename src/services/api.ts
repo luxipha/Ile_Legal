@@ -1,9 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ');
+import { supabase } from '../lib/supabase';
+
 
 // Mock API service for frontend-only development
 export const api = {
+  
+
   
 
   payments: {
@@ -44,6 +46,149 @@ export const api = {
     },
   },
 
+
+  bids: {
+    createBid: async (gigId: string, amount: number, description: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be logged in to create a bid');
+      }
+
+      const { data, error } = await supabase
+        .from('Bids')
+        .insert({
+          gig_id: gigId,
+          seller_id: user.id,
+          amount,
+          description,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    getBidsByGigId: async (gigId: string) => {
+      const { data, error } = await supabase
+        .from('Bids')
+        .select('*')
+        .eq('gig_id', gigId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    getActiveBids: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be logged in to view bids');
+      }
+
+      const { data, error } = await supabase
+        .from('Bids')
+        .select('*')
+        .eq('seller_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    updateBid: async (bidId: string, updates: {
+      amount?: number;
+      description?: string;
+      status?: 'pending' | 'accepted' | 'rejected';
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be logged in to update a bid');
+      }
+
+      // First verify that the bid belongs to the current user
+      const { data: existingBid, error: fetchError } = await supabase
+        .from('Bids')
+        .select('seller_id')
+        .eq('id', bidId)
+        .single();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (existingBid.seller_id !== user.id) {
+        throw new Error('You can only update your own bids');
+      }
+
+      const { data, error } = await supabase
+        .from('Bids')
+        .update(updates)
+        .eq('id', bidId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    deleteBid: async (bidId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be logged in to delete a bid');
+      }
+
+      // First verify that the bid belongs to the current user
+      const { data: existingBid, error: fetchError } = await supabase
+        .from('Bids')
+        .select('seller_id, status')
+        .eq('id', bidId)
+        .single();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (existingBid.seller_id !== user.id) {
+        throw new Error('You can only delete your own bids');
+      }
+
+      // Only allow deletion of pending bids
+      if (existingBid.status !== 'pending') {
+        throw new Error('You can only delete pending bids');
+      }
+
+      const { error } = await supabase
+        .from('Bids')
+        .delete()
+        .eq('id', bidId);
+
+      if (error) {
+        throw error;
+      }
+
+      return true;
+    },
+  },
+
   gigs: {
     getGigById: async (gigId: string) => {
       const { data, error } = await supabase
@@ -57,7 +202,7 @@ export const api = {
       title: string;
       description: string;
       categories: string[];
-      budget: string;
+      budget: number;
       deadline: string;
       attachments?: FileList | File[];
       buyer_id: string | undefined;
@@ -104,12 +249,42 @@ export const api = {
       return { data, error };
     },
 
-    getMyGigs: async (userId: string) => {
-      const { data, error } = await supabase
-        .from('Gigs')
-        .select('*')
-        .eq('buyer_id', userId)
-        .order('created_at', { ascending: false });
+    getMyGigs: async (userId: string, filters?: {
+      categories?: string[];
+      budget?: { min: number; max: number };
+      status?: string;
+      deadline?: { start: number; end: number };
+    }) => {
+      let query = supabase
+        .from("Gigs")
+        .select("*")
+        .eq('buyer_id', userId);
+
+      // Apply category filter if provided
+      if (filters?.categories && filters.categories.length > 0) {
+        query = query.contains('categories', filters.categories);
+      }
+
+      // Apply budget filter if provided
+      if (filters?.budget) {
+        query = query
+          .gte('budget', filters.budget.min)
+          .lte('budget', filters.budget.max);
+      }
+
+      // Apply status filter if provided
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      // Apply deadline filter if provided
+      if (filters?.deadline) {
+        query = query
+          .gte('deadline', new Date(filters.deadline.start).toISOString())
+          .lte('deadline', new Date(filters.deadline.end).toISOString());
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
         throw error;
@@ -149,6 +324,7 @@ export const api = {
 
 
   },
+
 
   feedback: {
     createFeedback: async (feedbackData: {

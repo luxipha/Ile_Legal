@@ -108,13 +108,7 @@ export const Register = (): JSX.Element => {
     }
   }, [user, navigate]);
 
-  const passwordRequirements = [
-    { text: "At least 8 characters", met: formData.password.length >= 8 },
-    { text: "Contains uppercase letter", met: /[A-Z]/.test(formData.password) },
-    { text: "Contains lowercase letter", met: /[a-z]/.test(formData.password) },
-    { text: "Contains number", met: /\d/.test(formData.password) },
-    { text: "Contains special character", met: /[!@#$%^&*]/.test(formData.password) },
-  ];
+  // Password validation is handled by the backend
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -347,7 +341,7 @@ export const Register = (): JSX.Element => {
                   }}
                   disabled={isSubmitting || isLoading}
                 >
-                  <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
+                  <img src="/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
                   {isLoading ? 'Connecting...' : 'Continue with Google'}
                 </Button>
               </div>
