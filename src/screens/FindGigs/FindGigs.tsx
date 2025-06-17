@@ -48,6 +48,8 @@ export const FindGigs = (): JSX.Element => {
     deliveryTime: "",
     proposal: ""
   });
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
+  const [bidError, setBidError] = useState<string | null>(null);
 
   const categories = [
     "All Categories",
@@ -99,10 +101,33 @@ export const FindGigs = (): JSX.Element => {
     setViewMode("place-bid");
   };
 
-  const handleBidSubmit = (e: React.FormEvent) => {
+  const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Bid submitted:", bidFormData);
-    setViewMode("list");
+    if (!selectedGig) return;
+
+    try {
+      setIsSubmittingBid(true);
+      setBidError(null);
+
+      await api.bids.createBid(
+        selectedGig.id,
+        Number(bidFormData.bidAmount),
+        bidFormData.proposal
+      );
+
+      // Reset form and return to list view
+      setBidFormData({
+        bidAmount: "",
+        deliveryTime: "",
+        proposal: ""
+      });
+      setViewMode("list");
+    } catch (err) {
+      console.error('Error submitting bid:', err);
+      setBidError(err instanceof Error ? err.message : 'Failed to submit bid. Please try again.');
+    } finally {
+      setIsSubmittingBid(false);
+    }
   };
 
   const renderBackButton = () => (
@@ -245,6 +270,11 @@ export const FindGigs = (): JSX.Element => {
               <Card className="bg-white border border-gray-200">
                 <CardContent className="p-8">
                   <form onSubmit={handleBidSubmit} className="space-y-6">
+                    {bidError && (
+                      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+                        {bidError}
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -257,6 +287,7 @@ export const FindGigs = (): JSX.Element => {
                           placeholder="50000"
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                           required
+                          min="0"
                         />
                       </div>
                       <div>
@@ -294,14 +325,23 @@ export const FindGigs = (): JSX.Element => {
                         variant="outline"
                         onClick={() => setViewMode("list")}
                         className="px-8 py-3"
+                        disabled={isSubmittingBid}
                       >
                         Cancel
                       </Button>
                       <Button
                         type="submit"
                         className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-3"
+                        disabled={isSubmittingBid}
                       >
-                        Submit Bid
+                        {isSubmittingBid ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#1B1828] mr-2"></div>
+                            Submitting...
+                          </>
+                        ) : (
+                          'Submit Bid'
+                        )}
                       </Button>
                     </div>
                   </form>
