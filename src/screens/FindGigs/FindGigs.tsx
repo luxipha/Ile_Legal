@@ -112,7 +112,8 @@ export const FindGigs = (): JSX.Element => {
       await api.bids.createBid(
         selectedGig.id,
         Number(bidFormData.bidAmount),
-        bidFormData.proposal
+        bidFormData.proposal,
+        selectedGig.buyer_id
       );
 
       // Reset form and return to list view

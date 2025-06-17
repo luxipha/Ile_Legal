@@ -47,7 +47,7 @@ export const api = {
 
 
   bids: {
-    createBid: async (gigId: string, amount: number, description: string) => {
+    createBid: async (gigId: string, amount: number, description: string, buyer_id: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -59,6 +59,7 @@ export const api = {
         .insert({
           gig_id: gigId,
           seller_id: user.id,
+          buyer_id: buyer_id,
           amount,
           description,
           status: 'pending'
@@ -114,15 +115,16 @@ export const api = {
       status?: 'pending' | 'accepted' | 'rejected';
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("user", user);
       
       if (!user) {
         throw new Error('User must be logged in to update a bid');
       }
 
-      // First verify that the bid belongs to the current user
+      // First verify that the bid belongs to either the current user (as seller) or the buyer
       const { data: existingBid, error: fetchError } = await supabase
         .from('Bids')
-        .select('seller_id')
+        .select('seller_id, buyer_id')
         .eq('id', bidId)
         .single();
 
@@ -130,8 +132,22 @@ export const api = {
         throw fetchError;
       }
 
-      if (existingBid.seller_id !== user.id) {
-        throw new Error('You can only update your own bids');
+      if (existingBid.seller_id !== user.id && existingBid.buyer_id !== user.id) {
+        throw new Error('You can only update bids that you are involved in');
+      }
+
+      // If the user is the seller, they can only update amount and description
+      if (existingBid.seller_id === user.id) {
+        if (updates.status) {
+          throw new Error('Sellers can only update the amount and description of their bids');
+        }
+      }
+
+      // If the user is the buyer, they can only update the status
+      if (existingBid.buyer_id === user.id) {
+        if (updates.amount || updates.description) {
+          throw new Error('Buyers can only update the status of bids');
+        }
       }
 
       const { data, error } = await supabase
