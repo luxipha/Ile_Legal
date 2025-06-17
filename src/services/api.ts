@@ -197,6 +197,49 @@ export const api = {
       return data;
     },
 
+    getAllGigs: async (filters?: {
+      categories?: string[];
+      budget?: { min: number; max: number };
+      status?: string;
+      deadline?: { start: number; end: number };
+    }) => {
+      let query = supabase
+        .from("Gigs")
+        .select("*");
+
+      // Apply category filter if provided
+      if (filters?.categories && filters.categories.length > 0) {
+        query = query.contains('categories', filters.categories);
+      }
+
+      // Apply budget filter if provided
+      if (filters?.budget) {
+        query = query
+          .gte('budget', filters.budget.min)
+          .lte('budget', filters.budget.max);
+      }
+
+      // Apply status filter if provided
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      // Apply deadline filter if provided
+      if (filters?.deadline) {
+        query = query
+          .gte('deadline', new Date(filters.deadline.start).toISOString())
+          .lte('deadline', new Date(filters.deadline.end).toISOString());
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data || [];
+    },
+
     createGig: async (gigData: {
       title: string;
       description: string;
@@ -308,7 +351,7 @@ export const api = {
       status: string;
       attachments?: any;
       buyer_id: string | undefined;
-      client: JSON
+      // client: JSON;
     }) => {
       const { error } = await supabase
         .from('Gigs')

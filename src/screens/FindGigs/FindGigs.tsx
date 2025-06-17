@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { ViewDetails } from "../../components/ViewDetails";
 import { Header } from "../../components/Header";
+import { api } from "../../services/api";
 import { 
   SearchIcon, 
   FilterIcon, 
@@ -21,21 +22,16 @@ import {
 type ViewMode = "list" | "view-details" | "place-bid";
 
 interface Gig {
-  id: number;
+  id: string;
   title: string;
-  company: string;
-  price: string;
-  deadline: string;
-  category: string;
   description: string;
-  location: string;
-  posted: string;
-  postedDate: string;
-  budget: string;
-  deliveryTime: string;
-  requirements: string[];
-  companyRating: number;
-  projectsPosted: number;
+  categories: string[];
+  budget: number;
+  deadline: string;
+  status: string;
+  buyer_id: string;
+  created_at: string;
+  attachments?: string[];
 }
 
 export const FindGigs = (): JSX.Element => {
@@ -44,6 +40,9 @@ export const FindGigs = (): JSX.Element => {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
+  const [gigs, setGigs] = useState<Gig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [bidFormData, setBidFormData] = useState({
     bidAmount: "",
     deliveryTime: "",
@@ -60,148 +59,31 @@ export const FindGigs = (): JSX.Element => {
     "Legal Documentation"
   ];
 
-  const gigs: Gig[] = [
-    {
-      id: 1,
-      title: "Land Title Verification - Victoria Island Property",
-      company: "Lagos Properties Ltd.",
-      price: "₦65,000",
-      deadline: "15/05/2025",
-      category: "land-title",
-      description: "We are seeking a qualified legal professional to conduct a comprehensive title verification for a property located in Victoria Island, Lagos.",
-      location: "Victoria Island, Lagos",
-      posted: "2 days ago",
-      postedDate: "Apr 24, 2024",
-      budget: "₦65,000",
-      deliveryTime: "e.g, 5 days",
-      requirements: [
-        "Confirmation of ownership history",
-        "Verification of all relevant documentation",
-        "Checks for any encumbrances or liens",
-        "Validation with the local land registry",
-        "Preparation of a detailed report on findings"
-      ],
-      companyRating: 4.8,
-      projectsPosted: 15
-    },
-    {
-      id: 2,
-      title: "Contract Review for Commercial Lease",
-      company: "Commercial Realty",
-      price: "₦45,000",
-      deadline: "10/05/2025",
-      category: "contract-review",
-      description: "Review and analysis of commercial lease agreement for office space. Need expert legal opinion on terms and conditions.",
-      location: "Ikoyi, Lagos",
-      posted: "1 day ago",
-      postedDate: "Apr 25, 2024",
-      budget: "₦45,000",
-      deliveryTime: "e.g, 3 days",
-      requirements: [
-        "Thorough review of lease terms",
-        "Risk assessment",
-        "Recommendations for amendments",
-        "Legal compliance check"
-      ],
-      companyRating: 4.6,
-      projectsPosted: 8
-    },
-    {
-      id: 3,
-      title: "Certificate of Occupancy Processing",
-      company: "Evergreen Estates",
-      price: "₦80,000",
-      deadline: "20/05/2025",
-      category: "c-of-o",
-      description: "Assist with C of O application and processing for residential development project. Experience with Lagos State procedures required.",
-      location: "Lekki, Lagos",
-      posted: "3 hours ago",
-      postedDate: "Apr 26, 2024",
-      budget: "₦80,000",
-      deliveryTime: "e.g, 7 days",
-      requirements: [
-        "C of O application preparation",
-        "Document compilation",
-        "Government liaison",
-        "Process monitoring"
-      ],
-      companyRating: 4.9,
-      projectsPosted: 22
-    },
-    {
-      id: 4,
-      title: "Property Survey and Documentation",
-      company: "Prime Developers",
-      price: "₦55,000",
-      deadline: "25/05/2025",
-      category: "property-survey",
-      description: "Conduct comprehensive property survey and prepare all necessary documentation for land acquisition.",
-      location: "Ajah, Lagos",
-      posted: "5 hours ago",
-      postedDate: "Apr 26, 2024",
-      budget: "₦55,000",
-      deliveryTime: "e.g, 6 days",
-      requirements: [
-        "Property boundary survey",
-        "Documentation preparation",
-        "Legal verification",
-        "Report compilation"
-      ],
-      companyRating: 4.7,
-      projectsPosted: 12
-    },
-    {
-      id: 5,
-      title: "Due Diligence for Residential Complex",
-      company: "Urban Homes Ltd",
-      price: "₦120,000",
-      deadline: "30/05/2025",
-      category: "due-diligence",
-      description: "Complete due diligence investigation for a 50-unit residential complex including title verification, compliance checks, and risk assessment.",
-      location: "Ikeja, Lagos",
-      posted: "1 day ago",
-      postedDate: "Apr 25, 2024",
-      budget: "₦120,000",
-      deliveryTime: "e.g, 10 days",
-      requirements: [
-        "Title verification",
-        "Compliance checks",
-        "Risk assessment",
-        "Financial analysis",
-        "Comprehensive report"
-      ],
-      companyRating: 4.8,
-      projectsPosted: 18
-    },
-    {
-      id: 6,
-      title: "Legal Documentation for Property Transfer",
-      company: "Heritage Properties",
-      price: "₦35,000",
-      deadline: "12/05/2025",
-      category: "legal-documentation",
-      description: "Prepare and review all legal documents required for property transfer including deed of assignment and power of attorney.",
-      location: "Surulere, Lagos",
-      posted: "3 days ago",
-      postedDate: "Apr 23, 2024",
-      budget: "₦35,000",
-      deliveryTime: "e.g, 4 days",
-      requirements: [
-        "Document preparation",
-        "Legal review",
-        "Compliance verification",
-        "Transfer facilitation"
-      ],
-      companyRating: 4.5,
-      projectsPosted: 9
-    }
-  ];
+  useEffect(() => {
+    const fetchGigs = async () => {
+      try {
+        setLoading(true);
+        const data = await api.gigs.getAllGigs({
+          status: 'active'
+        });
+        setGigs(data);
+        setError(null);
+      } catch (err) {
+        setError('Failed to fetch gigs. Please try again later.');
+        console.error('Error fetching gigs:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGigs();
+  }, []);
 
   const filteredGigs = gigs.filter(gig => {
     const matchesSearch = gig.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         gig.company.toLowerCase().includes(searchTerm.toLowerCase());
+                         gig.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "All Categories" || 
-                           gig.category === selectedCategory.toLowerCase().replace(/\s+/g, '-');
+                           gig.categories.includes(selectedCategory.toLowerCase().replace(/\s+/g, '-'));
     return matchesSearch && matchesCategory;
   });
 
@@ -233,6 +115,28 @@ export const FindGigs = (): JSX.Element => {
       Back to Find Gigs
     </Button>
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B1828] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading gigs...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (viewMode === "place-bid" && selectedGig) {
     return (
@@ -323,15 +227,15 @@ export const FindGigs = (): JSX.Element => {
                   <div className="grid grid-cols-3 gap-6">
                     <div>
                       <span className="text-gray-600">Budget:</span>
-                      <div className="font-semibold text-gray-900">{selectedGig.budget}</div>
+                      <div className="font-semibold text-gray-900">₦{selectedGig.budget.toLocaleString()}</div>
                     </div>
                     <div>
                       <span className="text-gray-600">Deadline:</span>
-                      <div className="font-semibold text-gray-900">{selectedGig.deadline}</div>
+                      <div className="font-semibold text-gray-900">{new Date(selectedGig.deadline).toLocaleDateString()}</div>
                     </div>
                     <div>
-                      <span className="text-gray-600">Delivery Time:</span>
-                      <div className="font-semibold text-gray-900">{selectedGig.deliveryTime}</div>
+                      <span className="text-gray-600">Posted:</span>
+                      <div className="font-semibold text-gray-900">{new Date(selectedGig.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -655,32 +559,27 @@ export const FindGigs = (): JSX.Element => {
                     <CardContent className="p-6">
                       <div className="mb-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                          gig.category === 'land-title' ? 'bg-green-100 text-green-800' :
-                          gig.category === 'contract-review' ? 'bg-blue-100 text-blue-800' :
-                          gig.category === 'c-of-o' ? 'bg-purple-100 text-purple-800' :
-                          gig.category === 'property-survey' ? 'bg-orange-100 text-orange-800' :
-                          gig.category === 'due-diligence' ? 'bg-red-100 text-red-800' :
+                          gig.categories.includes('land-title') ? 'bg-green-100 text-green-800' :
+                          gig.categories.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                          gig.categories.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                          gig.categories.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                          gig.categories.includes('due-diligence') ? 'bg-red-100 text-red-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {gig.category.replace('-', ' ')}
+                          {gig.categories[0].replace('-', ' ')}
                         </span>
                       </div>
                       
                       <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{gig.title}</h3>
-                      <p className="text-sm text-gray-600 mb-2">Posted By {gig.company}</p>
+                      <p className="text-sm text-gray-600 mb-2">{gig.description.substring(0, 100)}...</p>
                       
                       <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                        <MapPinIcon className="w-4 h-4" />
-                        <span>{gig.location}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
                         <CalendarIcon className="w-4 h-4" />
-                        <span>Due: {gig.deadline}</span>
+                        <span>Due: {new Date(gig.deadline).toLocaleDateString()}</span>
                       </div>
                       
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-gray-900">{gig.price}</span>
+                        <span className="text-lg font-bold text-gray-900">₦{gig.budget.toLocaleString()}</span>
                         <Button 
                           onClick={() => handleViewDetails(gig)}
                           className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] text-sm"
@@ -702,36 +601,33 @@ export const FindGigs = (): JSX.Element => {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                              gig.category === 'land-title' ? 'bg-green-100 text-green-800' :
-                              gig.category === 'contract-review' ? 'bg-blue-100 text-blue-800' :
-                              gig.category === 'c-of-o' ? 'bg-purple-100 text-purple-800' :
-                              gig.category === 'property-survey' ? 'bg-orange-100 text-orange-800' :
-                              gig.category === 'due-diligence' ? 'bg-red-100 text-red-800' :
+                              gig.categories.includes('land-title') ? 'bg-green-100 text-green-800' :
+                              gig.categories.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                              gig.categories.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                              gig.categories.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                              gig.categories.includes('due-diligence') ? 'bg-red-100 text-red-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {gig.category.replace('-', ' ')}
+                              {gig.categories[0].replace('-', ' ')}
                             </span>
-                            <span className="text-sm text-gray-500">{gig.posted}</span>
+                            <span className="text-sm text-gray-500">
+                              Posted {new Date(gig.created_at).toLocaleDateString()}
+                            </span>
                           </div>
                           
                           <h3 className="font-semibold text-gray-900 mb-2 text-lg">{gig.title}</h3>
-                          <p className="text-sm text-gray-600 mb-3">Posted By {gig.company}</p>
                           <p className="text-gray-600 mb-4">{gig.description}</p>
                           
                           <div className="flex items-center gap-6 text-sm text-gray-500">
                             <div className="flex items-center gap-2">
-                              <MapPinIcon className="w-4 h-4" />
-                              <span>{gig.location}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
                               <CalendarIcon className="w-4 h-4" />
-                              <span>Due: {gig.deadline}</span>
+                              <span>Due: {new Date(gig.deadline).toLocaleDateString()}</span>
                             </div>
                           </div>
                         </div>
                         
                         <div className="text-right ml-6">
-                          <div className="text-2xl font-bold text-gray-900 mb-4">{gig.price}</div>
+                          <div className="text-2xl font-bold text-gray-900 mb-4">₦{gig.budget.toLocaleString()}</div>
                           <Button 
                             onClick={() => handleViewDetails(gig)}
                             className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"

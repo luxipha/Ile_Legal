@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header";
 import { ViewBids } from "../../components/ViewBids/ViewBids";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
+import { api } from "../../services/api";
+import { supabase } from "../../lib/supabase";
 import { 
   UserIcon,
   PlusIcon,
@@ -53,6 +55,8 @@ export const MyGigs = (): JSX.Element => {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [gigs, setGigs] = useState<Gig[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editFormData, setEditFormData] = useState({
     title: "",
     category: "",
@@ -65,88 +69,60 @@ export const MyGigs = (): JSX.Element => {
   const filters = ["All Gigs", "Active", "Paused", "Draft"];
   const categories = ["All Categories", "Contract Law", "Business Law", "Family Law", "Property Law", "Immigration Law"];
 
-  const gigs: Gig[] = [
-    {
-      id: 1,
-      title: "Land Title Verification - Victoria Island Property",
-      category: "Property Law",
-      description: "We are seeking a qualified legal professional to conduct a comprehensive title verification for a property located in Victoria Island, Lagos. The verification should include confirmation of ownership history, verification of all relevant documentation, checks for any encumbrances or liens, validation with the local land registry, and preparation of a detailed report on findings.",
-      budget: "₦65,000",
-      deadline: "15/05/2025",
-      status: "Active",
-      statusColor: "bg-green-100 text-green-800",
-      orders: 47,
-      rating: 4.8,
-      views: 156,
-      postedDate: "24/04/2025",
-      bidsReceived: 3,
-      requirements: [
-        "Confirmation of ownership history",
-        "Verification of all relevant documentation",
-        "Checks for any encumbrances or liens",
-        "Validation with the local land registry",
-        "Preparation of a detailed report on findings"
-      ],
-      attachments: ["property_documents.pdf", "survey_plan.pdf"]
-    },
-    {
-      id: 2,
-      title: "Contract Review for Commercial Lease",
-      category: "Contract Law",
-      description: "Review and analysis of commercial lease agreement for office space. Need expert legal opinion on terms and conditions, risk assessment, recommendations for amendments, and legal compliance check.",
-      budget: "₦45,000",
-      deadline: "10/05/2025",
-      status: "Active",
-      statusColor: "bg-green-100 text-green-800",
-      orders: 23,
-      rating: 4.6,
-      views: 89,
-      postedDate: "25/04/2025",
-      bidsReceived: 2,
-      requirements: [
-        "Thorough review of lease terms",
-        "Risk assessment",
-        "Recommendations for amendments",
-        "Legal compliance check"
-      ],
-      attachments: ["lease_agreement_draft.pdf"]
-    },
-    {
-      id: 3,
-      title: "Due Diligence for Residential Development",
-      category: "Property Law",
-      description: "Complete due diligence investigation for a 50-unit residential complex including title verification, compliance checks, and risk assessment.",
-      budget: "₦120,000",
-      deadline: "30/05/2025",
-      status: "Paused",
-      statusColor: "bg-yellow-100 text-yellow-800",
-      orders: 12,
-      rating: 4.9,
-      views: 67,
-      postedDate: "20/04/2025",
-      bidsReceived: 5,
-      requirements: [
-        "Title verification",
-        "Compliance checks",
-        "Risk assessment",
-        "Financial analysis",
-        "Comprehensive report"
-      ],
-      attachments: ["project_overview.pdf", "site_plans.pdf", "financial_projections.xlsx"]
+  useEffect(() => {
+    fetchGigs();
+  }, []);
+
+  const fetchGigs = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const filters = {
+        status: selectedFilter === "All Gigs" ? undefined : selectedFilter.toLowerCase(),
+        categories: selectedCategory === "All Categories" ? undefined : [selectedCategory]
+      };
+
+      const fetchedGigs = await api.gigs.getMyGigs(user.id, filters);
+      
+      // Transform the fetched gigs to match our Gig interface
+      const transformedGigs: Gig[] = fetchedGigs.map((gig: any) => ({
+        id: gig.id,
+        title: gig.title,
+        category: gig.categories[0], // Assuming first category is primary
+        description: gig.description,
+        budget: `₦${gig.budget}`,
+        deadline: new Date(gig.deadline).toLocaleDateString(),
+        status: gig.status.charAt(0).toUpperCase() + gig.status.slice(1),
+        statusColor: getStatusColor(gig.status),
+        orders: 0, // These would need to be fetched separately
+        rating: 0,
+        views: 0,
+        postedDate: new Date(gig.created_at).toLocaleDateString(),
+        bidsReceived: 0,
+        requirements: gig.requirements || [],
+        attachments: gig.attachments || []
+      }));
+
+      setGigs(transformedGigs);
+    } catch (error) {
+      console.error('Error fetching gigs:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const filteredGigs = gigs.filter(gig => {
-    const matchesFilter = selectedFilter === "All Gigs" || gig.status === selectedFilter;
-    const matchesCategory = selectedCategory === "All Categories" || gig.category === selectedCategory;
-    return matchesFilter && matchesCategory;
-  });
-
-  const gigStats = {
-    total: gigs.length,
-    active: gigs.filter(g => g.status === "Active").length,
-    paused: gigs.filter(g => g.status === "Paused").length,
-    draft: gigs.filter(g => g.status === "Draft").length
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'paused':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'draft':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const handleViewGig = (gig: Gig) => {
@@ -160,10 +136,20 @@ export const MyGigs = (): JSX.Element => {
       title: gig.title,
       category: gig.category,
       description: gig.description,
-      budget: gig.budget.replace("₦", ""),
-      deadline: gig.deadline,
+      budget: gig.budget.replace('₦', ''),
+      deadline: new Date(gig.deadline).toLocaleDateString('en-CA'),
       requirements: [...gig.requirements]
     });
+
+    // Handle attachments - ensure it's an array before mapping
+    const attachments = Array.isArray(gig.attachments) ? gig.attachments : [];
+    setAttachedFiles(attachments.map(name => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name,
+      size: 0, // We don't have the original size
+      type: name.split('.').pop() || '' // Try to guess the type from extension
+    })));
+
     setViewMode("edit-gig");
   };
 
@@ -239,10 +225,63 @@ export const MyGigs = (): JSX.Element => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleUpdateGig = (e: React.FormEvent) => {
+  const handleUpdateGig = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Updating gig:", editFormData);
-    setViewMode("list");
+    if (!selectedGig) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Filter out empty requirements
+      const validRequirements = editFormData.requirements.filter(req => req.trim() !== '');
+
+      const gigData = {
+        title: editFormData.title,
+        description: editFormData.description,
+        categories: [editFormData.category],
+        budget: editFormData.budget.replace('₦', ''),
+        deadline: new Date(editFormData.deadline).toISOString(),
+        status: selectedGig.status.toLowerCase(),
+        attachments: attachedFiles.map(f => f.name),
+        buyer_id: user.id,
+        // client: {} as JSON,
+        requirements: validRequirements
+      };
+
+      const error = await api.gigs.updateGig(selectedGig.id.toString(), gigData);
+      
+      if (error) {
+        throw new Error('Failed to update gig');
+      }
+
+      // Refresh the gigs list to show updated data
+      await fetchGigs();
+      setViewMode("list");
+    } catch (error) {
+      console.error('Error updating gig:', error);
+      // You might want to show an error message to the user here
+    }
+  };
+
+  const handleCategoryClick = (category: string) => {
+    setSelectedCategory(prevCategory => 
+      prevCategory === category ? "All Categories" : category
+    );
+  };
+
+  // Update the filteredGigs to use the state
+  const filteredGigs = gigs.filter(gig => {
+    const matchesFilter = selectedFilter === "All Gigs" || gig.status === selectedFilter;
+    const matchesCategory = selectedCategory === "All Categories" || gig.category === selectedCategory;
+    return matchesFilter && matchesCategory;
+  });
+
+  const gigStats = {
+    total: gigs.length,
+    active: gigs.filter(g => g.status === "Active").length,
+    paused: gigs.filter(g => g.status === "Paused").length,
+    draft: gigs.filter(g => g.status === "Draft").length
   };
 
   if (viewMode === "view-gig" && selectedGig) {
@@ -652,7 +691,7 @@ export const MyGigs = (): JSX.Element => {
               {categories.slice(1).map((category) => (
                 <button
                   key={category}
-                  onClick={() => setSelectedCategory(category)}
+                  onClick={() => handleCategoryClick(category)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     selectedCategory === category
                       ? "bg-[#FEC85F] text-[#1B1828]"
