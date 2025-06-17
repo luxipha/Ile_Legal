@@ -4,9 +4,11 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const ResetPassword = (): JSX.Element => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,6 +44,7 @@ export const ResetPassword = (): JSX.Element => {
       if (error) throw error;
 
       alert('Password has been reset successfully');
+      await logout();
       navigate('/login');
     } catch (error: any) {
       console.error('Error resetting password:', error);
