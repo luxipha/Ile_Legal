@@ -325,6 +325,110 @@ export const api = {
 
   },
 
+  disputes: {
+    createDispute: async (disputeData: {
+      gig_id: string;
+      buyer_id: string;
+      seller_id: string;
+      details: string;
+      comments?: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('Disputes')
+        .insert({
+          ...disputeData,
+          status: 'pending'
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    getAllDisputes: async () => {
+      // Check if user is admin using session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Authentication error');
+      }
+
+      if (!session?.user || session.user.user_metadata.role_title !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      // If user is admin, fetch all disputes
+      const { data: disputes, error: disputesError } = await supabase
+        .from('Disputes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (disputesError) {
+        throw disputesError;
+      }
+
+      return disputes;
+    },
+
+    getDisputeById: async (id: number) => {
+      const { data: dispute, error } = await supabase
+        .from('Disputes')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return dispute;
+    },
+
+    updateDisputeStatus: async (id: number, status: 'approved' | 'denied') => {
+      // Check if user is admin using session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Authentication error');
+      }
+
+      if (!session?.user || session.user.user_metadata.role_title !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      // If user is admin, update the dispute status
+      const { data: dispute, error } = await supabase
+        .from('Disputes')
+        .update({ status })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return dispute;
+    },
+
+    updateDisputeComment: async (id: number, comment: string) => {
+      const { data: dispute, error } = await supabase
+        .from('Disputes')
+        .update({ comments: comment })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return dispute;
+    },
+  },
+
 
   feedback: {
     createFeedback: async (feedbackData: {
