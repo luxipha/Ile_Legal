@@ -2,7 +2,6 @@ import { useState } from "react";
 import { 
   AlertTriangleIcon, 
   BriefcaseIcon, 
-  UserIcon, 
   UsersIcon,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
