@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { 
@@ -7,22 +7,40 @@ import {
   BuildingIcon,
   PaperclipIcon
 } from "lucide-react";
+import { api } from "../../services/api";
+
+interface Message {
+  id: string;
+  text: string;
+  sender: "user" | "other";
+  timestamp: string;
+}
+
+interface ChatMessage {
+  id: string;
+  conversationId: string;
+  content: string;
+  attachments: string[];
+  timestamp: string;
+}
 
 interface Bid {
-  id: number;
-  name: string;
-  avatar: string;
-  title: string;
-  rating: number;
-  completedJobs: number;
-  amount: string;
-  deliveryTime: string;
-  submittedDate: string;
-  proposal: string;
+  id: string;
+  seller_id: string;
+  amount: number;
+  description: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  // Additional fields we'll get from the seller profile
+  seller_name?: string;
+  seller_title?: string;
+  seller_rating?: number;
+  seller_completed_jobs?: number;
+  seller_avatar?: string;
 }
 
 interface Gig {
-  id: number;
+  id: string;
   title: string;
   company: string;
   price: string;
@@ -56,48 +74,30 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   backButtonText
 }) => {
   const [activeTab, setActiveTab] = useState<string>("bids");
-  const [activeBidder, setActiveBidder] = useState<number | null>(null);
-  const [bidderMessages, setBidderMessages] = useState<Record<number, Array<{id: number; text: string; sender: "user" | "other"; timestamp: string}>>>({});
+  const [activeBidder, setActiveBidder] = useState<string | null>(null);
+  const [bidderMessages, setBidderMessages] = useState<Record<string, Message[]>>({});
   const [newMessage, setNewMessage] = useState("");
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const receivedBids: Bid[] = [
-    {
-      id: 1,
-      name: "Chioma Okonkwo",
-      title: "Property Lawyer",
-      rating: 4.9,
-      completedJobs: 24,
-      amount: "₦65,000",
-      deliveryTime: "5 days",
-      submittedDate: "21/04/2025",
-      proposal: "I have over 10 years of experience in title verification in Lagos State, particularly in Victoria Island. I have established connections with the land registry and can complete this task efficiently and accurately.",
-      avatar: "CO"
-    },
-    {
-      id: 2,
-      name: "Adebayo Ogundimu",
-      title: "Senior Legal Counsel",
-      rating: 4.8,
-      completedJobs: 18,
-      amount: "₦60,000",
-      deliveryTime: "4 days",
-      submittedDate: "22/04/2025",
-      proposal: "With 8 years of experience in property law and title verification, I can provide comprehensive verification services with detailed reporting and compliance checks.",
-      avatar: "AO"
-    },
-    {
-      id: 3,
-      name: "Funmi Adebisi",
-      title: "Real Estate Lawyer",
-      rating: 4.7,
-      completedJobs: 31,
-      amount: "₦70,000",
-      deliveryTime: "6 days",
-      submittedDate: "23/04/2025",
-      proposal: "I specialize in Victoria Island properties and have handled similar title verifications. My approach includes thorough documentation review and registry validation.",
-      avatar: "FA"
+  useEffect(() => {
+    loadBids();
+  }, [gig.id]);
+
+  const loadBids = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const bidsData = await api.bids.getBidsByGigId(gig.id);
+      setBids(bidsData);
+    } catch (err) {
+      setError('Failed to load bids. Please try again.');
+      console.error('Error loading bids:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const handleSendMessage = () => {
     if (newMessage.trim() && activeBidder !== null) {
@@ -105,8 +105,8 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
       const currentMessages = bidderMessages[activeBidder] || [];
       
       // Create new message
-      const newMsg = {
-        id: currentMessages.length > 0 ? Math.max(...currentMessages.map(m => m.id)) + 1 : 1,
+      const newMsg: Message = {
+        id: Date.now().toString(),
         text: newMessage.trim(),
         sender: "user" as const,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -118,82 +118,102 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         [activeBidder]: [...(prev[activeBidder] || []), newMsg]
       }));
       
-      // Simulate a response after a short delay (in a real app, this would come from the server)
-      setTimeout(() => {
-        const responseMsg = {
-          id: bidderMessages[activeBidder] ? Math.max(...bidderMessages[activeBidder].map(m => m.id)) + 1 : 1,
-          text: `Thank you for your message. I'll get back to you shortly regarding "${newMessage.trim()}".`,
-          sender: "other" as const,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        
-        setBidderMessages(prev => ({
-          ...prev,
-          [activeBidder]: [...(prev[activeBidder] || []), responseMsg]
-        }));
-      }, 2000);
+      // Send message through API
+      api.chat.sendMessage(activeBidder, newMessage.trim())
+        .then((response: ChatMessage) => {
+          const responseMsg: Message = {
+            id: response.id,
+            text: response.content,
+            sender: "other" as const,
+            timestamp: new Date(response.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          
+          setBidderMessages(prev => ({
+            ...prev,
+            [activeBidder]: [...(prev[activeBidder] || []), responseMsg]
+          }));
+        })
+        .catch(err => {
+          console.error('Error sending message:', err);
+          // Handle error appropriately
+        });
       
       setNewMessage("");
     }
   };
 
-  const handleAcceptBid = (bidId: number) => {
-    console.log("Accepting bid:", bidId);
-    // Reject bid handler - keeping this for future implementation
-  };
-
-  const handleRejectBid = (bidId: number) => {
-    console.log("Rejecting bid:", bidId);
-    // In a real app, this would send a request to the server
-    // For now, we'll just log the action
-    
-    // If we're currently viewing this bidder's messages, go back to bids
-    if (activeBidder === bidId) {
-      setActiveBidder(null);
-      setActiveTab("bids");
+  const handleAcceptBid = async (bidId: string) => {
+    try {
+      await api.bids.updateBid(bidId, { status: 'accepted' });
+      // Reload bids to reflect the change
+      await loadBids();
+    } catch (err) {
+      console.error('Error accepting bid:', err);
+      // Handle error appropriately
     }
   };
 
-  const handleMessageBidder = (bidderId: number) => {
-    console.log("Messaging bidder:", bidderId);
-    
-    // Set the active bidder
+  const handleRejectBid = async (bidId: string) => {
+    try {
+      await api.bids.updateBid(bidId, { status: 'rejected' });
+      // Reload bids to reflect the change
+      await loadBids();
+      
+      // If we're currently viewing this bidder's messages, go back to bids
+      if (activeBidder === bidId) {
+        setActiveBidder(null);
+        setActiveTab("bids");
+      }
+    } catch (err) {
+      console.error('Error rejecting bid:', err);
+      // Handle error appropriately
+    }
+  };
+
+  const handleMessageBidder = (bidderId: string) => {
     setActiveBidder(bidderId);
-    
-    // Switch to messages tab
     setActiveTab("messages");
     
     // Initialize messages for this bidder if they don't exist
     if (!bidderMessages[bidderId]) {
-      // Find the bidder to get their information
-      const bidder = receivedBids.find(bid => bid.id === bidderId);
-      
-      if (bidder) {
-        // Create initial messages
-        const initialMessages = [
-          {
-            id: 1,
-            text: `Hello, I'm interested in discussing your bid on my gig: ${gig.title}`,
-            sender: "user" as const,
-            timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-          },
-          {
-            id: 2,
-            text: `Thank you for reaching out! I'd be happy to discuss my proposal for ${gig.title} in more detail.`,
-            sender: "other" as const,
-            timestamp: new Date(Date.now() + 2*60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      api.chat.getMessages(bidderId)
+        .then((messages: ChatMessage[]) => {
+          if (messages.length === 0) {
+            // Create initial messages if none exist
+            const initialMessages: Message[] = [
+              {
+                id: Date.now().toString(),
+                text: `Hello, I'm interested in discussing your bid on my gig: ${gig.title}`,
+                sender: "user" as const,
+                timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+              }
+            ];
+            
+            setBidderMessages(prev => ({
+              ...prev,
+              [bidderId]: initialMessages
+            }));
+          } else {
+            // Convert API messages to our format
+            const formattedMessages: Message[] = messages.map(msg => ({
+              id: msg.id,
+              text: msg.content,
+              sender: msg.conversationId === activeBidder ? 'user' as const : 'other' as const,
+              timestamp: new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            }));
+            
+            setBidderMessages(prev => ({
+              ...prev,
+              [bidderId]: formattedMessages
+            }));
           }
-        ];
-        
-        setBidderMessages(prev => ({
-          ...prev,
-          [bidderId]: initialMessages
-        }));
-      }
+        })
+        .catch(err => {
+          console.error('Error loading messages:', err);
+          // Handle error appropriately
+        });
     }
   };
-
-  // View details functionality replaced with direct reject button
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -227,15 +247,22 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
           </div>
         </div>
         <span className="bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium">
-          {receivedBids.length} Bids Received
+          {bids.length} Bids Received
         </span>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+          {error}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex gap-8">
           {[
-            { id: "bids", label: `Bids (${receivedBids.length})` },
+            { id: "bids", label: `Bids (${bids.length})` },
             { id: "details", label: "Details" },
             { id: "messages", label: "Messages" }
           ].map((tab) => (
@@ -260,65 +287,84 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         <div className="col-span-2">
           {activeTab === "bids" && (
             <div className="space-y-6">
-              {receivedBids.map((bid) => (
-                <Card key={bid.id} className="border border-gray-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-                        {bid.avatar}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{bid.name}</h4>
-                            <p className="text-gray-600">{bid.title}</p>
+              {loading ? (
+                <div className="text-center py-8">Loading bids...</div>
+              ) : bids.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No bids received yet</div>
+              ) : (
+                bids.map((bid) => (
+                  <Card key={bid.id} className="border border-gray-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
+                          {bid.seller_avatar || 'U'}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{bid.seller_name || 'Anonymous'}</h4>
+                              <p className="text-gray-600">{bid.seller_title || 'Seller'}</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-gray-900">₦{bid.amount.toLocaleString()}</div>
+                              <div className="text-sm text-gray-500">Submitted: {new Date(bid.created_at).toLocaleDateString()}</div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-gray-900">{bid.amount}</div>
-                            <div className="text-sm text-gray-500">{bid.deliveryTime}</div>
+                          <div className="flex items-center gap-4 mb-3">
+                            {bid.seller_rating && (
+                              <div className="flex items-center gap-1">
+                                {renderStars(Math.floor(bid.seller_rating))}
+                                <span className="text-sm text-gray-600 ml-1">{bid.seller_rating}</span>
+                              </div>
+                            )}
+                            {bid.seller_completed_jobs && (
+                              <span className="text-sm text-gray-600">{bid.seller_completed_jobs} jobs completed</span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-4 mb-3">
-                          <div className="flex items-center gap-1">
-                            {renderStars(Math.floor(bid.rating))}
-                            <span className="text-sm text-gray-600 ml-1">{bid.rating}</span>
-                          </div>
-                          <span className="text-sm text-gray-600">{bid.completedJobs} jobs completed</span>
-                          <span className="text-sm text-gray-500">Submitted: {bid.submittedDate}</span>
-                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <h5 className="font-medium text-[#1B1828] mb-2">Proposal</h5>
-                      <p className="text-gray-600">{bid.proposal}</p>
-                    </div>
+                      
+                      <div className="mb-4">
+                        <h5 className="font-medium text-[#1B1828] mb-2">Proposal</h5>
+                        <p className="text-gray-600">{bid.description}</p>
+                      </div>
 
-                    <div className="flex gap-3">
-                      <Button 
-                        onClick={() => handleAcceptBid(bid.id)}
-                        className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"
-                      >
-                        Accept Bid
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={() => handleMessageBidder(bid.id)}
-                        className="border-[#1B1828] text-[#1B1828] hover:bg-[#1B1828]/10"
-                      >
-                        Message
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={() => handleRejectBid(bid.id)}
-                        className="border-red-500 text-red-600 hover:bg-red-50"
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      <div className="flex gap-3">
+                        {bid.status === 'pending' && (
+                          <>
+                            <Button 
+                              onClick={() => handleAcceptBid(bid.id)}
+                              className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"
+                            >
+                              Accept Bid
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => handleMessageBidder(bid.seller_id)}
+                              className="border-[#1B1828] text-[#1B1828] hover:bg-[#1B1828]/10"
+                            >
+                              Message
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => handleRejectBid(bid.id)}
+                              className="border-red-500 text-red-600 hover:bg-red-50"
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                        {bid.status === 'accepted' && (
+                          <span className="text-green-600 font-medium">Bid Accepted</span>
+                        )}
+                        {bid.status === 'rejected' && (
+                          <span className="text-red-600 font-medium">Bid Rejected</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           )}
 
@@ -346,15 +392,15 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               {/* Bidder Info */}
               <div className="flex items-center gap-4 p-4 border-b border-gray-200 bg-[#1B1828]/5">
                 {(() => {
-                  const bidder = receivedBids.find(bid => bid.id === activeBidder);
+                  const bidder = bids.find(bid => bid.seller_id === activeBidder);
                   return bidder ? (
                     <>
                       <div className="w-12 h-12 bg-[#FEC85F]/20 rounded-full flex items-center justify-center text-sm font-medium text-[#1B1828]">
-                        {bidder.avatar}
+                        {bidder.seller_avatar || 'U'}
                       </div>
                       <div>
-                        <h4 className="font-semibold text-[#1B1828]">{bidder.name}</h4>
-                        <p className="text-gray-600">{bidder.title}</p>
+                        <h4 className="font-semibold text-[#1B1828]">{bidder.seller_name || 'Anonymous'}</h4>
+                        <p className="text-gray-600">{bidder.seller_title || 'Seller'}</p>
                       </div>
                     </>
                   ) : null;
@@ -444,34 +490,23 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Bids:</span>
-                  <span className="font-semibold text-gray-900">{receivedBids.length}</span>
+                  <span className="font-semibold text-gray-900">{bids.length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Average Bid:</span>
-                  <span className="font-semibold text-gray-900">₦65,000</span>
+                  <span className="font-semibold text-gray-900">₦{bids.reduce((total, bid) => total + bid.amount, 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Lowest Bid:</span>
-                  <span className="font-semibold text-gray-900">₦60,000</span>
+                  <span className="font-semibold text-gray-900">₦{bids.reduce((min, bid) => Math.min(min, bid.amount), Infinity).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Highest Bid:</span>
-                  <span className="font-semibold text-gray-900">₦70,000</span>
+                  <span className="font-semibold text-gray-900">₦{bids.reduce((max, bid) => Math.max(max, bid.amount), 0).toLocaleString()}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          {/* View Details Button */}
-          {/* {onViewDetails && (
-            <Button
-              onClick={handleViewDetailsClick}
-              variant="outline"
-              className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 py-3"
-            >
-              View Full Details
-            </Button>
-          )} */}
         </div>
       </div>
     </div>
