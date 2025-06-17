@@ -1,0 +1,33 @@
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize the Supabase client
+export const supabase = createClient(
+  'https://govkkihikacnnyqzhtxv.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ'
+);
+
+// Mock function for direct login during testing
+export const testDirectLogin = async (email: string, password: string) => {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    return { data, error };
+  } catch (error) {
+    console.error('Test login error:', error);
+    return { data: null, error };
+  }
+};
+
+// Mock storage for file uploads
+export const mockStorage = {
+  upload: async (file: File) => {
+    // Simulate file upload
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return {
+      path: URL.createObjectURL(file),
+    };
+  },
+};
