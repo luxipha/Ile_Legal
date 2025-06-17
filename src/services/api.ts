@@ -6,6 +6,8 @@ const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhb
 export const api = {
   
 
+  
+
   payments: {
     createPaymentIntent: async (amount: number) => {
       // Simulate API delay
@@ -57,7 +59,7 @@ export const api = {
       title: string;
       description: string;
       categories: string[];
-      budget: string;
+      budget: number;
       deadline: string;
       attachments?: FileList | File[];
       buyer_id: string | undefined;
@@ -104,12 +106,42 @@ export const api = {
       return { data, error };
     },
 
-    getMyGigs: async (userId: string) => {
-      const { data, error } = await supabase
-        .from('Gigs')
-        .select('*')
-        .eq('buyer_id', userId)
-        .order('created_at', { ascending: false });
+    getMyGigs: async (userId: string, filters?: {
+      categories?: string[];
+      budget?: { min: number; max: number };
+      status?: string;
+      deadline?: { start: number; end: number };
+    }) => {
+      let query = supabase
+        .from("Gigs")
+        .select("*")
+        .eq('buyer_id', userId);
+
+      // Apply category filter if provided
+      if (filters?.categories && filters.categories.length > 0) {
+        query = query.contains('categories', filters.categories);
+      }
+
+      // Apply budget filter if provided
+      if (filters?.budget) {
+        query = query
+          .gte('budget', filters.budget.min)
+          .lte('budget', filters.budget.max);
+      }
+
+      // Apply status filter if provided
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      // Apply deadline filter if provided
+      if (filters?.deadline) {
+        query = query
+          .gte('deadline', new Date(filters.deadline.start).toISOString())
+          .lte('deadline', new Date(filters.deadline.end).toISOString());
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) {
         throw error;
