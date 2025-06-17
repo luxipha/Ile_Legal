@@ -380,4 +380,79 @@ export const api = {
     },
   },
 
+  submissions: {
+    createSubmission: async (submissionData: {
+      gig_id: string;
+      deliverables?: FileList | File[];
+      notes?: string;
+    }) => {
+      let deliverableFilenames: string[] = [];
+      
+      // Upload files if they exist
+      if (submissionData.deliverables) {
+        // Convert FileList to array of Files
+        const files = Array.from(submissionData.deliverables);
+        
+        const uploadPromises = files.map(async (file) => {
+          const filePath = `${submissionData.gig_id}/${file.name}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('deliverables')
+            .upload(filePath, file);
+            
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw uploadError;
+          }
+          
+          return file.name;
+        });
+        
+        deliverableFilenames = await Promise.all(uploadPromises);
+      }
+
+      const { data, error } = await supabase
+        .from('Work Submissions')
+        .insert({
+          gig_id: submissionData.gig_id,
+          deliverables: deliverableFilenames,
+          notes: submissionData.notes || '',
+          status: 'submitted'
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    getSubmissionsByGig: async (gigId: string) => {
+      const { data, error } = await supabase
+        .from('Work Submissions')
+        .select('*')
+        .eq('gig_id', gigId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
+    },
+
+    updateSubmissionStatus: async (submissionId: string, status: 'approved' | 'revision requested') => {
+      const { data, error } = await supabase
+        .from('Work Submissions')
+        .update({ status })
+        .eq('id', submissionId);
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+  },
+
 };
