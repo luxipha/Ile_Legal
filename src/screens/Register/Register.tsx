@@ -341,7 +341,7 @@ export const Register = (): JSX.Element => {
                   }}
                   disabled={isSubmitting || isLoading}
                 >
-                  <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
+                  <img src="/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
                   {isLoading ? 'Connecting...' : 'Continue with Google'}
                 </Button>
               </div>
