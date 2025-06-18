@@ -66,6 +66,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storageKey: 'ile-legal-auth',
     flowType: 'implicit'
   },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  },
   global: {
     headers: {
       'X-Client-Info': 'ile-legal-app',

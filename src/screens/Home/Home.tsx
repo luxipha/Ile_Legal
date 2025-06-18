@@ -1,11 +1,24 @@
-import React from "react";
+// React is used implicitly for JSX
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Separator } from "../../components/ui/separator";
-import { CheckCircleIcon, ClockIcon, LockIcon, ArrowRightIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { CheckCircleIcon, ClockIcon, LockIcon, ArrowRightIcon, LogOutIcon } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 export const Home = (): JSX.Element => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+  
   const handleMetaMaskConnect = async () => {
     if (typeof window.ethereum !== 'undefined') {
       try {
@@ -42,24 +55,57 @@ export const Home = (): JSX.Element => {
           </nav>
 
           <div className="flex items-center gap-4">
-            <Button
-              onClick={handleMetaMaskConnect}
-              variant="outline"
-              className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-4 py-2"
-            >
-              <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-2" />
-              MetaMask
-            </Button>
-            <Link to="/login">
-              <Button variant="ghost" className="text-gray-300 hover:text-white">
-                Sign In
-              </Button>
-            </Link>
-            <Link to="/register">
-              <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6">
-                Register
-              </Button>
-            </Link>
+            {user ? (
+              <>
+                <div className="text-gray-300 mr-2">
+                  Logged in as: <span className="font-medium">{user.email}</span>
+                  {user.role && <span className="ml-2 px-2 py-1 bg-gray-700 rounded-md text-xs">{user.role}</span>}
+                </div>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                >
+                  <LogOutIcon className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+                {user.role === 'buyer' && (
+                  <Link to="/buyer-dashboard">
+                    <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4">
+                      Go to Dashboard
+                    </Button>
+                  </Link>
+                )}
+                {user.role === 'seller' && (
+                  <Link to="/seller-dashboard">
+                    <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4">
+                      Go to Dashboard
+                    </Button>
+                  </Link>
+                )}
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={handleMetaMaskConnect}
+                  variant="outline"
+                  className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-4 py-2"
+                >
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-2" />
+                  MetaMask
+                </Button>
+                <Link to="/login">
+                  <Button variant="ghost" className="text-gray-300 hover:text-white">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link to="/register">
+                  <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6">
+                    Register
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>

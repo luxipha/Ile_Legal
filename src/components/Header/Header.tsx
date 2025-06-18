@@ -3,11 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { 
   BellIcon,
-  CreditCardIcon,
+  WalletIcon,
   UserIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  LogOutIcon,
+  CheckCircleIcon
 } from "lucide-react";
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from "../../contexts/AuthContext";
+import { WalletStatusNotification } from "../WalletStatusNotification/WalletStatusNotification";
 
 interface HeaderProps {
   title: string;
@@ -20,10 +23,20 @@ export const Header: React.FC<HeaderProps> = ({
   userName = "Demo Seller", 
   userType = "seller"
 }) => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showWalletStatus, setShowWalletStatus] = useState(false);
+  const navigate = useNavigate();
+  const { logout, ethAddress } = useAuth();
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   // Role-based notifications
   const buyerNotifications = [
@@ -76,9 +89,26 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm">
-            <CreditCardIcon className="w-5 h-5 mr-2" />
-          </Button>
+          <div className="relative">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowWalletStatus(!showWalletStatus)}
+              title="Wallet"
+              className={`flex items-center gap-2 border rounded-full px-4 py-2 hover:bg-gray-50 ${!!ethAddress ? 'border-amber-300 bg-amber-50' : 'border-gray-300 bg-gray-50'}`}
+            >
+              <WalletIcon className={`w-5 h-5 ${!!ethAddress ? 'text-amber-500' : 'text-gray-500'}`} />
+              <span className="font-medium">Wallet</span>
+              {!!ethAddress && <CheckCircleIcon className="w-5 h-5 text-green-500" />}
+            </Button>
+            
+            {showWalletStatus && (
+              <WalletStatusNotification 
+                isEnabled={!!ethAddress} 
+                walletBalance="1,250.00"
+              />
+            )}
+          </div>
           
           {/* Notifications Dropdown */}
           <div className="relative">
@@ -139,13 +169,17 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {userType === 'buyer' ? 'Payments' : 'Earnings'}
                 </Link>
-                <button 
-                  onClick={async () => {
-                    await logout();
-                    navigate('/login');
-                  }}
-                  className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
+                <Link 
+                  to="/#" 
+                  className="block px-4 py-3 text-gray-700 hover:bg-gray-50 border-b border-gray-100"
                 >
+                  Wallet
+                </Link>
+                <button 
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <LogOutIcon className="w-4 h-4" />
                   Sign out
                 </button>
               </div>

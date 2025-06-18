@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { User, UserRole } from '../../types';
 
 export const AuthCallback = () => {
   const navigate = useNavigate();
@@ -25,22 +26,73 @@ export const AuthCallback = () => {
           const { data: userData } = await supabase.auth.getUser();
           
           if (userData?.user) {
-            // Extract role from user metadata
-            const role = userData.user.user_metadata?.role || 'buyer';
+            // Try to get role from multiple sources (in order of priority):
+            // 1. From localStorage (set during registration process)
+            // 2. From user metadata (if already set)
+            // 3. Default to 'buyer'
+            let role = localStorage.getItem('pendingUserRole') || 
+                       userData.user.user_metadata?.role || 
+                       'buyer';
+            
+            console.log('Retrieved role:', role);
+            
+            // Clear the pending role from localStorage
+            localStorage.removeItem('pendingUserRole');
+            
+            // Update user metadata with role if it's not already set
+            if (!userData.user.user_metadata?.role) {
+              await supabase.auth.updateUser({
+                data: {
+                  role: role
+                }
+              });
+              console.log('Updated user metadata with role:', role);
+            }
             
             // Create a user object that matches our app's User interface
-            const appUser = {
+            const appUser: User = {
               id: userData.user.id,
-              name: userData.user.user_metadata?.name || 'User',
+              name: userData.user.user_metadata?.name || userData.user.user_metadata?.full_name || 'User',
               email: userData.user.email || '',
-              role: role,
+              role: role as UserRole,
               isVerified: !!userData.user.email_confirmed_at,
-              user_metadata: userData.user.user_metadata || {}
+              user_metadata: {
+                phone: userData.user.user_metadata?.phone,
+                address: userData.user.user_metadata?.address,
+                profile_picture: userData.user.user_metadata?.profile_picture,
+                role_title: userData.user.user_metadata?.role_title,
+                clearance_level: userData.user.user_metadata?.clearance_level,
+                email_verified: !!userData.user.email_confirmed_at,
+                eth_address: userData.user.user_metadata?.eth_address,
+                circle_wallet_id: userData.user.user_metadata?.circle_wallet_id,
+                circle_wallet_address: userData.user.user_metadata?.circle_wallet_address,
+                circle_wallet_status: userData.user.user_metadata?.circle_wallet_status
+              }
             };
             
             // Update auth context
             setUser(appUser);
             localStorage.setItem('ileUser', JSON.stringify(appUser));
+            
+            // Check if user has a Circle wallet, create one if not
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('circle_wallet_id')
+                .eq('id', userData.user.id)
+                .single();
+              
+              if (!profile?.circle_wallet_id) {
+                console.log('Creating Circle wallet for new Google user:', userData.user.id);
+                // Import the wallet service
+                const { createUserWallet } = await import('../../services/walletService');
+                const walletData = await createUserWallet(appUser);
+                console.log('Circle wallet created successfully:', walletData);
+              }
+            } catch (walletError) {
+              console.error('Error checking/creating Circle wallet:', walletError);
+              // Don't fail the authentication process if wallet creation fails
+            }
             
             // Redirect based on role
             switch (role) {
