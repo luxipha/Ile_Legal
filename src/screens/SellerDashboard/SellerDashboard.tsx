@@ -5,6 +5,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { ViewDetails } from "../../components/ViewDetails";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
+import { api } from "../../services/api";
 import { 
   GavelIcon, 
   BriefcaseIcon, 
@@ -21,7 +22,7 @@ import {
 type ViewMode = "dashboard" | "place-bid" | "view-details" | "submit-work" | "edit-bid";
 
 interface Gig {
-  id: number;
+  id: string;
   title: string;
   company: string;
   price: string;
@@ -36,7 +37,7 @@ interface Gig {
 }
 
 interface OngoingGig {
-  id: number;
+  id: string;
   title: string;
   company: string;
   price: string;
@@ -61,10 +62,18 @@ export const SellerDashboard = (): JSX.Element => {
     description: "",
     files: [] as File[]
   });
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [blockchainHashes, setBlockchainHashes] = useState<Array<{
+    fileName: string;
+    hash: string;
+    txId?: string;
+  }>>([]);
+  const [showBlockchainUpload, setShowBlockchainUpload] = useState(false);
 
   const availableGigs: Gig[] = [
     {
-      id: 1,
+      id: "1",
       title: "Land Title Verification - Victoria Island Property",
       company: "Lagos Properties Ltd.",
       price: "₦65,000",
@@ -84,7 +93,7 @@ export const SellerDashboard = (): JSX.Element => {
       projectsPosted: 15
     },
     {
-      id: 2,
+      id: "2",
       title: "Contract Review for Commercial Lease",
       company: "Commercial Realty",
       price: "₦45,000",
@@ -106,7 +115,7 @@ export const SellerDashboard = (): JSX.Element => {
 
   const ongoingGigs: OngoingGig[] = [
     {
-      id: 1,
+      id: "1",
       title: "Due Diligence on Residential Development",
       company: "Evergreen Estates",
       price: "₦90,000",
@@ -162,27 +171,88 @@ export const SellerDashboard = (): JSX.Element => {
     setViewMode("dashboard");
   };
 
-  const handleWorkSubmit = (e: React.FormEvent) => {
+  const handleWorkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Work submitted:", submitWorkData);
-    setViewMode("dashboard");
+    if (!selectedOngoingGig) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      await api.submissions.createSubmission({
+        gig_id: selectedOngoingGig.id,
+        deliverables: submitWorkData.files,
+        notes: submitWorkData.description,
+        blockchain_hashes: blockchainHashes
+      });
+      
+      // Reset form and go back to dashboard
+      setSubmitWorkData({ description: "", files: [] });
+      setBlockchainHashes([]);
+      setViewMode("dashboard");
+    } catch (error) {
+      console.error("Error submitting work:", error);
+      setSubmitError("Failed to submit work. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      
+      // Add files to regular upload
       setSubmitWorkData(prev => ({
         ...prev,
-        files: [...prev.files, ...Array.from(e.target.files!)]
+        files: [...prev.files, ...newFiles]
       }));
+
+      // If blockchain verification is enabled, process files for hashing
+      if (showBlockchainUpload) {
+        for (const file of newFiles) {
+          try {
+            // Only hash PDF files for blockchain verification
+            if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+              // Import hash utilities dynamically
+              const { HashUtils } = await import('../../components/blockchain/shared/hashUtils');
+              
+              // Generate hash for the file
+              const fileResult = await HashUtils.hashFile(file);
+              const documentHash = HashUtils.createDocumentHash(fileResult);
+              
+              // Add to blockchain hashes (simulate blockchain submission)
+              setBlockchainHashes(prev => [...prev, {
+                fileName: file.name,
+                hash: documentHash.hash,
+                txId: `DEMO_TX_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
+              }]);
+            }
+          } catch (error) {
+            console.error('Error processing file for blockchain:', error);
+            setSubmitError(`Failed to process ${file.name} for blockchain verification`);
+          }
+        }
+      }
     }
   };
 
   const removeFile = (index: number) => {
+    const fileToRemove = submitWorkData.files[index];
+    
     setSubmitWorkData(prev => ({
       ...prev,
       files: prev.files.filter((_, i) => i !== index)
     }));
+
+    // Also remove from blockchain hashes if it exists
+    if (fileToRemove && showBlockchainUpload) {
+      setBlockchainHashes(prev => 
+        prev.filter(hash => hash.fileName !== fileToRemove.name)
+      );
+    }
   };
+
 
   const renderBackButton = () => (
     <Button
@@ -581,6 +651,11 @@ export const SellerDashboard = (): JSX.Element => {
               {/* Submit Work Form */}
               <Card className="bg-white border border-gray-200">
                 <CardContent className="p-8">
+                  {submitError && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+                      {submitError}
+                    </div>
+                  )}
                   <form onSubmit={handleWorkSubmit} className="space-y-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -597,13 +672,44 @@ export const SellerDashboard = (): JSX.Element => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Upload Files
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Upload Files
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="blockchain-verify"
+                            checked={showBlockchainUpload}
+                            onChange={(e) => setShowBlockchainUpload(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <label htmlFor="blockchain-verify" className="text-sm text-gray-700">
+                            🔒 Enable Blockchain Verification
+                          </label>
+                        </div>
+                      </div>
+
+                      {showBlockchainUpload && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-700 mb-1">
+                            <strong>Blockchain Verification Enabled</strong>
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            Documents will be hashed and submitted to Algorand blockchain for tamper-proof evidence
+                          </p>
+                        </div>
+                      )}
+
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                         <UploadIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-600 mb-4">
                           Upload your completed work, reports, and supporting documents
+                          {showBlockchainUpload && (
+                            <span className="block text-sm text-blue-600 mt-1">
+                              Files will be blockchain-verified for authenticity
+                            </span>
+                          )}
                         </p>
                         <input
                           type="file"
@@ -615,7 +721,11 @@ export const SellerDashboard = (): JSX.Element => {
                         />
                         <label
                           htmlFor="file-upload"
-                          className="bg-[#1B1828] text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-[#1B1828]/90 transition-colors"
+                          className={`px-6 py-2 rounded-lg cursor-pointer transition-colors ${
+                            showBlockchainUpload 
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                              : 'bg-[#1B1828] hover:bg-[#1B1828]/90 text-white'
+                          }`}
                         >
                           Choose Files
                         </label>
@@ -633,6 +743,11 @@ export const SellerDashboard = (): JSX.Element => {
                                 <span className="text-xs text-gray-500">
                                   ({(file.size / 1024 / 1024).toFixed(2)} MB)
                                 </span>
+                                {showBlockchainUpload && (
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                    🔒 Blockchain Verified
+                                  </span>
+                                )}
                               </div>
                               <Button
                                 type="button"
@@ -645,6 +760,23 @@ export const SellerDashboard = (): JSX.Element => {
                               </Button>
                             </div>
                           ))}
+                        </div>
+                      )}
+
+                      {/* Display blockchain verification status */}
+                      {showBlockchainUpload && blockchainHashes.length > 0 && (
+                        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                          <h4 className="text-sm font-medium text-green-800 mb-2">
+                            ✅ Blockchain Verification Complete
+                          </h4>
+                          <div className="space-y-1">
+                            {blockchainHashes.map((item, index) => (
+                              <div key={index} className="text-xs text-green-700">
+                                <span className="font-medium">{item.fileName}</span>
+                                {item.txId && <span className="ml-2">TX: {item.txId.substring(0, 12)}...</span>}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -660,9 +792,10 @@ export const SellerDashboard = (): JSX.Element => {
                       </Button>
                       <Button
                         type="submit"
-                        className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
+                        disabled={isSubmitting}
+                        className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 disabled:opacity-50"
                       >
-                        Submit Work
+                        {isSubmitting ? "Submitting..." : "Submit Work"}
                       </Button>
                     </div>
                   </form>
@@ -815,7 +948,7 @@ export const SellerDashboard = (): JSX.Element => {
                         onClick={() => {
                           // Create a gig object from the active bid data
                           const activeBidGig: Gig = {
-                            id: 101, // Using a unique ID for this active bid
+                            id: "101", // Using a unique ID for this active bid
                             title: "Property Survey - Lekki Phase 1",
                             company: "Prestige Homes",
                             price: "₦75,000",

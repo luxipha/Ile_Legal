@@ -54,8 +54,12 @@
 // Currently using mock data for frontend-only development
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Local Supabase configuration for development
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:54321'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+
+console.log('Supabase URL:', supabaseUrl)
+console.log('Supabase Key:', supabaseAnonKey ? 'Set' : 'Not set')
 
 // Create Supabase client with additional options to handle CORS
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -79,6 +83,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
   },
 })
+
+// Test Supabase connection on initialization
+const testConnection = async () => {
+  try {
+    const { error } = await supabase.from('profiles').select('count', { count: 'exact', head: true });
+    if (error && !error.message.includes('relation') && !error.message.includes('does not exist')) {
+      console.warn('Supabase connection test failed:', error.message);
+    } else {
+      console.log('✅ Supabase connection successful');
+    }
+  } catch (error) {
+    console.warn('⚠️ Supabase server may not be running. Using fallback mode.');
+  }
+};
+
+// Test connection in development
+if (import.meta.env.DEV) {
+  testConnection();
+}
 
 // Debug Supabase connection
 supabase.auth.onAuthStateChange((event, session) => {

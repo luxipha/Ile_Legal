@@ -58,7 +58,7 @@ export const api = {
       }
 
       const { data, error } = await supabase
-        .from('Bids')
+        .from('bids')
         .insert({
           gig_id: gigId,
           seller_id: user.id,
@@ -79,7 +79,7 @@ export const api = {
 
     getBidsByGigId: async (gigId: string) => {
       const { data, error } = await supabase
-        .from('Bids')
+        .from('bids')
         .select('*')
         .eq('gig_id', gigId)
         .order('created_at', { ascending: false });
@@ -91,17 +91,22 @@ export const api = {
       return data;
     },
 
-    getActiveBids: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    getActiveBids: async (userId?: string) => {
+      // If userId is provided, use it; otherwise try to get from Supabase auth
+      let sellerId = userId;
       
-      if (!user) {
-        throw new Error('User must be logged in to view bids');
+      if (!sellerId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('User must be logged in to view bids');
+        }
+        sellerId = user.id;
       }
 
       const { data, error } = await supabase
-        .from('Bids')
+        .from('bids')
         .select('*')
-        .eq('seller_id', user.id)
+        .eq('seller_id', sellerId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
@@ -126,7 +131,7 @@ export const api = {
 
       // First verify that the bid belongs to either the current user (as seller) or the buyer
       const { data: existingBid, error: fetchError } = await supabase
-        .from('Bids')
+        .from('bids')
         .select('seller_id, buyer_id')
         .eq('id', bidId)
         .single();
@@ -154,7 +159,7 @@ export const api = {
       }
 
       const { data, error } = await supabase
-        .from('Bids')
+        .from('bids')
         .update(updates)
         .eq('id', bidId)
         .select()
@@ -176,7 +181,7 @@ export const api = {
 
       // First verify that the bid belongs to the current user
       const { data: existingBid, error: fetchError } = await supabase
-        .from('Bids')
+        .from('bids')
         .select('seller_id, status')
         .eq('id', bidId)
         .single();
@@ -195,7 +200,7 @@ export const api = {
       }
 
       const { error } = await supabase
-        .from('Bids')
+        .from('bids')
         .delete()
         .eq('id', bidId);
 
@@ -210,7 +215,7 @@ export const api = {
   gigs: {
     getGigById: async (gigId: string) => {
       const { data, error } = await supabase
-        .from('Gigs')
+        .from('gigs')
         .select('*')
         .eq('id', gigId);
       if (error) {
@@ -226,7 +231,7 @@ export const api = {
       deadline?: { start: number; end: number };
     }) => {
       let query = supabase
-        .from("Gigs")
+        .from("gigs")
         .select("*");
 
       // Apply category filter if provided
@@ -298,7 +303,7 @@ export const api = {
       }
 
       const { data, error } = await supabase
-        .from('Gigs')
+        .from('gigs')
         .insert({
           title: gigData.title,
           description: gigData.description,
@@ -319,7 +324,7 @@ export const api = {
       deadline?: { start: number; end: number };
     }) => {
       let query = supabase
-        .from("Gigs")
+        .from("gigs")
         .select("*")
         .eq('buyer_id', userId);
 
@@ -358,7 +363,7 @@ export const api = {
 
     deleteGig: async (gigId: string) => {
       const { error } = await supabase
-        .from('Gigs')
+        .from('gigs')
         .delete()
         .eq('id', gigId);
       return error;
@@ -376,7 +381,7 @@ export const api = {
       // client: JSON;
     }) => {
       const { error } = await supabase
-        .from('Gigs')
+        .from('gigs')
         .update(gigData)
         .eq('id', gigId);
       console.log(error);
@@ -854,6 +859,11 @@ export const api = {
       gig_id: string;
       deliverables?: FileList | File[];
       notes?: string;
+      blockchain_hashes?: Array<{
+        fileName: string;
+        hash: string;
+        txId?: string;
+      }>;
     }) => {
       let deliverableFilenames: string[] = [];
       
@@ -880,12 +890,20 @@ export const api = {
         deliverableFilenames = await Promise.all(uploadPromises);
       }
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User must be logged in to submit work');
+      }
+
       const { data, error } = await supabase
         .from('Work Submissions')
         .insert({
           gig_id: submissionData.gig_id,
+          seller_id: user.id,
           deliverables: deliverableFilenames,
           notes: submissionData.notes || '',
+          blockchain_hashes: submissionData.blockchain_hashes || [],
           status: 'submitted'
         });
 

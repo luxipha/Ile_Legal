@@ -73,6 +73,11 @@ function AppRoutes() {
           <MyGigs />
         </ProtectedRoute>
       } />
+      <Route path="/MyGigs" element={
+        <ProtectedRoute requiredRole="buyer">
+          <MyGigs />
+        </ProtectedRoute>
+      } />
       <Route path="/post-gig" element={
         <ProtectedRoute requiredRole="buyer">
           <PostGig />
