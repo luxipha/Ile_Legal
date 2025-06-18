@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header";
@@ -18,6 +18,7 @@ import {
   PlusIcon,
   BriefcaseIcon
 } from "lucide-react";
+import { api } from '../../services/api';
 
 interface Education {
   degree: string;
@@ -37,12 +38,25 @@ interface ProfileData {
   education: Education[];
 }
 
+interface Feedback {
+  id: number;
+  rating: number;
+  free_response: string;
+  creator: string;
+  recipient: string;
+  gig_id: number;
+  created_at: string;
+}
+
 type ViewMode = "profile" | "edit-profile";
 
 export const BuyerProfile = (): JSX.Element => {
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "projects">("overview");
   const [newInterest, setNewInterest] = useState("");
+  const [reviews, setReviews] = useState<Feedback[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [averageRating, setAverageRating] = useState(0);
   
   const [profileData, setProfileData] = useState<ProfileData>({
     firstName: "Demo",
@@ -76,6 +90,44 @@ export const BuyerProfile = (): JSX.Element => {
 
   const [editFormData, setEditFormData] = useState<ProfileData>(profileData);
 
+  // Fetch feedback data when component mounts or when reviews tab is active
+  useEffect(() => {
+    if (activeTab === "reviews") {
+      fetchFeedback();
+    }
+  }, [activeTab]);
+
+  const fetchFeedback = async () => {
+    setLoadingReviews(true);
+    try {
+      const feedbackData = await api.feedback.getFeedbackForUser();
+      setReviews(feedbackData);
+      
+      // Calculate average rating
+      if (feedbackData.length > 0) {
+        const totalRating = feedbackData.reduce((sum, feedback) => sum + feedback.rating, 0);
+        setAverageRating(totalRating / feedbackData.length);
+      }
+    } catch (error) {
+      console.error('Error fetching feedback:', error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return "1 day ago";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+  };
+
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "experience", label: "Experience" },
@@ -97,27 +149,6 @@ export const BuyerProfile = (): JSX.Element => {
       company: "Evergreen Estates",
       period: "2014 - 2018",
       description: "Managed large-scale residential developments with budgets exceeding ₦5 billion."
-    }
-  ];
-
-  const reviews = [
-    {
-      name: "Chioma Okonkwo",
-      rating: 5,
-      comment: "Excellent client to work with. Clear requirements and prompt payments.",
-      date: "2 weeks ago"
-    },
-    {
-      name: "Adebayo Ogundimu",
-      rating: 5,
-      comment: "Professional and knowledgeable about property law requirements.",
-      date: "1 month ago"
-    },
-    {
-      name: "Funmi Adebisi",
-      rating: 4,
-      comment: "Good communication throughout the project. Satisfied with the collaboration.",
-      date: "2 months ago"
     }
   ];
 
@@ -281,32 +312,44 @@ export const BuyerProfile = (): JSX.Element => {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-gray-900">Professional Reviews</h3>
               <div className="flex items-center gap-2">
-                <div className="flex">{renderStars(5)}</div>
-                <span className="text-lg font-semibold text-gray-900">4.8 out of 5</span>
+                <div className="flex">{renderStars(Math.round(averageRating))}</div>
+                <span className="text-lg font-semibold text-gray-900">
+                  {averageRating > 0 ? `${averageRating.toFixed(1)} out of 5` : "No reviews yet"}
+                </span>
               </div>
             </div>
 
-            <div className="space-y-6">
-              {reviews.map((review, index) => (
-                <Card key={index} className="bg-white border border-gray-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                          <UserIcon className="w-6 h-6 text-gray-600" />
+            {loadingReviews ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">Loading reviews...</div>
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-500">No reviews yet</div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {reviews.map((review, index) => (
+                  <Card key={review.id || index} className="bg-white border border-gray-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                            <UserIcon className="w-6 h-6 text-gray-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Legal Professional</h4>
+                            <div className="flex">{renderStars(review.rating)}</div>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{review.name}</h4>
-                          <div className="flex">{renderStars(review.rating)}</div>
-                        </div>
+                        <span className="text-sm text-gray-500">{formatDate(review.created_at)}</span>
                       </div>
-                      <span className="text-sm text-gray-500">{review.date}</span>
-                    </div>
-                    <p className="text-gray-600">{review.comment}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      <p className="text-gray-600">{review.free_response}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         );
 
