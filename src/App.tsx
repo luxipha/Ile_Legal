@@ -18,85 +18,142 @@ import { Messages } from "./screens/Messages";
 import { AdminDashboard } from "./screens/AdminDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ResetPassword } from "./screens/ResetPassword/ResetPassword";
+import { AuthCallback } from "./screens/AuthCallback/AuthCallback";
+import { TestAccounts } from "./screens/TestAccounts";
+import { BlockchainDemo } from "./screens/BlockchainDemo";
+import { AuthProvider } from "./contexts/AuthContext";
+import WalletIndex from "./screens/Wallet";
+import ToastWrapper from './components/ToastWrapper';
+
+function AppRoutes() {
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      
+      {/* Protected Routes with role-based access */}
+      <Route path="/seller-dashboard" element={
+        <ProtectedRoute requiredRole="seller">
+          <SellerDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/buyer-dashboard" element={
+        <ProtectedRoute requiredRole="buyer">
+          <BuyerDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin-dashboard" element={
+        <ProtectedRoute requiredRole="admin">
+          <AdminDashboard />
+        </ProtectedRoute>
+      } />
+      
+      {/* Other protected routes */}
+      <Route path="/buyer-messages" element={
+        <ProtectedRoute requiredRole="buyer">
+          <BuyerMessages />
+        </ProtectedRoute>
+      } />
+      <Route path="/payments" element={
+        <ProtectedRoute>
+          <BuyerPayments />
+        </ProtectedRoute>
+      } />
+      <Route path="/buyer-profile" element={
+        <ProtectedRoute requiredRole="buyer">
+          <BuyerProfile />
+        </ProtectedRoute>
+      } />
+      <Route path="/my-gigs" element={
+        <ProtectedRoute requiredRole="seller">
+          <MyGigs />
+        </ProtectedRoute>
+      } />
+      <Route path="/MyGigs" element={
+        <ProtectedRoute requiredRole="buyer">
+          <MyGigs />
+        </ProtectedRoute>
+      } />
+      <Route path="/post-gig" element={
+        <ProtectedRoute requiredRole="buyer">
+          <PostGig />
+        </ProtectedRoute>
+      } />
+      <Route path="/find-gigs" element={
+        <ProtectedRoute>
+          <FindGigs />
+        </ProtectedRoute>
+      } />
+      <Route path="/active-bids" element={
+        <ProtectedRoute requiredRole="seller">
+          <ActiveBids />
+        </ProtectedRoute>
+      } />
+      <Route path="/earnings" element={
+        <ProtectedRoute requiredRole="seller">
+          <Earnings />
+        </ProtectedRoute>
+      } />
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      } />
+      <Route path="/messages" element={
+        <ProtectedRoute requiredRole="seller">
+          <Messages />
+        </ProtectedRoute>
+      } />
+      <Route path="/seller-messages" element={
+        <ProtectedRoute requiredRole="seller">
+          <Messages />
+        </ProtectedRoute>
+      } />
+      
+      {/* Wallet routes */}
+      <Route path="/wallet" element={
+        <ProtectedRoute>
+          <WalletIndex />
+        </ProtectedRoute>
+      } />
+      <Route path="/wallet/transactions" element={
+        <ProtectedRoute>
+          <WalletIndex />
+        </ProtectedRoute>
+      } />
+      <Route path="/wallet/funding" element={
+        <ProtectedRoute>
+          <WalletIndex />
+        </ProtectedRoute>
+      } />
+      <Route path="/wallet/test" element={
+        <ProtectedRoute requiredRole="admin">
+          <WalletIndex />
+        </ProtectedRoute>
+      } />
+      
+      {/* Test Accounts Route - No protection */}
+      <Route path="/test-accounts" element={<TestAccounts />} />
+      
+      {/* Blockchain Demo Route - No protection for demonstration */}
+      <Route path="/BlockchainDemo" element={<BlockchainDemo />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-
-        {/* Protected Routes */}
-        <Route path="/seller-dashboard" element={
-          <ProtectedRoute>
-            <SellerDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/buyer-dashboard" element={
-          <ProtectedRoute>
-            <BuyerDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/buyer-messages" element={
-          <ProtectedRoute>
-            <BuyerMessages />
-          </ProtectedRoute>
-        } />
-        <Route path="/payments" element={
-          <ProtectedRoute>
-            <BuyerPayments />
-          </ProtectedRoute>
-        } />
-        <Route path="/buyer-profile" element={
-          <ProtectedRoute>
-            <BuyerProfile />
-          </ProtectedRoute>
-        } />
-        <Route path="/my-gigs" element={
-          <ProtectedRoute>
-            <MyGigs />
-          </ProtectedRoute>
-        } />
-        <Route path="/post-gig" element={
-          <ProtectedRoute>
-            <PostGig />
-          </ProtectedRoute>
-        } />
-        <Route path="/find-gigs" element={
-          <ProtectedRoute>
-            <FindGigs />
-          </ProtectedRoute>
-        } />
-        <Route path="/active-bids" element={
-          <ProtectedRoute>
-            <ActiveBids />
-          </ProtectedRoute>
-        } />
-        <Route path="/earnings" element={
-          <ProtectedRoute>
-            <Earnings />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="/messages" element={
-          <ProtectedRoute>
-            <Messages />
-          </ProtectedRoute>
-        } />
-        <Route path="/admin-dashboard" element={
-          <ProtectedRoute>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } />
-      </Routes>
-    </Router>
+    <ToastWrapper>
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
+    </ToastWrapper>
   );
 }
 

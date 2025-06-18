@@ -1,38 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { ViewDetails } from "../../components/ViewDetails";
-import { Header } from "../../components/Header";
+import { ViewDetails, Gig } from "../../components/ViewDetails";
+import { Header } from "../../components/Header/Header";
+import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { api } from "../../services/api";
+
 import { 
   SearchIcon, 
   FilterIcon, 
   GridIcon, 
   ListIcon,
-  MapPinIcon,
   CalendarIcon,
-  DollarSignIcon,
-  UserIcon,
-  GavelIcon,
-  MessageSquareIcon,
   ArrowLeftIcon
 } from "lucide-react";
 
 type ViewMode = "list" | "view-details" | "place-bid";
-
-interface Gig {
-  id: string;
-  title: string;
-  description: string;
-  categories: string[];
-  budget: number;
-  deadline: string;
-  status: string;
-  buyer_id: string;
-  created_at: string;
-  attachments?: string[];
-}
 
 export const FindGigs = (): JSX.Element => {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -85,7 +68,7 @@ export const FindGigs = (): JSX.Element => {
     const matchesSearch = gig.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          gig.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "All Categories" || 
-                           gig.categories.includes(selectedCategory.toLowerCase().replace(/\s+/g, '-'));
+                           (gig.categories && gig.categories.includes(selectedCategory.toLowerCase().replace(/\s+/g, '-')));
     return matchesSearch && matchesCategory;
   });
 
@@ -94,10 +77,8 @@ export const FindGigs = (): JSX.Element => {
     setViewMode("view-details");
   };
 
-  const handlePlaceBid = (gig?: Gig) => {
-    if (gig) {
-      setSelectedGig(gig);
-    }
+  const handlePlaceBid = (gig: Gig) => {
+    setSelectedGig(gig);
     setViewMode("place-bid");
   };
 
@@ -113,7 +94,7 @@ export const FindGigs = (): JSX.Element => {
         selectedGig.id,
         Number(bidFormData.bidAmount),
         bidFormData.proposal,
-        selectedGig.buyer_id
+        selectedGig.buyer_id || selectedGig.buyerId || ""
       );
 
       // Reset form and return to list view
@@ -168,74 +149,7 @@ export const FindGigs = (): JSX.Element => {
     return (
       <div className="min-h-screen bg-gray-50 flex">
         {/* Sidebar */}
-        <div className="w-64 bg-[#1B1828] text-white flex flex-col">
-          {/* Logo */}
-          <div className="p-6 border-b border-gray-700">
-            <Link to="/" className="flex items-center gap-3">
-              <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
-              <div className="text-gray-300 text-sm">
-                Legal
-                <br />
-                Marketplace
-              </div>
-            </Link>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 p-4">
-            <ul className="space-y-2">
-              <li>
-                <Link to="/seller-dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <UserIcon className="w-5 h-5" />
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link to="/find-gigs" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 text-white">
-                  <SearchIcon className="w-5 h-5" />
-                  Find Gigs
-                </Link>
-              </li>
-              <li>
-                <Link to="/active-bids" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <GavelIcon className="w-5 h-5" />
-                  Active Bids
-                </Link>
-              </li>
-              <li>
-                <Link to="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <MessageSquareIcon className="w-5 h-5" />
-                  Messages
-                </Link>
-              </li>
-              <li>
-                <Link to="/earnings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <DollarSignIcon className="w-5 h-5" />
-                  Earnings
-                </Link>
-              </li>
-              <li>
-                <Link to="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <UserIcon className="w-5 h-5" />
-                  Profile
-                </Link>
-              </li>
-            </ul>
-          </nav>
-
-          {/* User Profile */}
-          <div className="p-4 border-t border-gray-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <UserIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SellerSidebar activePage="find-gigs" />
 
         {/* Main Content - Place Bid */}
         <div className="flex-1 flex flex-col">
@@ -253,15 +167,21 @@ export const FindGigs = (): JSX.Element => {
                   <div className="grid grid-cols-3 gap-6">
                     <div>
                       <span className="text-gray-600">Budget:</span>
-                      <div className="font-semibold text-gray-900">₦{selectedGig.budget.toLocaleString()}</div>
+                      <div className="font-semibold text-gray-900">
+                        {selectedGig.budget ? `₦${selectedGig.budget.toLocaleString()}` : selectedGig.price || 'Not specified'}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-600">Deadline:</span>
-                      <div className="font-semibold text-gray-900">{new Date(selectedGig.deadline).toLocaleDateString()}</div>
+                      <div className="font-semibold text-gray-900">
+                        {selectedGig.deadline ? new Date(selectedGig.deadline).toLocaleDateString() : 'Not specified'}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-600">Posted:</span>
-                      <div className="font-semibold text-gray-900">{new Date(selectedGig.created_at).toLocaleDateString()}</div>
+                      <div className="font-semibold text-gray-900">
+                        {selectedGig.created_at ? new Date(selectedGig.created_at).toLocaleDateString() : selectedGig.postedDate || 'Not specified'}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -359,74 +279,7 @@ export const FindGigs = (): JSX.Element => {
     return (
       <div className="min-h-screen bg-gray-50 flex">
         {/* Sidebar */}
-        <div className="w-64 bg-[#1B1828] text-white flex flex-col">
-          {/* Logo */}
-          <div className="p-6 border-b border-gray-700">
-            <Link to="/" className="flex items-center gap-3">
-              <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
-              <div className="text-gray-300 text-sm">
-                Legal
-                <br />
-                Marketplace
-              </div>
-            </Link>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 p-4">
-            <ul className="space-y-2">
-              <li>
-                <Link to="/seller-dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <UserIcon className="w-5 h-5" />
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link to="/find-gigs" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 text-white">
-                  <SearchIcon className="w-5 h-5" />
-                  Find Gigs
-                </Link>
-              </li>
-              <li>
-                <Link to="/active-bids" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <GavelIcon className="w-5 h-5" />
-                  Active Bids
-                </Link>
-              </li>
-              <li>
-                <Link to="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <MessageSquareIcon className="w-5 h-5" />
-                  Messages
-                </Link>
-              </li>
-              <li>
-                <Link to="/earnings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <DollarSignIcon className="w-5 h-5" />
-                  Earnings
-                </Link>
-              </li>
-              <li>
-                <Link to="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <UserIcon className="w-5 h-5" />
-                  Profile
-                </Link>
-              </li>
-            </ul>
-          </nav>
-
-          {/* User Profile */}
-          <div className="p-4 border-t border-gray-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <UserIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SellerSidebar activePage="find-gigs" />
 
         {/* Main Content - View Details */}
         <div className="flex-1 flex flex-col">
@@ -437,7 +290,7 @@ export const FindGigs = (): JSX.Element => {
             <ViewDetails
               gig={selectedGig}
               onBack={() => setViewMode("list")}
-              onPlaceBid={handlePlaceBid}
+              onPlaceBid={(gig) => handlePlaceBid(gig)}
               backButtonText="Back to Find Gigs"
             />
           </main>
@@ -450,74 +303,7 @@ export const FindGigs = (): JSX.Element => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className="w-64 bg-[#1B1828] text-white flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-700">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
-            <div className="text-gray-300 text-sm">
-              Legal
-              <br />
-              Marketplace
-            </div>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <ul className="space-y-2">
-            <li>
-              <Link to="/seller-dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <UserIcon className="w-5 h-5" />
-                Dashboard
-              </Link>
-            </li>
-            <li>
-              <Link to="/find-gigs" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 text-white">
-                <SearchIcon className="w-5 h-5" />
-                Find Gigs
-              </Link>
-            </li>
-            <li>
-              <Link to="/active-bids" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <GavelIcon className="w-5 h-5" />
-                Active Bids
-              </Link>
-            </li>
-            <li>
-              <Link to="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <MessageSquareIcon className="w-5 h-5" />
-                Messages
-              </Link>
-            </li>
-            <li>
-              <Link to="/earnings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <DollarSignIcon className="w-5 h-5" />
-                Earnings
-              </Link>
-            </li>
-            <li>
-              <Link to="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <UserIcon className="w-5 h-5" />
-                Profile
-              </Link>
-            </li>
-          </ul>
-        </nav>
-
-        {/* User Profile */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-              <UserIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-sm font-medium">Demo Seller</div>
-              <div className="text-xs text-gray-400">seller@example.com</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SellerSidebar activePage="find-gigs" />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
@@ -600,14 +386,14 @@ export const FindGigs = (): JSX.Element => {
                     <CardContent className="p-6">
                       <div className="mb-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                          gig.categories.includes('land-title') ? 'bg-green-100 text-green-800' :
-                          gig.categories.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
-                          gig.categories.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
-                          gig.categories.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
-                          gig.categories.includes('due-diligence') ? 'bg-red-100 text-red-800' :
+                          gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
+                          gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                          gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                          gig.categories?.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                          gig.categories?.includes('due-diligence') ? 'bg-red-100 text-red-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {gig.categories[0].replace('-', ' ')}
+                          {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
                         </span>
                       </div>
                       
@@ -616,11 +402,13 @@ export const FindGigs = (): JSX.Element => {
                       
                       <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
                         <CalendarIcon className="w-4 h-4" />
-                        <span>Due: {new Date(gig.deadline).toLocaleDateString()}</span>
+                        <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
                       </div>
                       
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-gray-900">₦{gig.budget.toLocaleString()}</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
+                        </span>
                         <Button 
                           onClick={() => handleViewDetails(gig)}
                           className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] text-sm"
@@ -642,17 +430,17 @@ export const FindGigs = (): JSX.Element => {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                              gig.categories.includes('land-title') ? 'bg-green-100 text-green-800' :
-                              gig.categories.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
-                              gig.categories.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
-                              gig.categories.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
-                              gig.categories.includes('due-diligence') ? 'bg-red-100 text-red-800' :
+                              gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
+                              gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                              gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                              gig.categories?.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                              gig.categories?.includes('due-diligence') ? 'bg-red-100 text-red-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {gig.categories[0].replace('-', ' ')}
+                              {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
                             </span>
                             <span className="text-sm text-gray-500">
-                              Posted {new Date(gig.created_at).toLocaleDateString()}
+                              Posted {gig.created_at ? new Date(gig.created_at).toLocaleDateString() : gig.postedDate || 'Unknown'}
                             </span>
                           </div>
                           
@@ -662,13 +450,15 @@ export const FindGigs = (): JSX.Element => {
                           <div className="flex items-center gap-6 text-sm text-gray-500">
                             <div className="flex items-center gap-2">
                               <CalendarIcon className="w-4 h-4" />
-                              <span>Due: {new Date(gig.deadline).toLocaleDateString()}</span>
+                              <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
                             </div>
                           </div>
                         </div>
                         
                         <div className="text-right ml-6">
-                          <div className="text-2xl font-bold text-gray-900 mb-4">₦{gig.budget.toLocaleString()}</div>
+                          <div className="text-2xl font-bold text-gray-900 mb-4">
+                            {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
+                          </div>
                           <Button 
                             onClick={() => handleViewDetails(gig)}
                             className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"

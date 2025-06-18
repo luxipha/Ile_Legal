@@ -2,21 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
+import { Header } from "../../components/Header/Header";
+import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { 
-  UserIcon,
-  SearchIcon,
-  GavelIcon,
-  MessageSquareIcon,
-  DollarSignIcon,
-  BellIcon,
-  CreditCardIcon,
   StarIcon,
   CheckCircleIcon,
   MailIcon,
   PhoneIcon,
   MapPinIcon,
   GraduationCapIcon,
-  AwardIcon,
   BriefcaseIcon,
   FileTextIcon,
   EditIcon,
@@ -24,7 +18,11 @@ import {
   UploadIcon,
   PlusIcon,
   MinusIcon,
-  ChevronDownIcon
+  UserIcon,
+  SearchIcon,
+  GavelIcon,
+  MessageSquareIcon,
+  DollarSignIcon
 } from "lucide-react";
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
@@ -63,8 +61,6 @@ export const Profile = (): JSX.Element => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "cases">("overview");
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [newSpecialization, setNewSpecialization] = useState("");
   const [reviews, setReviews] = useState<Feedback[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
@@ -144,21 +140,6 @@ export const Profile = (): JSX.Element => {
     { id: "experience", label: "Experience" },
     { id: "reviews", label: "Reviews" },
     { id: "cases", label: "Cases" }
-  ];
-
-  const notifications = [
-    {
-      id: 1,
-      title: "New bid received on your gig",
-      time: "2 hours ago",
-      read: false
-    },
-    {
-      id: 2,
-      title: "Payment received",
-      time: "5 hours ago",
-      read: true
-    }
   ];
 
   const experience = [
@@ -480,89 +461,7 @@ export const Profile = (): JSX.Element => {
 
         {/* Main Content - Edit Profile */}
         <div className="flex-1 flex flex-col">
-          {/* Top Header */}
-          <header className="bg-white border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-semibold text-gray-900">Edit Profile</h1>
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" size="sm">
-                  <CreditCardIcon className="w-5 h-5 mr-2" />
-                </Button>
-                
-                {/* Notifications Dropdown */}
-                <div className="relative">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative"
-                  >
-                    <BellIcon className="w-5 h-5" />
-                    {notifications.some(n => !n.read) && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
-                    )}
-                  </Button>
-                  
-                  {showNotifications && (
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                      <div className="p-4 border-b border-gray-200">
-                        <h3 className="font-semibold text-gray-900">Notifications</h3>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {notifications.map((notification) => (
-                          <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50">
-                            <div className="font-medium text-gray-900">{notification.title}</div>
-                            <div className="text-sm text-gray-500">{notification.time}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Profile Dropdown */}
-                <div className="relative">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                    className="flex items-center gap-2"
-                  >
-                    <span className="text-sm text-gray-600">{profileData.firstName} {profileData.lastName}</span>
-                    <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                      <UserIcon className="w-4 h-4" />
-                    </div>
-                    <ChevronDownIcon className="w-4 h-4 text-gray-400" />
-                  </Button>
-
-                  {showProfileDropdown && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                      <Link 
-                        to="/profile" 
-                        className="block px-4 py-3 text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                      >
-                        Your Profile
-                      </Link>
-                      <Link 
-                        to="/earnings" 
-                        className="block px-4 py-3 text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                      >
-                        Wallet & Payments
-                      </Link>
-                      <button 
-                        onClick={async () => {
-                          await logout();
-                          navigate('/login');
-                        }}
-                        className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </header>
+          <Header title="Edit Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="seller" />
 
           {/* Edit Profile Content */}
           <main className="flex-1 p-6 overflow-y-auto">
@@ -860,157 +759,11 @@ export const Profile = (): JSX.Element => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className="w-64 bg-[#1B1828] text-white flex flex-col">
-        <div className="p-6 border-b border-gray-700">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
-            <div className="text-gray-300 text-sm">
-              Legal
-              <br />
-              Marketplace
-            </div>
-          </Link>
-        </div>
-
-        <nav className="flex-1 p-4">
-          <ul className="space-y-2">
-            <li>
-              <Link to="/seller-dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <UserIcon className="w-5 h-5" />
-                Dashboard
-              </Link>
-            </li>
-            <li>
-              <Link to="/find-gigs" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <SearchIcon className="w-5 h-5" />
-                Find Gigs
-              </Link>
-            </li>
-            <li>
-              <Link to="/active-bids" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <GavelIcon className="w-5 h-5" />
-                Active Bids
-              </Link>
-            </li>
-            <li>
-              <Link to="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <MessageSquareIcon className="w-5 h-5" />
-                Messages
-              </Link>
-            </li>
-            <li>
-              <Link to="/earnings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <DollarSignIcon className="w-5 h-5" />
-                Earnings
-              </Link>
-            </li>
-            <li>
-              <Link to="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 text-white">
-                <UserIcon className="w-5 h-5" />
-                Profile
-              </Link>
-            </li>
-          </ul>
-        </nav>
-
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-              <UserIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-sm font-medium">{profileData.firstName} {profileData.lastName}</div>
-              <div className="text-xs text-gray-400">{profileData.email}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SellerSidebar activePage="profile" />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold text-gray-900">Profile</h1>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm">
-                <CreditCardIcon className="w-5 h-5 mr-2" />
-              </Button>
-              
-              {/* Notifications Dropdown */}
-              <div className="relative">
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative"
-                >
-                  <BellIcon className="w-5 h-5" />
-                  {notifications.some(n => !n.read) && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
-                  )}
-                </Button>
-                
-                {showNotifications && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                    <div className="p-4 border-b border-gray-200">
-                      <h3 className="font-semibold text-gray-900">Notifications</h3>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {notifications.map((notification) => (
-                        <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50">
-                          <div className="font-medium text-gray-900">{notification.title}</div>
-                          <div className="text-sm text-gray-500">{notification.time}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Profile Dropdown */}
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                  className="flex items-center gap-2"
-                >
-                  <span className="text-sm text-gray-600">{profileData.firstName} {profileData.lastName}</span>
-                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                    <UserIcon className="w-4 h-4" />
-                  </div>
-                  <ChevronDownIcon className="w-4 h-4 text-gray-400" />
-                </Button>
-
-                {showProfileDropdown && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                    <Link 
-                      to="/profile" 
-                      className="block px-4 py-3 text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                    >
-                      Your Profile
-                    </Link>
-                    <Link 
-                      to="/earnings" 
-                      className="block px-4 py-3 text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                    >
-                      Wallet & Payments
-                    </Link>
-                    <button 
-                      onClick={async () => {
-                        await logout();
-                        navigate('/login');
-                      }}
-                      className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50"
-                    >
-                      Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
+        <Header title="Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="seller" />
 
         {/* Profile Content */}
         <main className="flex-1 p-6">

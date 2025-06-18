@@ -11,4 +11,10 @@ export default defineConfig({
       plugins: [tailwind()],
     },
   },
+  define: {
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    include: ['algosdk']
+  }
 });

@@ -1,18 +1,17 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { PaymentMethods } from "../../components/PaymentMethods";
 import { WithdrawFundsModal } from "../../components/WithdrawFundsModal";
-import { Header } from "../../components/Header";
+import { Wallet } from "../../components/Wallet/Wallet";
+import { Header } from "../../components/Header/Header";
+import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
+import { DisputeForm, DisputeData } from "../../components/DisputeForm/DisputeForm";
+import { useToast } from "../../components/ui/toast";
 import { 
-  UserIcon,
-  SearchIcon,
-  GavelIcon,
-  MessageSquareIcon,
-  DollarSignIcon,
   TrendingUpIcon,
-  TrendingDownIcon
+  TrendingDownIcon,
+  AlertCircleIcon
 } from "lucide-react";
 
 interface BankAccount {
@@ -24,8 +23,21 @@ interface BankAccount {
   currency: "NGN" | "USDC";
 }
 
+interface Transaction {
+  id: number;
+  type: "payment" | "withdrawal";
+  description: string;
+  date: string;
+  amount: string;
+  icon: string;
+  color: string;
+  counterparty?: string;
+}
+
 export const Earnings = (): JSX.Element => {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [disputeTransactionId, setDisputeTransactionId] = useState<number | null>(null);
+  const { addToast } = useToast();
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
     {
       id: "1",
@@ -37,7 +49,7 @@ export const Earnings = (): JSX.Element => {
     }
   ]);
 
-  const transactions = [
+  const transactions: Transaction[] = [
     {
       id: 1,
       type: "payment",
@@ -45,7 +57,8 @@ export const Earnings = (): JSX.Element => {
       date: "22/04/2025",
       amount: "+65,000",
       icon: "up",
-      color: "text-green-600"
+      color: "text-green-600",
+      counterparty: "John Doe"
     },
     {
       id: 2,
@@ -55,6 +68,26 @@ export const Earnings = (): JSX.Element => {
       amount: "-100,000",
       icon: "down",
       color: "text-red-600"
+    },
+    {
+      id: 3,
+      type: "payment",
+      description: "Payment for Contract Review",
+      date: "18/04/2025",
+      amount: "+45,000",
+      icon: "up",
+      color: "text-green-600",
+      counterparty: "Sarah Johnson"
+    },
+    {
+      id: 4,
+      type: "payment",
+      description: "Payment for Property Survey",
+      date: "15/04/2025",
+      amount: "+80,000",
+      icon: "up",
+      color: "text-green-600",
+      counterparty: "Michael Brown"
     }
   ];
 
@@ -89,78 +122,30 @@ export const Earnings = (): JSX.Element => {
       return filtered;
     });
   };
+  
+  const handleOpenDispute = (transactionId: number) => {
+    setDisputeTransactionId(transactionId);
+  };
+  
+  const handleCancelDispute = () => {
+    setDisputeTransactionId(null);
+  };
+  
+  const handleSubmitDispute = async (disputeData: DisputeData) => {
+    // Here you would typically call an API to submit the dispute
+    console.log('Dispute submitted:', disputeData);
+    
+    // Show success message
+    addToast("Your dispute has been submitted successfully", "success");
+    
+    // Close the dispute form
+    setDisputeTransactionId(null);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className="w-64 bg-[#1B1828] text-white flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-700">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
-            <div className="text-gray-300 text-sm">
-              Legal
-              <br />
-              Marketplace
-            </div>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <ul className="space-y-2">
-            <li>
-              <Link to="/seller-dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <UserIcon className="w-5 h-5" />
-                Dashboard
-              </Link>
-            </li>
-            <li>
-              <Link to="/find-gigs" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <SearchIcon className="w-5 h-5" />
-                Find Gigs
-              </Link>
-            </li>
-            <li>
-              <Link to="/active-bids" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <GavelIcon className="w-5 h-5" />
-                Active Bids
-              </Link>
-            </li>
-            <li>
-              <Link to="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <MessageSquareIcon className="w-5 h-5" />
-                Messages
-              </Link>
-            </li>
-            <li>
-              <Link to="/earnings" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 text-white">
-                <DollarSignIcon className="w-5 h-5" />
-                Earnings
-              </Link>
-            </li>
-            <li>
-              <Link to="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <UserIcon className="w-5 h-5" />
-                Profile
-              </Link>
-            </li>
-          </ul>
-        </nav>
-
-        {/* User Profile */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-              <UserIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-sm font-medium">Demo Seller</div>
-              <div className="text-xs text-gray-400">seller@example.com</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SellerSidebar activePage="earnings" />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
@@ -218,25 +203,51 @@ export const Earnings = (): JSX.Element => {
                     
                     <div className="space-y-4">
                       {transactions.map((transaction) => (
-                        <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              transaction.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
-                            }`}>
-                              {transaction.type === 'payment' ? (
-                                <TrendingUpIcon className="w-5 h-5 text-green-600" />
-                              ) : (
-                                <TrendingDownIcon className="w-5 h-5 text-red-600" />
+                        <div key={transaction.id} className="mb-2">
+                          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                transaction.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
+                              }`}>
+                                {transaction.type === 'payment' ? (
+                                  <TrendingUpIcon className="w-5 h-5 text-green-600" />
+                                ) : (
+                                  <TrendingDownIcon className="w-5 h-5 text-red-600" />
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">{transaction.description}</div>
+                                <div className="text-sm text-gray-500">{transaction.date}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className={`font-bold text-lg ${transaction.color}`}>
+                                {transaction.amount}
+                              </div>
+                              {transaction.type === 'payment' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleOpenDispute(transaction.id)}
+                                  className="flex items-center gap-1 text-amber-600 border-amber-200 hover:bg-amber-50"
+                                >
+                                  <AlertCircleIcon className="w-4 h-4" />
+                                  Report
+                                </Button>
                               )}
                             </div>
-                            <div>
-                              <div className="font-medium text-gray-900">{transaction.description}</div>
-                              <div className="text-sm text-gray-500">{transaction.date}</div>
-                            </div>
                           </div>
-                          <div className={`font-bold text-lg ${transaction.color}`}>
-                            {transaction.amount}
-                          </div>
+                          
+                          {disputeTransactionId === transaction.id && (
+                            <DisputeForm
+                              transactionId={transaction.id}
+                              transactionTitle={transaction.description}
+                              transactionAmount={transaction.amount}
+                              counterpartyName={transaction.counterparty || 'Counterparty'}
+                              onSubmit={handleSubmitDispute}
+                              onCancel={handleCancelDispute}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -246,12 +257,21 @@ export const Earnings = (): JSX.Element => {
 
               {/* Payment Methods - 40% width (2 columns) */}
               <div className="col-span-2">
-                <PaymentMethods
-                  bankAccounts={bankAccounts}
-                  onAddBankAccount={handleAddBankAccount}
-                  onSetDefault={handleSetDefault}
-                  onRemoveAccount={handleRemoveAccount}
+                {/* Crypto Wallet */}
+                <Wallet 
+                  balance="125.00"
+                  address="0x742d1235f6b5c2c2"
+                  currency="USDC"
                 />
+                
+                <div className="mt-6">
+                  <PaymentMethods
+                    bankAccounts={bankAccounts}
+                    onAddBankAccount={handleAddBankAccount}
+                    onSetDefault={handleSetDefault}
+                    onRemoveAccount={handleRemoveAccount}
+                  />
+                </div>
               </div>
             </div>
           </div>

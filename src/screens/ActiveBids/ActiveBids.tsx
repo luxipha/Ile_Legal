@@ -2,20 +2,22 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { Header } from "../../components/Header";
+import { Header } from "../../components/Header/Header";
+import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
+import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../services/api";
 import { 
-  UserIcon,
-  SearchIcon,
-  GavelIcon,
-  MessageSquareIcon,
-  DollarSignIcon,
   CalendarIcon,
   ArrowLeftIcon,
   StarIcon,
   BuildingIcon,
   SendIcon,
-  PaperclipIcon
+  PaperclipIcon,
+  UserIcon,
+  SearchIcon,
+  GavelIcon,
+  MessageSquareIcon,
+  DollarSignIcon
 } from "lucide-react";
 
 type ViewMode = "list" | "edit-bid" | "view-details";
@@ -46,6 +48,7 @@ interface Bid {
 export const ActiveBids = (): JSX.Element => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
   const [activeTab, setActiveTab] = useState<"details" | "bids" | "messages">("details");
@@ -76,10 +79,15 @@ export const ActiveBids = (): JSX.Element => {
   }, [location]);
 
   const fetchActiveBids = async () => {
+    if (!user) {
+      setError("Please log in to view your bids");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const bids = await api.bids.getActiveBids();
-      console.log("bids", bids);
+      const bids = await api.bids.getActiveBids(user.id);
       setActiveBids(bids);
       setError(null);
     } catch (err) {
@@ -656,74 +664,7 @@ export const ActiveBids = (): JSX.Element => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className="w-64 bg-[#1B1828] text-white flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-700">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
-            <div className="text-gray-300 text-sm">
-              Legal
-              <br />
-              Marketplace
-            </div>
-          </Link>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <ul className="space-y-2">
-            <li>
-              <Link to="/seller-dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <UserIcon className="w-5 h-5" />
-                Dashboard
-              </Link>
-            </li>
-            <li>
-              <Link to="/find-gigs" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <SearchIcon className="w-5 h-5" />
-                Find Gigs
-              </Link>
-            </li>
-            <li>
-              <Link to="/active-bids" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 text-white">
-                <GavelIcon className="w-5 h-5" />
-                Active Bids
-              </Link>
-            </li>
-            <li>
-              <Link to="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <MessageSquareIcon className="w-5 h-5" />
-                Messages
-              </Link>
-            </li>
-            <li>
-              <Link to="/earnings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <DollarSignIcon className="w-5 h-5" />
-                Earnings
-              </Link>
-            </li>
-            <li>
-              <Link to="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <UserIcon className="w-5 h-5" />
-                Profile
-              </Link>
-            </li>
-          </ul>
-        </nav>
-
-        {/* User Profile */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-              <UserIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-sm font-medium">Demo Seller</div>
-              <div className="text-xs text-gray-400">seller@example.com</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SellerSidebar activePage="active-bids" />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
