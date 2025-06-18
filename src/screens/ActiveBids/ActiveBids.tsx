@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
+import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../services/api";
 import { 
   CalendarIcon,
@@ -47,6 +48,7 @@ interface Bid {
 export const ActiveBids = (): JSX.Element => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
   const [activeTab, setActiveTab] = useState<"details" | "bids" | "messages">("details");
@@ -77,9 +79,15 @@ export const ActiveBids = (): JSX.Element => {
   }, [location]);
 
   const fetchActiveBids = async () => {
+    if (!user) {
+      setError("Please log in to view your bids");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const bids = await api.bids.getActiveBids();
+      const bids = await api.bids.getActiveBids(user.id);
       setActiveBids(bids);
       setError(null);
     } catch (err) {

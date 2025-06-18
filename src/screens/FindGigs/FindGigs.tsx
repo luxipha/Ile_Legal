@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { ViewDetails } from "../../components/ViewDetails";
+import { ViewDetails, Gig } from "../../components/ViewDetails";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { api } from "../../services/api";
@@ -16,21 +16,6 @@ import {
 } from "lucide-react";
 
 type ViewMode = "list" | "view-details" | "place-bid";
-
-
-// Remove the local interface Gig definition
-interface Gig {
-  id: string;
-  title: string;
-  description: string;
-  categories: string[];
-  budget: number;
-  deadline: string;
-  status: string;
-  buyer_id: string;
-  created_at: string;
-  attachments?: string[];
-}
 
 export const FindGigs = (): JSX.Element => {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -83,7 +68,7 @@ export const FindGigs = (): JSX.Element => {
     const matchesSearch = gig.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          gig.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "All Categories" || 
-                           gig.categories.includes(selectedCategory.toLowerCase().replace(/\s+/g, '-'));
+                           (gig.categories && gig.categories.includes(selectedCategory.toLowerCase().replace(/\s+/g, '-')));
     return matchesSearch && matchesCategory;
   });
 
@@ -109,7 +94,7 @@ export const FindGigs = (): JSX.Element => {
         selectedGig.id,
         Number(bidFormData.bidAmount),
         bidFormData.proposal,
-        selectedGig.buyer_id
+        selectedGig.buyer_id || selectedGig.buyerId || ""
       );
 
       // Reset form and return to list view
@@ -182,15 +167,21 @@ export const FindGigs = (): JSX.Element => {
                   <div className="grid grid-cols-3 gap-6">
                     <div>
                       <span className="text-gray-600">Budget:</span>
-                      <div className="font-semibold text-gray-900">₦{selectedGig.budget.toLocaleString()}</div>
+                      <div className="font-semibold text-gray-900">
+                        {selectedGig.budget ? `₦${selectedGig.budget.toLocaleString()}` : selectedGig.price || 'Not specified'}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-600">Deadline:</span>
-                      <div className="font-semibold text-gray-900">{new Date(selectedGig.deadline).toLocaleDateString()}</div>
+                      <div className="font-semibold text-gray-900">
+                        {selectedGig.deadline ? new Date(selectedGig.deadline).toLocaleDateString() : 'Not specified'}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-600">Posted:</span>
-                      <div className="font-semibold text-gray-900">{new Date(selectedGig.created_at).toLocaleDateString()}</div>
+                      <div className="font-semibold text-gray-900">
+                        {selectedGig.created_at ? new Date(selectedGig.created_at).toLocaleDateString() : selectedGig.postedDate || 'Not specified'}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -395,14 +386,14 @@ export const FindGigs = (): JSX.Element => {
                     <CardContent className="p-6">
                       <div className="mb-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                          gig.categories.includes('land-title') ? 'bg-green-100 text-green-800' :
-                          gig.categories.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
-                          gig.categories.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
-                          gig.categories.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
-                          gig.categories.includes('due-diligence') ? 'bg-red-100 text-red-800' :
+                          gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
+                          gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                          gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                          gig.categories?.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                          gig.categories?.includes('due-diligence') ? 'bg-red-100 text-red-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {gig.categories[0].replace('-', ' ')}
+                          {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
                         </span>
                       </div>
                       
@@ -411,11 +402,13 @@ export const FindGigs = (): JSX.Element => {
                       
                       <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
                         <CalendarIcon className="w-4 h-4" />
-                        <span>Due: {new Date(gig.deadline).toLocaleDateString()}</span>
+                        <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
                       </div>
                       
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-gray-900">₦{gig.budget.toLocaleString()}</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
+                        </span>
                         <Button 
                           onClick={() => handleViewDetails(gig)}
                           className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] text-sm"
@@ -437,17 +430,17 @@ export const FindGigs = (): JSX.Element => {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                              gig.categories.includes('land-title') ? 'bg-green-100 text-green-800' :
-                              gig.categories.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
-                              gig.categories.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
-                              gig.categories.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
-                              gig.categories.includes('due-diligence') ? 'bg-red-100 text-red-800' :
+                              gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
+                              gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                              gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                              gig.categories?.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                              gig.categories?.includes('due-diligence') ? 'bg-red-100 text-red-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {gig.categories[0].replace('-', ' ')}
+                              {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
                             </span>
                             <span className="text-sm text-gray-500">
-                              Posted {new Date(gig.created_at).toLocaleDateString()}
+                              Posted {gig.created_at ? new Date(gig.created_at).toLocaleDateString() : gig.postedDate || 'Unknown'}
                             </span>
                           </div>
                           
@@ -457,13 +450,15 @@ export const FindGigs = (): JSX.Element => {
                           <div className="flex items-center gap-6 text-sm text-gray-500">
                             <div className="flex items-center gap-2">
                               <CalendarIcon className="w-4 h-4" />
-                              <span>Due: {new Date(gig.deadline).toLocaleDateString()}</span>
+                              <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
                             </div>
                           </div>
                         </div>
                         
                         <div className="text-right ml-6">
-                          <div className="text-2xl font-bold text-gray-900 mb-4">₦{gig.budget.toLocaleString()}</div>
+                          <div className="text-2xl font-bold text-gray-900 mb-4">
+                            {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
+                          </div>
                           <Button 
                             onClick={() => handleViewDetails(gig)}
                             className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"

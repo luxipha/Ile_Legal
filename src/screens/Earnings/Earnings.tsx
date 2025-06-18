@@ -3,11 +3,15 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { PaymentMethods } from "../../components/PaymentMethods";
 import { WithdrawFundsModal } from "../../components/WithdrawFundsModal";
+import { Wallet } from "../../components/Wallet/Wallet";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
+import { DisputeForm, DisputeData } from "../../components/DisputeForm/DisputeForm";
+import { useToast } from "../../components/ui/toast";
 import { 
   TrendingUpIcon,
-  TrendingDownIcon
+  TrendingDownIcon,
+  AlertCircleIcon
 } from "lucide-react";
 
 interface BankAccount {
@@ -19,8 +23,21 @@ interface BankAccount {
   currency: "NGN" | "USDC";
 }
 
+interface Transaction {
+  id: number;
+  type: "payment" | "withdrawal";
+  description: string;
+  date: string;
+  amount: string;
+  icon: string;
+  color: string;
+  counterparty?: string;
+}
+
 export const Earnings = (): JSX.Element => {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [disputeTransactionId, setDisputeTransactionId] = useState<number | null>(null);
+  const { addToast } = useToast();
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
     {
       id: "1",
@@ -32,7 +49,7 @@ export const Earnings = (): JSX.Element => {
     }
   ]);
 
-  const transactions = [
+  const transactions: Transaction[] = [
     {
       id: 1,
       type: "payment",
@@ -40,7 +57,8 @@ export const Earnings = (): JSX.Element => {
       date: "22/04/2025",
       amount: "+65,000",
       icon: "up",
-      color: "text-green-600"
+      color: "text-green-600",
+      counterparty: "John Doe"
     },
     {
       id: 2,
@@ -50,6 +68,26 @@ export const Earnings = (): JSX.Element => {
       amount: "-100,000",
       icon: "down",
       color: "text-red-600"
+    },
+    {
+      id: 3,
+      type: "payment",
+      description: "Payment for Contract Review",
+      date: "18/04/2025",
+      amount: "+45,000",
+      icon: "up",
+      color: "text-green-600",
+      counterparty: "Sarah Johnson"
+    },
+    {
+      id: 4,
+      type: "payment",
+      description: "Payment for Property Survey",
+      date: "15/04/2025",
+      amount: "+80,000",
+      icon: "up",
+      color: "text-green-600",
+      counterparty: "Michael Brown"
     }
   ];
 
@@ -83,6 +121,25 @@ export const Earnings = (): JSX.Element => {
       }
       return filtered;
     });
+  };
+  
+  const handleOpenDispute = (transactionId: number) => {
+    setDisputeTransactionId(transactionId);
+  };
+  
+  const handleCancelDispute = () => {
+    setDisputeTransactionId(null);
+  };
+  
+  const handleSubmitDispute = async (disputeData: DisputeData) => {
+    // Here you would typically call an API to submit the dispute
+    console.log('Dispute submitted:', disputeData);
+    
+    // Show success message
+    addToast("Your dispute has been submitted successfully", "success");
+    
+    // Close the dispute form
+    setDisputeTransactionId(null);
   };
 
   return (
@@ -146,25 +203,51 @@ export const Earnings = (): JSX.Element => {
                     
                     <div className="space-y-4">
                       {transactions.map((transaction) => (
-                        <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              transaction.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
-                            }`}>
-                              {transaction.type === 'payment' ? (
-                                <TrendingUpIcon className="w-5 h-5 text-green-600" />
-                              ) : (
-                                <TrendingDownIcon className="w-5 h-5 text-red-600" />
+                        <div key={transaction.id} className="mb-2">
+                          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                transaction.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
+                              }`}>
+                                {transaction.type === 'payment' ? (
+                                  <TrendingUpIcon className="w-5 h-5 text-green-600" />
+                                ) : (
+                                  <TrendingDownIcon className="w-5 h-5 text-red-600" />
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">{transaction.description}</div>
+                                <div className="text-sm text-gray-500">{transaction.date}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className={`font-bold text-lg ${transaction.color}`}>
+                                {transaction.amount}
+                              </div>
+                              {transaction.type === 'payment' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleOpenDispute(transaction.id)}
+                                  className="flex items-center gap-1 text-amber-600 border-amber-200 hover:bg-amber-50"
+                                >
+                                  <AlertCircleIcon className="w-4 h-4" />
+                                  Report
+                                </Button>
                               )}
                             </div>
-                            <div>
-                              <div className="font-medium text-gray-900">{transaction.description}</div>
-                              <div className="text-sm text-gray-500">{transaction.date}</div>
-                            </div>
                           </div>
-                          <div className={`font-bold text-lg ${transaction.color}`}>
-                            {transaction.amount}
-                          </div>
+                          
+                          {disputeTransactionId === transaction.id && (
+                            <DisputeForm
+                              transactionId={transaction.id}
+                              transactionTitle={transaction.description}
+                              transactionAmount={transaction.amount}
+                              counterpartyName={transaction.counterparty || 'Counterparty'}
+                              onSubmit={handleSubmitDispute}
+                              onCancel={handleCancelDispute}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -174,12 +257,21 @@ export const Earnings = (): JSX.Element => {
 
               {/* Payment Methods - 40% width (2 columns) */}
               <div className="col-span-2">
-                <PaymentMethods
-                  bankAccounts={bankAccounts}
-                  onAddBankAccount={handleAddBankAccount}
-                  onSetDefault={handleSetDefault}
-                  onRemoveAccount={handleRemoveAccount}
+                {/* Crypto Wallet */}
+                <Wallet 
+                  balance="125.00"
+                  address="0x742d1235f6b5c2c2"
+                  currency="USDC"
                 />
+                
+                <div className="mt-6">
+                  <PaymentMethods
+                    bankAccounts={bankAccounts}
+                    onAddBankAccount={handleAddBankAccount}
+                    onSetDefault={handleSetDefault}
+                    onRemoveAccount={handleRemoveAccount}
+                  />
+                </div>
               </div>
             </div>
           </div>
