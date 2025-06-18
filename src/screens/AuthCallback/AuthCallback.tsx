@@ -19,7 +19,6 @@ export const AuthCallback = () => {
         }
 
         if (data?.session) {
-          console.log('Auth callback successful, session:', data.session);
           
           // Get user data
           const { data: userData } = await supabase.auth.getUser();

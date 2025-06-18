@@ -99,7 +99,7 @@ export const api = {
         .from('Bids')
         .select('*')
         .eq('seller_id', user.id)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'accepted'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -389,13 +389,26 @@ export const api = {
       seller_id: string;
       details: string;
       comments?: string;
+      resolution_decision?: string;
+      outcome?: string;
+      refund_amount?: string;
     }) => {
+      const insertData = {
+        ...disputeData,
+        status: 'pending',
+      };
+      if (disputeData.resolution_decision !== undefined) {
+        insertData.resolution_decision = disputeData.resolution_decision;
+      }
+      if (disputeData.outcome !== undefined) {
+        insertData.outcome = disputeData.outcome;
+      }
+      if (disputeData.refund_amount !== undefined) {
+        insertData.refund_amount = disputeData.refund_amount;
+      }
       const { data, error } = await supabase
         .from('Disputes')
-        .insert({
-          ...disputeData,
-          status: 'pending'
-        });
+        .insert(insertData);
 
       if (error) {
         throw error;
@@ -406,8 +419,9 @@ export const api = {
 
     getAllDisputes: async () => {
       // Check if user is admin using session
+      console.log("getAllDisputes");
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+      console.log("session", session);
       if (sessionError) {
         throw new Error('Authentication error');
       }
@@ -421,7 +435,7 @@ export const api = {
         .from('Disputes')
         .select('*')
         .order('created_at', { ascending: false });
-
+      console.log("disputes", disputes);
       if (disputesError) {
         throw disputesError;
       }
@@ -443,7 +457,7 @@ export const api = {
       return dispute;
     },
 
-    updateDisputeStatus: async (id: number, status: 'approved' | 'denied') => {
+    updateDisputeStatus: async (id: number, status: 'approved' | 'denied' | 'resolved') => {
       // Check if user is admin using session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -484,6 +498,40 @@ export const api = {
 
       return dispute;
     },
+
+    updateDisputeOutcome: async (id: number, outcome: string, refund_amount?: string) => {
+      const updateObj: any = { outcome };
+      if (refund_amount !== undefined) {
+        updateObj.refund_amount = refund_amount;
+      }
+      const { data: dispute, error } = await supabase
+        .from('Disputes')
+        .update(updateObj)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return dispute;
+    },
+
+    updateDisputeResolutionComment: async (id: number, resolution_comment: string) => {
+      const { data: dispute, error } = await supabase
+        .from('Disputes')
+        .update({ resolution_comment })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return dispute;
+    },
   },
 
 
@@ -491,7 +539,7 @@ export const api = {
     createFeedback: async (feedbackData: {
       free_response: string;
       rating: number;
-      gig_id: string;
+      gig_id: number;
     }) => {
       const { data, error } = await supabase
         .from('Feedback')

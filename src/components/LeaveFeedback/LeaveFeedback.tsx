@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 import { Button } from "../ui/button";
 import { ArrowLeftIcon } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { api } from "../../services/api";
 
 export interface LeaveFeedbackProps {
   isOpen: boolean;
@@ -12,7 +13,6 @@ export interface LeaveFeedbackProps {
   provider: string;
   providerAvatar: string;
   completedDate: string;
-  onSubmit: (gigId: number, rating: number, feedback: string) => void;
 }
 
 export const LeaveFeedback = ({
@@ -22,12 +22,14 @@ export const LeaveFeedback = ({
   gigTitle,
   provider,
   providerAvatar,
-  completedDate,
-  onSubmit
+  completedDate
 }: LeaveFeedbackProps) => {
   const [rating, setRating] = useState(5); // Default to 5 stars
   const [feedback, setFeedback] = useState("");
   const [charCount, setCharCount] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const maxChars = 500;
 
   const handleFeedbackChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -38,9 +40,29 @@ export const LeaveFeedback = ({
     }
   };
 
-  const handleSubmit = () => {
-    onSubmit(gigId, rating, feedback);
-    onClose();
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await api.feedback.createFeedback({
+        free_response: feedback,
+        rating,
+        gig_id: gigId
+      });
+      setSuccess(true);
+      setFeedback("");
+      setCharCount(0);
+      setTimeout(() => {
+        setSuccess(false);
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      console.log("err", err);
+      setError("Failed to submit feedback. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleRatingClick = (value: number) => {
@@ -112,25 +134,31 @@ export const LeaveFeedback = ({
               onChange={handleFeedbackChange}
               placeholder="Share your experience working with this provider..."
               className="w-full border border-gray-300 rounded-lg p-4 min-h-[150px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={submitting}
             />
             <div className="text-right text-gray-500 mt-1">
               {charCount}/{maxChars}
             </div>
           </div>
 
+          {error && <div className="text-red-600 mt-2">{error}</div>}
+          {success && <div className="text-green-600 mt-2">Feedback submitted successfully!</div>}
+
           <div className="mt-6 flex gap-4">
             <Button 
               variant="outline" 
               onClick={onClose}
               className="flex-1 py-6 text-base"
+              disabled={submitting}
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSubmit}
               className="flex-1 py-6 text-base bg-[#1B1828] hover:bg-[#2D2A3C]"
+              disabled={submitting || feedback.length === 0}
             >
-              Submit Feedback
+              {submitting ? "Submitting..." : "Submit Feedback"}
             </Button>
           </div>
         </div>
