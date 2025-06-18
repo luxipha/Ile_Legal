@@ -115,7 +115,7 @@ export const AdminVerifyUser = ({
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-4">Submitted Documents</h4>
                     <div className="space-y-3">
-                      {user.documents.map((doc, index) => (
+                      {(user.documents ?? []).map((doc, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <span className="font-medium text-gray-900">{doc.name}</span>
                           <div className="flex items-center gap-3">

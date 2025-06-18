@@ -37,6 +37,7 @@ interface AuthContextType {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   getUser: () => Promise<User | null>;
   resetPassword: (email: string) => Promise<void>;
+  getAllUsers: () => Promise<User[]>;
 }
 
 // Mock users for demo
@@ -311,22 +312,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('User already exists');
       }
 
+      // Register user with Supabase Auth
+      const signUpResult = await signUpNewUser(email, name, password, role);
+      const userId = signUpResult?.user?.id;
+      if (userId) {
+        // Insert into profiles table
+        const { error: profileError } = await supabase.from('Profiles').insert([
+          {
+            id: userId,
+            name,
+            email,
+            role_title: role,
+            email_verified: false
+          }
+        ]);
+        if (profileError) {
+          console.error('Error inserting into profiles:', profileError);
+          throw profileError;
+        }
+      }
+
+      // Set user in state (optional, for immediate login)
       const newUser = {
-        id: `${Date.now()}`,
+        id: userId || `${Date.now()}`,
         name,
         email,
         role,
         isVerified: false,
-        user_metadata: {}
+        user_metadata: { role_title: role }
       };
-
       const mockToken = `mock-token-${Date.now()}`;
-
       setUser(newUser);
       setToken(mockToken);
       localStorage.setItem('ileUser', JSON.stringify(newUser));
       localStorage.setItem('ileToken', mockToken);
-      signUpNewUser(email, name, password, role)
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -384,6 +403,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     }
     if (authUser) {
+      // Update the profiles table
+      const { error: profileUpdateError } = await supabase.from('Profiles').update({
+        name: authUser.user_metadata?.name,
+        email: authUser.email,
+        role_title: authUser.user_metadata?.role_title,
+        email_verified: authUser.user_metadata?.email_verified,
+        profile_picture: authUser.user_metadata?.profile_picture
+      }).eq('id', authUser.id);
+      if (profileUpdateError) {
+        console.error('Error updating profiles table:', profileUpdateError);
+        throw profileUpdateError;
+      }
       const updatedUser: User = {
         id: authUser.id,
         name: authUser.user_metadata?.name || '',
@@ -472,7 +503,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data?.verified) {
         // Check if user exists with this ETH address
         const { data: userData, error: userError } = await supabase
-          .from('profiles')
+          .from('Profiles')
           .select('*')
           .eq('eth_address', address)
           .single();
@@ -502,7 +533,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           // Create new user with ETH address
           const { data: userProfile } = await supabase
-            .from('profiles')
+            .from('Profiles')
             .select('*')
             .eq('eth_address', address)
             .single();
@@ -607,6 +638,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // New getAllUsers function
+  const getAllUsers = async (): Promise<User[]> => {
+    // Check if current user is admin
+    console.log("user", user);
+    if (!user || user.user_metadata?.role_title !== 'admin') {
+      throw new Error('Access denied. Admin privileges required.');
+    }
+
+    const { data, error } = await supabase
+      .from('Profiles')
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching all users:', error);
+      throw error;
+    }
+
+    console.log("data", data);
+
+    return data.map((userData: any) => ({
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role_title as UserRole,
+      isVerified: userData.email_verified,
+      user_metadata: userData.user_metadata
+    }));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -624,6 +684,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInWithGoogle,
         signInWithMetaMask,
         resetPassword,
+        getAllUsers,
         uploadProfilePicture: async (file: File): Promise<string> => {
           if (!user) return '';
           await updateProfile({ profile_picture: file });

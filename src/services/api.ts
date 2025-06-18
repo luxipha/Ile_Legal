@@ -54,9 +54,13 @@ export const api = {
         throw new Error('User must be logged in to create a bid');
       }
 
+      // Generate a random integer ID from 0 to 10000000
+      const randomId = Math.floor(Math.random() * 10000001);
+
       const { data, error } = await supabase
         .from('Bids')
         .insert({
+          id: randomId,
           gig_id: gigId,
           seller_id: user.id,
           buyer_id: buyer_id,
@@ -69,6 +73,34 @@ export const api = {
 
       if (error) {
         throw error;
+      }
+
+      // Get current bids array from the gig
+      const { data: gigData, error: gigFetchError } = await supabase
+        .from('Gigs')
+        .select('bids')
+        .eq('id', gigId)
+        .single();
+
+      if (gigFetchError) {
+        console.error('Error fetching gig bids:', gigFetchError);
+        return data;
+      }
+
+      // Append the new bid ID to the bids array
+      const currentBids = gigData.bids || [];
+      const updatedBids = [...currentBids, randomId];
+
+      // Update the gig with the new bids array
+      const { error: gigUpdateError } = await supabase
+        .from('Gigs')
+        .update({ bids: updatedBids })
+        .eq('id', gigId);
+
+      if (gigUpdateError) {
+        console.error('Error updating gig bids array:', gigUpdateError);
+        // Don't throw error here as the bid was created successfully
+        // The gig update failure shouldn't prevent the bid creation
       }
 
       return data;
@@ -541,12 +573,41 @@ export const api = {
       rating: number;
       gig_id: number;
     }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be logged in to create feedback');
+      }
+
+      // Get the gig to determine buyer_id and seller_id
+      const { data: gigData, error: gigError } = await supabase
+        .from('Gigs')
+        .select('buyer_id, seller_id')
+        .eq('id', feedbackData.gig_id)
+        .single();
+
+      if (gigError) {
+        throw new Error('Gig not found');
+      }
+
+      // Determine recipient: whichever is not equal to current user
+      let recipient;
+      if (gigData.buyer_id === user.id) {
+        recipient = gigData.seller_id;
+      } else if (gigData.seller_id === user.id) {
+        recipient = gigData.buyer_id;
+      } else {
+        throw new Error('User is not associated with this gig');
+      }
+
       const { data, error } = await supabase
         .from('Feedback')
         .insert({
           free_response: feedbackData.free_response,
           rating: feedbackData.rating,
-          gig_id: feedbackData.gig_id
+          gig_id: feedbackData.gig_id,
+          creator: user.id,
+          recipient: recipient
         });
 
       if (error) {
@@ -586,6 +647,26 @@ export const api = {
 
       const sum = data.reduce((acc, curr) => acc + curr.rating, 0);
       return sum / data.length;
+    },
+
+    getFeedbackForUser: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be logged in to view feedback');
+      }
+
+      const { data, error } = await supabase
+        .from('Feedback')
+        .select('*')
+        .eq('recipient', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
     },
   },
 

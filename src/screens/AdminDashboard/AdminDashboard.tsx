@@ -16,6 +16,7 @@ import { AdminVerifyUser } from "./AdminVerifyUser";
 import { AdminManageGig } from "./AdminManageGig";
 import { AdminLayout } from "./AdminLayout";
 import { api } from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 export type ViewMode = "dashboard" | "verify-user" | "manage-gigs" | "disputes" | "settings" | "profile" | "view-gig-details" | "view-user-details";
 
@@ -56,131 +57,80 @@ interface Dispute {
   openedDate: string;
   lastActivity: string;
   type: "Payment Dispute" | "Quality Dispute" | "Delivery Dispute";
+  gig_id: string;
+  seller_id: string;
 }
 
 export const AdminDashboard = (): JSX.Element => {
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
   const [selectedGigTab] = useState<"all" | "active" | "pending" | "completed" | "flagged">("all");
-  // Removed unused state variable selectedDisputeTab
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
 
+  // Auth context for admin user and fetching all users
+  const { getAllUsers, user: authUser } = useAuth();
+
+  // Users state
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+
+  // Gigs state
+  const [gigs, setGigs] = useState<any[]>([]);
+  const [gigsLoading, setGigsLoading] = useState(false);
+  const [gigsError, setGigsError] = useState<string | null>(null);
+
   // Disputes state
-  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [disputes, setDisputes] = useState<any[]>([]);
   const [disputesLoading, setDisputesLoading] = useState(false);
   const [disputesError, setDisputesError] = useState<string | null>(null);
 
+  // Fetch users
   useEffect(() => {
-    if (viewMode === "disputes") {
+    if (authUser && authUser.user_metadata?.role_title === 'admin') {
+      setUsersLoading(true);
+      setUsersError(null);
+      getAllUsers()
+        .then((data) => setUsers(data))
+        .catch((err) => {
+          setUsersError("Failed to load users.");
+          setUsers([]);
+        })
+        .finally(() => setUsersLoading(false));
+    }
+  }, [authUser, getAllUsers]);
+
+  // Fetch gigs
+  useEffect(() => {
+    if (authUser && authUser.user_metadata?.role_title === 'admin') {
+      setGigsLoading(true);
+      setGigsError(null);
+      api.gigs.getAllGigs()
+        .then((data) => setGigs(data))
+        .catch((err) => {
+          setGigsError("Failed to load gigs.");
+          setGigs([]);
+        })
+        .finally(() => setGigsLoading(false));
+    }
+  }, [authUser]);
+
+  // Fetch disputes
+  useEffect(() => {
+    if (authUser && authUser.user_metadata?.role_title === 'admin') {
       setDisputesLoading(true);
       setDisputesError(null);
       api.disputes.getAllDisputes()
-        .then((data) => {
-          setDisputes(data);
-        })
+        .then((data) => setDisputes(data))
         .catch((err) => {
           setDisputesError("Failed to load disputes.");
+          setDisputes([]);
         })
-        .finally(() => {
-          setDisputesLoading(false);
-        });
+        .finally(() => setDisputesLoading(false));
     }
-  }, [viewMode]);
+  }, [authUser]);
 
   // Settings component handles its own modal state
-
-  const users: User[] = [
-    {
-      id: 1,
-      name: "Oluwaseun Adebayo",
-      email: "oluwaseun@example.com",
-      type: "Property Law",
-      status: "Pending",
-      submittedDate: "22/04/2025",
-      documents: [
-        { name: "Bar Certificate", status: "Pending" },
-        { name: "Professional ID", status: "Verified" },
-        { name: "Practice License", status: "Pending" }
-      ]
-    },
-    {
-      id: 2,
-      name: "Chioma Okonkwo",
-      email: "chioma@example.com",
-      type: "Contract Law",
-      status: "Pending",
-      submittedDate: "21/04/2025",
-      documents: [
-        { name: "Bar Certificate", status: "Pending" },
-        { name: "Professional ID", status: "Verified" },
-        { name: "Practice License", status: "Pending" }
-      ]
-    },
-    {
-      id: 3,
-      name: "Amara Nwosu",
-      email: "amara@example.com",
-      type: "Business Law",
-      status: "Verified",
-      submittedDate: "20/04/2025",
-      documents: [
-        { name: "Bar Certificate", status: "Verified" },
-        { name: "Professional ID", status: "Verified" },
-        { name: "Practice License", status: "Verified" }
-      ]
-    },
-    {
-      id: 4,
-      name: "Tunde Bakare",
-      email: "tunde@example.com",
-      type: "Property Law",
-      status: "Rejected",
-      submittedDate: "18/04/2025",
-      documents: [
-        { name: "Bar Certificate", status: "Rejected" },
-        { name: "Professional ID", status: "Verified" },
-        { name: "Practice License", status: "Pending" }
-      ]
-    },
-    {
-      id: 5,
-      name: "Zainab Mohammed",
-      email: "zainab@example.com",
-      type: "Contract Law",
-      status: "Pending",
-      submittedDate: "26/04/2025",
-      documents: [
-        { name: "Bar Certificate", status: "Pending" },
-        { name: "Professional ID", status: "Pending" },
-        { name: "Practice License", status: "Pending" }
-      ]
-    }
-  ];
-
-  const gigs: Gig[] = [
-    {
-      id: 1,
-      title: "Land Title Verification - Victoria Island Property",
-      client: "Lagos Properties Ltd.",
-      provider: "Chinedu Okonkwo",
-      amount: "₦65,000",
-      status: "In Progress",
-      priority: "High Value",
-      postedDate: "26/04/2025",
-      dueDate: "15/05/2025"
-    },
-    {
-      id: 2,
-      title: "Contract Review for Commercial Lease",
-      client: "Commercial Realty",
-      provider: "Aadma Jalloh",
-      amount: "₦45,000",
-      status: "Pending Assignment",
-      priority: "New",
-      postedDate: "25/04/2025",
-      dueDate: "10/05/2025"
-    }
-  ];
 
   const handleVerifyUser = (userId: number): boolean => {
     console.log(`Approving user:`, userId);
@@ -339,7 +289,9 @@ export const AdminDashboard = (): JSX.Element => {
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">Total Users</div>
-                  <div className="text-xl font-bold">{users.length}</div>
+                  <div className="text-xl font-bold">
+                    {usersLoading ? '...' : usersError ? '!' : users.length}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -353,7 +305,9 @@ export const AdminDashboard = (): JSX.Element => {
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">Active Gigs</div>
-                  <div className="text-xl font-bold">{gigs.filter(g => g.status === "Active").length}</div>
+                  <div className="text-xl font-bold">
+                    {gigsLoading ? '...' : gigsError ? '!' : gigs.length}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -381,7 +335,7 @@ export const AdminDashboard = (): JSX.Element => {
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">Disputes</div>
-                  <div className="text-xl font-bold">{disputes.length}</div>
+                  <div className="text-xl font-bold">{disputesLoading ? '...' : disputesError ? '!' : disputes.length}</div>
                 </div>
               </div>
             </CardContent>
@@ -394,50 +348,61 @@ export const AdminDashboard = (): JSX.Element => {
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Pending Verifications</h3>
               <p className="text-gray-600 mb-4">Legal professionals awaiting verification</p>
-              
-              <div className="space-y-4">
-                {users.filter(u => u.status === "Pending").slice(0, 2).map((user) => (
-                  <div key={user.id} className="border-b border-gray-100 pb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                        <UsersIcon className="w-4 h-4 text-gray-500" />
+              {usersLoading ? (
+                <div className="text-gray-500">Loading...</div>
+              ) : usersError ? (
+                <div className="text-red-500">{usersError}</div>
+              ) : (
+                <div className="space-y-4">
+                  {users
+                    .filter(user => (user.status === "Pending" || user.user_metadata?.status === "Pending"))
+                    .slice(0, 2)
+                    .map((user) => (
+                      <div key={user.id} className="border-b border-gray-100 pb-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                            <UsersIcon className="w-4 h-4 text-gray-500" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{user.name}</div>
+                            <div className="text-xs text-gray-500">{user.type || user.user_metadata?.type || "Legal Professional"}</div>
+                          </div>
+                          <div className="ml-auto text-xs text-gray-500">{user.submittedDate || user.user_metadata?.submittedDate || ""}</div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Pending</span>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="ml-auto text-xs h-7"
+                            onClick={() => handleVerifyUser(user.id)}
+                          >
+                            Verify
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-xs text-red-500 border-red-200 hover:bg-red-50 h-7"
+                            onClick={() => handleRejectUser(user.id, "Documents incomplete")}
+                          >
+                            Reject
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="link"
+                            className="text-xs text-blue-500 h-7"
+                            onClick={() => handleViewUserDetails(user.id)}
+                          >
+                            View Details
+                          </Button>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-xs text-gray-500">{user.type} - Legal Professional</div>
-                      </div>
-                      <div className="ml-auto text-xs text-gray-500">{user.submittedDate}</div>
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Pending</span>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="ml-auto text-xs h-7"
-                        onClick={() => handleVerifyUser(user.id)}
-                      >
-                        Verify
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="text-xs text-red-500 border-red-200 hover:bg-red-50 h-7"
-                        onClick={() => handleRejectUser(user.id, "Documents incomplete")}
-                      >
-                        Reject
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="link"
-                        className="text-xs text-blue-500 h-7"
-                        onClick={() => handleViewUserDetails(user.id)}
-                      >
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    ))}
+                  {users.filter(user => (user.status === "Pending" || user.user_metadata?.status === "Pending")).length === 0 && (
+                    <div className="text-gray-500">No pending verifications.</div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -446,45 +411,56 @@ export const AdminDashboard = (): JSX.Element => {
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Active Disputes</h3>
               <p className="text-gray-600 mb-4">Disputes requiring admin intervention</p>
-              
-              <div className="space-y-4">
-                {disputes.slice(0, 1).map((dispute) => (
-                  <div key={dispute.id} className="border-b border-gray-100 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900">Payment Dispute - Land Survey Project</h4>
-                      <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">
-                        High Priority
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Between: Evergreen Properties & Solomon Adebayo
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-gray-900">₦120,000</span>
-                      <div className="text-xs text-gray-500">
-                        Opened: 24/04/2025
+              {disputesLoading ? (
+                <div className="text-gray-500">Loading...</div>
+              ) : disputesError ? (
+                <div className="text-red-500">{disputesError}</div>
+              ) : (
+                <div className="space-y-4">
+                  {disputes
+                    .filter(dispute => dispute.status === "Pending" || dispute.status === "In Review")
+                    .slice(0, 1)
+                    .map((dispute) => (
+                      <div key={dispute.id} className="border-b border-gray-100 pb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-gray-900">{dispute.title || "Dispute"}</h4>
+                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">
+                            {dispute.priority || "High Priority"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Between: {dispute.buyer} & {dispute.seller}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-gray-900">{dispute.amount}</span>
+                          <div className="text-xs text-gray-500">
+                            Opened: {dispute.openedDate || dispute.created_at || ""}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          <Button 
+                            size="sm" 
+                            className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white h-8"
+                            onClick={() => setViewMode("disputes")}
+                          >
+                            Resolve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-8"
+                            onClick={() => setViewMode("disputes")}
+                          >
+                            Contact Parties
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <Button 
-                        size="sm" 
-                        className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white h-8"
-                        onClick={() => setViewMode("disputes")}
-                      >
-                        Resolve
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="h-8"
-                        onClick={() => setViewMode("disputes")}
-                      >
-                        Contact Parties
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    ))}
+                  {disputes.filter(dispute => dispute.status === "Pending" || dispute.status === "In Review").length === 0 && (
+                    <div className="text-gray-500">No active disputes.</div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
