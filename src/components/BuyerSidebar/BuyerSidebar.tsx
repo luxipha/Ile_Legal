@@ -63,7 +63,7 @@ export const BuyerSidebar: React.FC<BuyerSidebarProps> = ({
           </li>
           <li>
             <Link 
-              to="/my-gigs" 
+              to="/MyGigs" 
               className={`flex items-center gap-3 px-4 py-3 rounded-lg ${
                 activePage === "my-gigs" 
                   ? "bg-gray-700 text-white" 

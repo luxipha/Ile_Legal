@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+import { createUserWallet } from '../services/walletService';
 
 // User types
 type UserRole = 'buyer' | 'seller' | 'admin';
@@ -18,10 +19,12 @@ export interface User {
     clearance_level?: string;
     email_verified?: boolean;
     eth_address?: string;
+    circle_wallet_id?: string;
+    circle_wallet_address?: string;
   };
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   token: string | null;
   ethAddress: string | null;
@@ -29,7 +32,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
-  updateProfile: (userData: Partial<User>) => Promise<void>;
+  updateProfile: (userData: Partial<User> & { profile_picture?: File }) => Promise<void>;
   createTestUser: (role: UserRole) => Promise<void>;
   signInWithGoogle: (role?: UserRole) => Promise<void>;
   signInWithMetaMask: (role?: UserRole) => Promise<void>;
@@ -45,24 +48,24 @@ const DEMO_USERS = [
   {
     id: '1',
     name: 'Demo Buyer',
-    email: 'buyer@example.com',
-    password: 'password123',
+    email: 'buyer@ile-legal.com', // Updated
+    password: 'buyer', //  Updated to match Supabase
     role: 'buyer' as UserRole,
     isVerified: true
   },
   {
     id: '2',
     name: 'Demo Seller',
-    email: 'seller@example.com',
-    password: 'password123',
+    email: 'seller1@ile-legal.com', // Updated
+    password: 'seller', // Updated to match Supabase
     role: 'seller' as UserRole,
     isVerified: true
   },
   {
     id: '3',
     name: 'Demo Admin',
-    email: 'admin@example.com',
-    password: 'password123',
+    email: 'admin.test@ile-legal.com', // Updated
+    password: 'password123', // Keep existing for admin
     role: 'admin' as UserRole,
     isVerified: true
   }
@@ -72,9 +75,41 @@ const DEMO_USERS = [
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Import the Supabase client from our lib/supabase.ts file
+// import { supabaseLocal as supabase } from '../lib/supabaseLocal';
 import { supabase } from '../lib/supabase';
 
-
+// Function to create a test user for development purposes
+const createTestUser = async (role: UserRole = 'buyer'): Promise<void> => {
+  console.log('createTestUser function called with role:', role);
+  console.log("supabase", supabase);
+  
+  try {
+    // Generate random email
+    const randomEmail = `test${Math.floor(Math.random() * 10000)}@example.com`;
+    const randomPassword = 'Password123!';
+    
+    // Create user with Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email: randomEmail,
+      password: randomPassword,
+      options: {
+        data: {
+          name: `Test User ${Math.floor(Math.random() * 1000)}`,
+          role: role
+        }
+      }
+    });
+    
+    if (error) {
+      console.error('Error creating test user:', error.message);
+      return;
+    }
+    
+    console.log('Test user created:', data);
+  } catch (error: any) {
+    console.error('Error creating test user:', error.message);
+  }
+};
 
 // Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -125,39 +160,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Function to get user data from session
-  async function getUser() {
+  // Function to get user data from session with comprehensive role detection
+  async function getUser(): Promise<User | null> {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error) {
       console.error('Error fetching session:', error);
       return null;
     }
     if (session) {
+      // Enhanced role detection logic from first file
+      let detectedRole: UserRole = 'buyer'; // Default fallback
+      const email = session.user.email || '';
+      
+      // Try to get role from user metadata first
+      if (session.user.user_metadata?.role_title) {
+        detectedRole = session.user.user_metadata.role_title as UserRole;
+      } else if (session.user.user_metadata?.role) {
+        detectedRole = session.user.user_metadata.role as UserRole;
+      } else {
+        // Email-based role detection as reliable fallback
+        if (email.includes('admin') || email === 'admin.test@ile-legal.com') {
+          detectedRole = 'admin';
+        } else if (email.includes('seller') || email === 'seller1@ile-legal.com') {
+          detectedRole = 'seller';
+        } else if (email.includes('buyer') || email === 'buyer@ile-legal.com') {
+          detectedRole = 'buyer';
+        }
+      }
+      
+      // Handle profile picture
+      let profilePictureUrl = null;
       if (session.user.user_metadata.user_metadata) {
         const { data } = await supabase
-        .storage
-        .from('profile-pictures')
-        .getPublicUrl(`profile_pictures/${session.user.id}.jpg`)
-        return {
-          id: session.user.id,
-          name: session.user.user_metadata.name,
-          email: session.user.email || '',
-          role: session.user.user_metadata.role,
-          isVerified: session.user.user_metadata.email_verified,
-          user_metadata: session.user.user_metadata,
-          profile_picture: data
-        };
-      } else {
-        return {
-          id: session.user.id,
-          name: session.user.user_metadata.name,
-          email: session.user.email || '',
-          role: session.user.user_metadata.role,
-          isVerified: session.user.user_metadata.email_verified,
-          user_metadata: session.user.user_metadata,
-          profile_picture: null
-        };
+          .storage
+          .from('profile-pictures')
+          .getPublicUrl(`profile_pictures/${session.user.id}.jpg`);
+        profilePictureUrl = data;
       }
+      
+      return {
+        id: session.user.id,
+        name: session.user.user_metadata.name || '',
+        email: email,
+        role: detectedRole,
+        isVerified: session.user.user_metadata.email_verified || false,
+        user_metadata: {
+          ...session.user.user_metadata,
+          profile_picture: profilePictureUrl?.publicUrl || session.user.user_metadata.profile_picture
+        }
+      };
     }
     return null;
   }
@@ -182,42 +233,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return data;
   }
 
-  // Mock login function
+  // Enhanced login function with comprehensive role detection
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
     try {
-      const data = await signInWithEmail(email, password)
-      console.log('data:', data);
-      // Make sure we have valid data before setting the user
-      if (!data.user?.id) {
+      console.log("login", email, password);
+      setIsLoading(true);
+      const data = await signInWithEmail(email, password);
+      console.log("data", data);
+      if (!data || !data.user) {
         throw new Error('Invalid user data received');
       }
-
+      
+      // Debug user metadata and role detection
+      console.log('Login - User metadata:', data.user.user_metadata);
+      console.log('Login - Role from role_title:', data.user.user_metadata?.role_title);
+      console.log('Login - Role from role:', data.user.user_metadata?.role);
+      
+      // Enhanced role detection with email-based fallback
+      let detectedRole: UserRole = 'buyer'; // Default fallback
+      
+      // Try to get role from user metadata first
+      if (data.user.user_metadata?.role_title) {
+        detectedRole = data.user.user_metadata.role_title as UserRole;
+        console.log('Login - Role from role_title:', detectedRole);
+      } else if (data.user.user_metadata?.role) {
+        detectedRole = data.user.user_metadata.role as UserRole;
+        console.log('Login - Role from role:', detectedRole);
+      } else {
+        // Email-based role detection as reliable fallback
+        console.log('Login - No role in metadata, using email-based detection for:', email);
+        if (email.includes('admin') || email === 'admin.test@ile-legal.com') {
+          detectedRole = 'admin';
+          console.log('Login - Detected admin from email');
+        } else if (email.includes('seller') || email === 'seller1@ile-legal.com') {
+          detectedRole = 'seller';
+          console.log('Login - Detected seller from email');
+        } else if (email.includes('buyer') || email === 'buyer@ile-legal.com') {
+          detectedRole = 'buyer';
+          console.log('Login - Detected buyer from email');
+        }
+      }
+      
+      console.log('Login - Final detected role:', detectedRole);
+      
       const user: User = {
         id: data.user.id,
-        name: data.user.user_metadata.name || '',
+        name: data.user.user_metadata?.name || '',
         email: data.user.email || '',
-        role: data.user.user_metadata.role_title as UserRole,
-        isVerified: !!data.user.user_metadata.email_verified,
-        user_metadata: data.user.user_metadata
-      }
-      // Simulate API delay
-      // await new Promise(resolve => setTimeout(resolve, 500));
+        role: detectedRole,
+        isVerified: !!data.user.user_metadata?.email_verified,
+        user_metadata: data.user.user_metadata || {}
+      };
 
-      // const demoUser = DEMO_USERS.find(u => u.email === email && u.password === password);
-      
-      // if (!demoUser) {
-      //   throw new Error('Invalid credentials');
-      // }
-
-      // const { ...userWithoutPassword } = demoUser;
       const mockToken = `mock-token-${Date.now()}`;
 
       setUser(user);
       setToken(mockToken);
       localStorage.setItem('ileUser', JSON.stringify(user));
       localStorage.setItem('ileToken', mockToken);
-      signInWithEmail(email, password)
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -226,78 +299,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Function to create a test user for development purposes
-  const createTestUser = async (role: UserRole = 'admin'): Promise<void> => {
-    console.log('createTestUser function called with role:', role);
-    
+  // Enhanced sign up function with Circle wallet integration
+  async function signUpNewUser(email: string, name: string, password: string, role: UserRole) {
     try {
-      // Generate random email
-      const randomEmail = `test${Math.floor(Math.random() * 10000)}@example.com`;
-      const randomPassword = 'Password123!';
-      
-      // Create user with Supabase
+      // Register user with Supabase auth
       const { data, error } = await supabase.auth.signUp({
-        email: randomEmail,
-        password: randomPassword,
+        email: email,
+        password: password,
         options: {
           emailRedirectTo: window.location.origin + '/auth/callback',
           data: {
-            name: `Test User ${Math.floor(Math.random() * 1000)}`,
+            name: name,
             role_title: role,
-            email_verified: true,
+            role: role,
+            email_verified: false
           }
-        }
+        },
       });
-
-      const newUser = {
-        id: `${Date.now()}`,
-        name: `Test User ${Math.floor(Math.random() * 1000)}`,
-        email: randomEmail,
-        role: role,
-        isVerified: false,
-        user_metadata: {}
-      };
-
-      console.log('newUser:', newUser);
-
-      const mockToken = `mock-token-${Date.now()}`;
-
-      setUser(newUser);
-      setToken(mockToken);
-      localStorage.setItem('ileUser', JSON.stringify(newUser));
-      localStorage.setItem('ileToken', mockToken);
       
       if (error) {
-        console.error('Error creating test user:', error.message);
-        return;
+        console.error('Error signing up:', error);
+        throw error;
       }
       
-      console.log('Test user created:', data);
-    } catch (error: any) {
-      console.error('Error creating test user:', error.message);
-    }
-  };
-
-  async function signUpNewUser(email: string, name: string, password: string, role: UserRole) {
-    const { data, error } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-      options: {
-        emailRedirectTo: window.location.origin + '/auth/callback',
-        data: {
+      if (data?.user) {
+        // Create a user object that matches our app's User interface
+        const newUser: User = {
+          id: data.user.id,
           name: name,
-          role_title: role,
-          email_verified: false
+          email: email,
+          role: role,
+          isVerified: false,
+          user_metadata: data.user.user_metadata || {}
+        };
+        
+        try {
+          // Create a Circle wallet for the new user
+          console.log('Creating Circle wallet for new user:', newUser.id);
+          const walletData = await createUserWallet(newUser);
+          console.log('Circle wallet created successfully:', walletData);
+          
+          // Update the user object with wallet information
+          newUser.user_metadata = {
+            ...newUser.user_metadata,
+            circle_wallet_id: walletData.walletId,
+            circle_wallet_address: walletData.address
+          };
+          
+          // Update the user in Supabase with the wallet information
+          await supabase.auth.updateUser({
+            data: {
+              circle_wallet_id: walletData.walletId,
+              circle_wallet_address: walletData.address
+            }
+          });
+        } catch (walletError) {
+          // Log the error but don't fail the registration process
+          console.error('Error creating Circle wallet:', walletError);
+          // We'll retry wallet creation later if needed
         }
-      },
-    });
-    
-    if (error) {
-      console.error('Error signing up:', error);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in signUpNewUser:', error);
       throw error;
     }
-    
-    return data;
   }
 
   // Register function
@@ -354,13 +421,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // This function is now replaced by the logout function below
-  // Keeping it commented for reference
-  // async function signOut(): Promise<void> {
-  //   await supabase.auth.signOut({scope: 'local'});
-  // }
-
-  // Updated updateProfile function
+  // Enhanced updateProfile function with file upload support
   async function updateProfile(updatedData: Partial<User> & { profile_picture?: File }) {
     const userData = await getUser();
     
@@ -419,7 +480,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: authUser.id,
         name: authUser.user_metadata?.name || '',
         email: authUser.email || '',
-        role: (authUser.user_metadata?.role_title as UserRole) || 'buyer',
+        role: (authUser.user_metadata?.role_title as UserRole) || (authUser.user_metadata?.role as UserRole) || 'buyer',
         isVerified: authUser.user_metadata?.email_verified === true,
         user_metadata: authUser.user_metadata || {}
       };
@@ -448,7 +509,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Sign in with MetaMask
+  // Enhanced MetaMask sign-in with Circle wallet integration
   const signInWithMetaMask = async (role: UserRole = 'buyer'): Promise<void> => {
     try {
       setIsLoading(true);
@@ -466,24 +527,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Please use MetaMask for authentication. Other wallets are not supported.');
       }
       
-      // Force MetaMask to be the provider even if it's not the default
+      // Create a provider using ethers v6 syntax
       let provider;
-      if (ethereum.providers) {
-        // Find MetaMask in the list of providers
-        const metaMaskProvider = ethereum.providers.find((p: any) => p.isMetaMask);
-        if (metaMaskProvider) {
-          provider = new ethers.providers.Web3Provider(metaMaskProvider);
-        } else {
-          throw new Error('MetaMask not found among available providers.');
-        }
-      } else {
-        // If there's only one provider and it's MetaMask
-        provider = new ethers.providers.Web3Provider(ethereum);
+      try {
+        // In ethers v6, we use BrowserProvider instead of Web3Provider
+        provider = new ethers.BrowserProvider(ethereum);
+      } catch (error) {
+        console.error('Error creating provider:', error);
+        throw new Error('Failed to connect to MetaMask');
       }
       
       // Request account access specifically from MetaMask
       await provider.send('eth_requestAccounts', []);
-      const signer = provider.getSigner();
+      const signer = await provider.getSigner();
       const address = await signer.getAddress();
       
       // Get a signature from the user to verify they own the address
@@ -518,7 +574,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: userData.id,
             name: userData.name || `ETH User ${address.substring(0, 6)}`,
             email: userData.email || '',
-            role: (userData.role_title as UserRole) || 'buyer',
+            role: (userData.role_title as UserRole) || (userData.role as UserRole) || 'buyer',
             isVerified: true, // ETH users are considered verified
             user_metadata: {
               ...userData,
@@ -530,6 +586,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setEthAddress(address);
           localStorage.setItem('ileUser', JSON.stringify(updatedUser));
           localStorage.setItem('ileEthAddress', address);
+          
+          // Check if user has a Circle wallet, create one if not
+          if (!userData.circle_wallet_id) {
+            try {
+              console.log('Creating Circle wallet for existing MetaMask user:', updatedUser.id);
+              const walletData = await createUserWallet(updatedUser);
+              console.log('Circle wallet created successfully:', walletData);
+            } catch (walletError) {
+              console.error('Error creating Circle wallet for MetaMask user:', walletError);
+              // Don't fail the authentication process if wallet creation fails
+            }
+          }
         } else {
           // Create new user with ETH address
           const { data: userProfile } = await supabase
@@ -576,6 +644,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setEthAddress(address);
               localStorage.setItem('ileUser', JSON.stringify(createdUser));
               localStorage.setItem('ileEthAddress', address);
+              
+              // Create a Circle wallet for the new MetaMask user
+              try {
+                console.log('Creating Circle wallet for new MetaMask user:', createdUser.id);
+                const walletData = await createUserWallet(createdUser);
+                console.log('Circle wallet created successfully:', walletData);
+              } catch (walletError) {
+                console.error('Error creating Circle wallet for new MetaMask user:', walletError);
+                // Don't fail the authentication process if wallet creation fails
+              }
             }
           }
         }
@@ -592,18 +670,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
   
-  // Sign in with Google
+  // Enhanced Google sign-in with role handling
   const signInWithGoogle = async (role: UserRole = 'buyer'): Promise<void> => {
     try {
       setIsLoading(true);
       
       // Store the selected role in localStorage to retrieve after OAuth redirect
       localStorage.setItem('pendingUserRole', role);
+      console.log('Stored role in localStorage:', role);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            // Pass the role as a query parameter
+            role: role
+          }
         }
       });
       
