@@ -1,42 +1,46 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
+import { useAuth } from '../../contexts/AuthContext';
+import { messagingService } from '../../services/messagingService';
+import { useToast } from "../ui/toast";
+import { api } from "../../services/api";
 import { 
   ArrowLeftIcon,
   StarIcon,
   BuildingIcon,
   PaperclipIcon
 } from "lucide-react";
-import { api } from "../../services/api";
 
 interface Message {
   id: string;
   text: string;
   sender: "user" | "other";
   timestamp: string;
-}
-
-interface ChatMessage {
-  id: string;
-  conversationId: string;
-  content: string;
-  attachments: string[];
-  timestamp: string;
+  pending?: boolean;
 }
 
 interface Bid {
   id: string;
-  seller_id: string;
-  amount: number;
-  description: string;
-  status: 'pending' | 'accepted' | 'rejected';
-  created_at: string;
-  // Additional fields we'll get from the seller profile
-  seller_name?: string;
-  seller_title?: string;
-  seller_rating?: number;
-  seller_completed_jobs?: number;
-  seller_avatar?: string;
+  userId?: string; // Legacy field for compatibility
+  seller_id?: string; // New API field
+  name?: string; // Legacy field
+  seller_name?: string; // New API field
+  avatar?: string; // Legacy field
+  seller_avatar?: string; // New API field
+  title?: string; // Legacy field
+  seller_title?: string; // New API field
+  rating?: number; // Legacy field
+  seller_rating?: number; // New API field
+  completedJobs?: number; // Legacy field
+  seller_completed_jobs?: number; // New API field
+  amount: string | number;
+  deliveryTime?: string;
+  submittedDate?: string;
+  created_at?: string; // New API field
+  proposal?: string;
+  description?: string; // New API field
+  status?: 'pending' | 'accepted' | 'rejected';
 }
 
 interface Gig {
@@ -57,6 +61,15 @@ interface Gig {
   projectsPosted: number;
 }
 
+// Extended messaging service interface to handle optional methods
+interface ExtendedMessagingService {
+  subscribeToMessages: (conversationId: string, callback: (payload: any) => void) => { unsubscribe: () => void };
+  getOrCreateConversation: (buyerId: string, sellerId: string, gigId: string) => Promise<{ id: string }>;
+  getMessages: (conversationId: string) => Promise<any[]>;
+  sendMessage: (conversationId: string, userId: string, content: string) => Promise<any>;
+  markMessagesAsRead?: (conversationId: string, userId: string) => Promise<void>;
+}
+
 /**
  * ViewBids component is primarily designed for BUYERS to view and manage bids on their gigs.
  * It displays a list of bids from sellers, allows messaging, and provides bid management.
@@ -66,24 +79,188 @@ interface ViewBidsProps {
   gig: Gig;
   onBack: () => void;
   backButtonText: string;
+  // Optional prop to determine data source
+  useStaticData?: boolean;
 }
 
 export const ViewBids: React.FC<ViewBidsProps> = ({ 
   gig, 
   onBack, 
-  backButtonText
+  backButtonText,
+  useStaticData = false
 }) => {
   const [activeTab, setActiveTab] = useState<string>("bids");
   const [activeBidder, setActiveBidder] = useState<string | null>(null);
   const [bidderMessages, setBidderMessages] = useState<Record<string, Message[]>>({});
   const [newMessage, setNewMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [pendingMessages, setPendingMessages] = useState<Record<string, Set<string>>>({});
   const [bids, setBids] = useState<Bid[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!useStaticData);
   const [error, setError] = useState<string | null>(null);
+  
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  
+  // Cast messaging service to extended interface
+  const extendedMessagingService = messagingService as ExtendedMessagingService;
+  
+  // Static data fallback (from the first file)
+  const staticBids: Bid[] = [
+    {
+      id: "bid-1",
+      userId: "seller-1",
+      seller_id: "seller-1",
+      name: "Adebayo Ogunlesi",
+      seller_name: "Adebayo Ogunlesi",
+      avatar: "AO",
+      seller_avatar: "AO",
+      title: "Senior Legal Consultant",
+      seller_title: "Senior Legal Consultant",
+      rating: 4.9,
+      seller_rating: 4.9,
+      completedJobs: 47,
+      seller_completed_jobs: 47,
+      amount: "₦65,000",
+      deliveryTime: "3 days",
+      submittedDate: "2 days ago",
+      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      proposal: "I have extensive experience in property verification and can deliver a comprehensive report within 3 days. My approach includes thorough document verification, site visits, and liaison with relevant authorities to ensure all legal requirements are met.",
+      description: "I have extensive experience in property verification and can deliver a comprehensive report within 3 days. My approach includes thorough document verification, site visits, and liaison with relevant authorities to ensure all legal requirements are met.",
+      status: 'pending'
+    },
+    {
+      id: "bid-2",
+      userId: "seller-2",
+      seller_id: "seller-2",
+      name: "Ngozi Okonjo",
+      seller_name: "Ngozi Okonjo",
+      avatar: "NO",
+      seller_avatar: "NO",
+      title: "Property Law Specialist",
+      seller_title: "Property Law Specialist",
+      rating: 4.7,
+      seller_rating: 4.7,
+      completedJobs: 32,
+      seller_completed_jobs: 32,
+      amount: "₦70,000",
+      deliveryTime: "2 days",
+      submittedDate: "3 days ago",
+      created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      proposal: "As a property law specialist with over 10 years of experience, I can provide a detailed verification report that covers all legal aspects of the property. I will ensure all documentation is properly reviewed and verified with the relevant authorities.",
+      description: "As a property law specialist with over 10 years of experience, I can provide a detailed verification report that covers all legal aspects of the property. I will ensure all documentation is properly reviewed and verified with the relevant authorities.",
+      status: 'pending'
+    },
+    {
+      id: "bid-3",
+      userId: "seller-3",
+      seller_id: "seller-3",
+      name: "Chukwudi Eze",
+      seller_name: "Chukwudi Eze",
+      avatar: "CE",
+      seller_avatar: "CE",
+      title: "Legal Consultant",
+      seller_title: "Legal Consultant",
+      rating: 4.5,
+      seller_rating: 4.5,
+      completedJobs: 28,
+      seller_completed_jobs: 28,
+      amount: "₦60,000",
+      deliveryTime: "4 days",
+      submittedDate: "1 day ago",
+      created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      proposal: "I offer comprehensive property verification services with a focus on identifying any potential legal issues. My service includes document verification, title search, and confirmation with local authorities. I will provide a detailed report with recommendations.",
+      description: "I offer comprehensive property verification services with a focus on identifying any potential legal issues. My service includes document verification, title search, and confirmation with local authorities. I will provide a detailed report with recommendations.",
+      status: 'pending'
+    }
+  ];
 
+  // Helper functions to normalize bid data
+  const getBidSellerId = (bid: Bid): string => bid.seller_id || bid.userId || bid.id;
+  const getBidSellerName = (bid: Bid): string => bid.seller_name || bid.name || 'Anonymous';
+  const getBidSellerAvatar = (bid: Bid): string => bid.seller_avatar || bid.avatar || 'U';
+  const getBidSellerTitle = (bid: Bid): string => bid.seller_title || bid.title || 'Seller';
+  const getBidSellerRating = (bid: Bid): number => bid.seller_rating || bid.rating || 0;
+  const getBidSellerCompletedJobs = (bid: Bid): number => bid.seller_completed_jobs || bid.completedJobs || 0;
+  const getBidAmount = (bid: Bid): string => {
+    if (typeof bid.amount === 'string') return bid.amount;
+    return `₦${bid.amount.toLocaleString()}`;
+  };
+  const getBidDescription = (bid: Bid): string => bid.description || bid.proposal || '';
+  const getBidSubmittedDate = (bid: Bid): string => {
+    if (bid.submittedDate) return bid.submittedDate;
+    if (bid.created_at) return new Date(bid.created_at).toLocaleDateString();
+    return 'Unknown';
+  };
+
+  // Load bids on component mount
   useEffect(() => {
-    loadBids();
-  }, [gig.id]);
+    if (useStaticData) {
+      setBids(staticBids);
+      setLoading(false);
+    } else {
+      loadBids();
+    }
+  }, [gig.id, useStaticData]);
+
+  // Set up subscription to new messages (from first file)
+  useEffect(() => {
+    if (!activeConversation || !activeBidder || useStaticData) return;
+    
+    const subscription = extendedMessagingService.subscribeToMessages(
+      activeConversation,
+      (payload: any) => {
+        const newMessage = payload.new;
+        
+        if (newMessage && activeBidder) {
+          const formattedMessage: Message = {
+            id: newMessage.id,
+            text: newMessage.content,
+            sender: newMessage.sender_id === user?.id ? "user" : "other",
+            timestamp: new Date(newMessage.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+          };
+          
+          if (newMessage.sender_id === user?.id) {
+            setBidderMessages(prev => {
+              const updated = { ...prev };
+              if (updated[activeBidder]) {
+                const pendingSet = pendingMessages[activeBidder] || new Set();
+                if (pendingSet.size > 0) {
+                  const oldestPending = updated[activeBidder].find(msg => msg.pending === true);
+                  if (oldestPending) {
+                    updated[activeBidder] = updated[activeBidder].map(msg => 
+                      msg.id === oldestPending.id ? formattedMessage : msg
+                    );
+                    return updated;
+                  }
+                }
+              }
+              return prev;
+            });
+          } else {
+            setBidderMessages(prev => ({
+              ...prev,
+              [activeBidder]: [...(prev[activeBidder] || []), formattedMessage]
+            }));
+            
+            // Mark messages as read if the method exists
+            if (user?.id && extendedMessagingService.markMessagesAsRead) {
+              extendedMessagingService.markMessagesAsRead(activeConversation, user.id)
+                .catch((error: any) => {
+                  console.error("Error marking messages as read:", error);
+                });
+            }
+          }
+        }
+      }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [activeConversation, activeBidder, user?.id, pendingMessages, useStaticData]);
 
   const loadBids = async () => {
     try {
@@ -94,17 +271,31 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
     } catch (err) {
       setError('Failed to load bids. Please try again.');
       console.error('Error loading bids:', err);
+      // Fallback to static data if API fails
+      setBids(staticBids);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() && activeBidder !== null) {
-      // Get current messages for this bidder
-      const currentMessages = bidderMessages[activeBidder] || [];
-      
-      // Create new message
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) {
+      addToast("Please enter a message", "info");
+      return;
+    }
+    
+    if (!user?.id) {
+      addToast("You need to be logged in to send messages", "error");
+      return;
+    }
+    
+    if (!activeBidder) {
+      addToast("No active conversation", "error");
+      return;
+    }
+
+    // Handle static data mode differently
+    if (useStaticData) {
       const newMsg: Message = {
         id: Date.now().toString(),
         text: newMessage.trim(),
@@ -112,106 +303,248 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       
-      // Update messages for this bidder
       setBidderMessages(prev => ({
         ...prev,
         [activeBidder]: [...(prev[activeBidder] || []), newMsg]
       }));
       
-      // Send message through API
-      api.chat.sendMessage(activeBidder, newMessage.trim())
-        .then((response: ChatMessage) => {
-          const responseMsg: Message = {
-            id: response.id,
-            text: response.content,
-            sender: "other" as const,
-            timestamp: new Date(response.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-          
-          setBidderMessages(prev => ({
-            ...prev,
-            [activeBidder]: [...(prev[activeBidder] || []), responseMsg]
-          }));
-        })
-        .catch(err => {
-          console.error('Error sending message:', err);
-          // Handle error appropriately
-        });
-      
       setNewMessage("");
+      addToast("Message sent successfully", "success");
+      return;
+    }
+
+    // Handle real API messaging
+    setIsSending(true);
+    const tempId = `temp-${Date.now()}`;
+    const messageContent = newMessage.trim();
+    
+    try {
+      const bidder = bids.find(bid => getBidSellerId(bid) === activeBidder);
+      if (!bidder) {
+        addToast("Could not find bidder information", "error");
+        return;
+      }
+      
+      if (!activeConversation) {
+        try {
+          const conversation = await extendedMessagingService.getOrCreateConversation(
+            user.id,
+            getBidSellerId(bidder),
+            gig.id
+          );
+          setActiveConversation(conversation.id);
+        } catch (error) {
+          console.error("Failed to create conversation:", error);
+          addToast("Failed to create conversation", "error");
+          return;
+        }
+      }
+      
+      if (activeConversation) {
+        setPendingMessages(prev => ({
+          ...prev,
+          [activeBidder]: new Set([...(prev[activeBidder] || []), tempId])
+        }));
+        
+        const newMsg: Message = {
+          id: tempId,
+          text: messageContent,
+          sender: "user" as const,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          pending: true
+        };
+        
+        setBidderMessages(prev => ({
+          ...prev,
+          [activeBidder]: [...(prev[activeBidder] || []), newMsg]
+        }));
+        
+        setNewMessage("");
+        
+        await extendedMessagingService.sendMessage(
+          activeConversation,
+          user.id,
+          messageContent
+        );
+        
+        setPendingMessages(prev => {
+          const updated = { ...prev };
+          if (updated[activeBidder]) {
+            const updatedSet = new Set([...updated[activeBidder]]);
+            updatedSet.delete(tempId);
+            updated[activeBidder] = updatedSet;
+          }
+          return updated;
+        });
+        
+        addToast("Message sent successfully", "success");
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      addToast("Failed to send message", "error");
+      
+      setBidderMessages(prev => {
+        const updated = { ...prev };
+        if (updated[activeBidder]) {
+          updated[activeBidder] = updated[activeBidder].filter(msg => msg.id !== tempId);
+        }
+        return updated;
+      });
+      
+      setPendingMessages(prev => {
+        const updated = { ...prev };
+        if (updated[activeBidder]) {
+          const updatedSet = new Set([...updated[activeBidder]]);
+          updatedSet.delete(tempId);
+          updated[activeBidder] = updatedSet;
+        }
+        return updated;
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
   const handleAcceptBid = async (bidId: string) => {
+    if (useStaticData) {
+      console.log("Accepting bid:", bidId);
+      addToast("Bid accepted (demo mode)", "success");
+      return;
+    }
+
     try {
       await api.bids.updateBid(bidId, { status: 'accepted' });
-      // Reload bids to reflect the change
       await loadBids();
+      addToast("Bid accepted successfully", "success");
     } catch (err) {
       console.error('Error accepting bid:', err);
-      // Handle error appropriately
+      addToast("Failed to accept bid", "error");
     }
   };
 
   const handleRejectBid = async (bidId: string) => {
-    try {
-      await api.bids.updateBid(bidId, { status: 'rejected' });
-      // Reload bids to reflect the change
-      await loadBids();
-      
-      // If we're currently viewing this bidder's messages, go back to bids
+    if (useStaticData) {
+      console.log("Rejecting bid:", bidId);
       if (activeBidder === bidId) {
         setActiveBidder(null);
         setActiveTab("bids");
       }
+      addToast("Bid rejected (demo mode)", "success");
+      return;
+    }
+
+    try {
+      await api.bids.updateBid(bidId, { status: 'rejected' });
+      await loadBids();
+      
+      if (activeBidder === bidId) {
+        setActiveBidder(null);
+        setActiveTab("bids");
+      }
+      addToast("Bid rejected successfully", "success");
     } catch (err) {
       console.error('Error rejecting bid:', err);
-      // Handle error appropriately
+      addToast("Failed to reject bid", "error");
     }
   };
 
-  const handleMessageBidder = (bidderId: string) => {
+  const handleMessageBidder = async (bidderId: string) => {
+    console.log("Messaging bidder:", bidderId);
+    
+    if (!user?.id) {
+      addToast("You need to be logged in to send messages", "error");
+      return;
+    }
+    
     setActiveBidder(bidderId);
     setActiveTab("messages");
     
-    // Initialize messages for this bidder if they don't exist
-    if (!bidderMessages[bidderId]) {
-      api.chat.getMessages(bidderId)
-        .then((messages: ChatMessage[]) => {
-          if (messages.length === 0) {
-            // Create initial messages if none exist
-            const initialMessages: Message[] = [
-              {
-                id: Date.now().toString(),
-                text: `Hello, I'm interested in discussing your bid on my gig: ${gig.title}`,
-                sender: "user" as const,
-                timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-              }
-            ];
-            
-            setBidderMessages(prev => ({
-              ...prev,
-              [bidderId]: initialMessages
-            }));
-          } else {
-            // Convert API messages to our format
-            const formattedMessages: Message[] = messages.map(msg => ({
-              id: msg.id,
-              text: msg.content,
-              sender: msg.conversationId === activeBidder ? 'user' as const : 'other' as const,
-              timestamp: new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-            }));
-            
-            setBidderMessages(prev => ({
-              ...prev,
-              [bidderId]: formattedMessages
-            }));
+    // Handle static data mode
+    if (useStaticData) {
+      if (!bidderMessages[bidderId]) {
+        const initialMessages: Message[] = [
+          {
+            id: Date.now().toString(),
+            text: `Hello, I'm interested in discussing your bid on my gig: ${gig.title}`,
+            sender: "user" as const,
+            timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
           }
-        })
-        .catch(err => {
-          console.error('Error loading messages:', err);
-          // Handle error appropriately
-        });
+        ];
+        
+        setBidderMessages(prev => ({
+          ...prev,
+          [bidderId]: initialMessages
+        }));
+      }
+      return;
+    }
+    
+    // Handle real API messaging
+    setIsLoadingMessages(true);
+    
+    try {
+      const bidder = bids.find(bid => getBidSellerId(bid) === bidderId);
+      if (!bidder) {
+        addToast("Could not find bidder information", "error");
+        return;
+      }
+      
+      const conversation = await extendedMessagingService.getOrCreateConversation(
+        user.id,
+        getBidSellerId(bidder),
+        gig.id
+      );
+      
+      setActiveConversation(conversation.id);
+      
+      const messages = await extendedMessagingService.getMessages(conversation.id);
+      
+      // Mark messages as read if the method exists
+      if (extendedMessagingService.markMessagesAsRead) {
+        await extendedMessagingService.markMessagesAsRead(conversation.id, user.id);
+      }
+      
+      const formattedMessages: Message[] = messages.map(msg => ({
+        id: msg.id,
+        text: msg.content,
+        sender: msg.sender_id === user.id ? "user" : "other",
+        timestamp: new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      }));
+      
+      if (formattedMessages.length === 0) {
+        const initialMessage: Message = {
+          id: Date.now().toString(),
+          text: `Hello, I'm interested in discussing your bid on my gig: ${gig.title}`,
+          sender: "user" as const,
+          timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        };
+        
+        try {
+          await extendedMessagingService.sendMessage(
+            conversation.id,
+            user.id,
+            initialMessage.text
+          );
+          
+          formattedMessages.push(initialMessage);
+        } catch (error) {
+          console.error("Error sending initial message:", error);
+          addToast("Failed to send initial message", "error");
+        }
+      }
+      
+      setBidderMessages(prev => ({
+        ...prev,
+        [bidderId]: formattedMessages
+      }));
+      
+      addToast("Conversation loaded successfully", "success");
+      
+    } catch (error) {
+      console.error("Error loading conversation:", error);
+      addToast("Failed to load conversation", "error");
+    } finally {
+      setIsLoadingMessages(false);
     }
   };
 
@@ -223,6 +556,24 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
       />
     ));
   };
+
+  const calculateBidStatistics = () => {
+    if (bids.length === 0) return { average: 0, lowest: 0, highest: 0 };
+    
+    const amounts = bids.map(bid => {
+      const amountStr = getBidAmount(bid);
+      const numberStr = amountStr.replace(/[₦,]/g, '');
+      return parseInt(numberStr) || 0;
+    });
+    
+    return {
+      average: Math.round(amounts.reduce((sum, amt) => sum + amt, 0) / amounts.length),
+      lowest: Math.min(...amounts),
+      highest: Math.max(...amounts)
+    };
+  };
+
+  const stats = calculateBidStatistics();
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -297,28 +648,31 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                     <CardContent className="p-6">
                       <div className="flex items-start gap-4 mb-4">
                         <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-                          {bid.seller_avatar || 'U'}
+                          {getBidSellerAvatar(bid)}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
                             <div>
-                              <h4 className="font-semibold text-gray-900">{bid.seller_name || 'Anonymous'}</h4>
-                              <p className="text-gray-600">{bid.seller_title || 'Seller'}</p>
+                              <h4 className="font-semibold text-gray-900">{getBidSellerName(bid)}</h4>
+                              <p className="text-gray-600">{getBidSellerTitle(bid)}</p>
                             </div>
                             <div className="text-right">
-                              <div className="text-2xl font-bold text-gray-900">₦{bid.amount.toLocaleString()}</div>
-                              <div className="text-sm text-gray-500">Submitted: {new Date(bid.created_at).toLocaleDateString()}</div>
+                              <div className="text-2xl font-bold text-gray-900">{getBidAmount(bid)}</div>
+                              <div className="text-sm text-gray-500">
+                                {bid.deliveryTime && `${bid.deliveryTime} • `}
+                                Submitted: {getBidSubmittedDate(bid)}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-4 mb-3">
-                            {bid.seller_rating && (
+                            {getBidSellerRating(bid) > 0 && (
                               <div className="flex items-center gap-1">
-                                {renderStars(Math.floor(bid.seller_rating))}
-                                <span className="text-sm text-gray-600 ml-1">{bid.seller_rating}</span>
+                                {renderStars(Math.floor(getBidSellerRating(bid)))}
+                                <span className="text-sm text-gray-600 ml-1">{getBidSellerRating(bid)}</span>
                               </div>
                             )}
-                            {bid.seller_completed_jobs && (
-                              <span className="text-sm text-gray-600">{bid.seller_completed_jobs} jobs completed</span>
+                            {getBidSellerCompletedJobs(bid) > 0 && (
+                              <span className="text-sm text-gray-600">{getBidSellerCompletedJobs(bid)} jobs completed</span>
                             )}
                           </div>
                         </div>
@@ -326,11 +680,11 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                       
                       <div className="mb-4">
                         <h5 className="font-medium text-[#1B1828] mb-2">Proposal</h5>
-                        <p className="text-gray-600">{bid.description}</p>
+                        <p className="text-gray-600">{getBidDescription(bid)}</p>
                       </div>
 
                       <div className="flex gap-3">
-                        {bid.status === 'pending' && (
+                        {(!bid.status || bid.status === 'pending') && (
                           <>
                             <Button 
                               onClick={() => handleAcceptBid(bid.id)}
@@ -340,7 +694,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                             </Button>
                             <Button 
                               variant="outline"
-                              onClick={() => handleMessageBidder(bid.seller_id)}
+                              onClick={() => handleMessageBidder(getBidSellerId(bid))}
                               className="border-[#1B1828] text-[#1B1828] hover:bg-[#1B1828]/10"
                             >
                               Message
@@ -392,15 +746,15 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               {/* Bidder Info */}
               <div className="flex items-center gap-4 p-4 border-b border-gray-200 bg-[#1B1828]/5">
                 {(() => {
-                  const bidder = bids.find(bid => bid.seller_id === activeBidder);
+                  const bidder = bids.find(bid => getBidSellerId(bid) === activeBidder);
                   return bidder ? (
                     <>
                       <div className="w-12 h-12 bg-[#FEC85F]/20 rounded-full flex items-center justify-center text-sm font-medium text-[#1B1828]">
-                        {bidder.seller_avatar || 'U'}
+                        {getBidSellerAvatar(bidder)}
                       </div>
                       <div>
-                        <h4 className="font-semibold text-[#1B1828]">{bidder.seller_name || 'Anonymous'}</h4>
-                        <p className="text-gray-600">{bidder.seller_title || 'Seller'}</p>
+                        <h4 className="font-semibold text-[#1B1828]">{getBidSellerName(bidder)}</h4>
+                        <p className="text-gray-600">{getBidSellerTitle(bidder)}</p>
                       </div>
                     </>
                   ) : null;
@@ -416,27 +770,44 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               
               {/* Messages Area */}
               <div className="h-96 overflow-y-auto p-4 space-y-4 border border-gray-200 rounded-lg bg-gray-50">
-                {bidderMessages[activeBidder]?.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        message.sender === 'user'
-                          ? 'bg-[#1B1828] text-white'
-                          : 'bg-[#FEC85F]/20 text-[#1B1828]'
-                      }`}
-                    >
-                      <p className="text-sm">{message.text}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.sender === 'user' ? 'text-gray-300' : 'text-gray-500'
-                      }`}>
-                        {message.timestamp}
-                      </p>
-                    </div>
+                {isLoadingMessages ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B1828]"></div>
                   </div>
-                ))}
+                ) : bidderMessages[activeBidder]?.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <p>No messages yet. Start the conversation!</p>
+                  </div>
+                ) : (
+                  bidderMessages[activeBidder]?.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                          message.sender === 'user'
+                            ? message.pending 
+                              ? 'bg-[#1B1828]/70 text-white' 
+                              : 'bg-[#1B1828] text-white'
+                            : 'bg-[#FEC85F]/20 text-[#1B1828]'
+                        }`}
+                      >
+                        <p className="text-sm">{message.text}</p>
+                        <div className="flex items-center justify-between">
+                          <p className={`text-xs mt-1 ${
+                            message.sender === 'user' ? 'text-gray-300' : 'text-gray-500'
+                          }`}>
+                            {message.timestamp}
+                          </p>
+                          {message.pending && (
+                            <span className="ml-2 text-xs text-gray-300">Sending...</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Message Input */}
@@ -458,9 +829,10 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                 
                 <Button 
                   onClick={handleSendMessage} 
+                  disabled={isSending}
                   className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] font-medium"
                 >
-                  Send
+                  {isSending ? "Sending..." : "Send"}
                 </Button>
               </div>
             </div>
@@ -494,15 +866,15 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Average Bid:</span>
-                  <span className="font-semibold text-gray-900">₦{bids.reduce((total, bid) => total + bid.amount, 0).toLocaleString()}</span>
+                  <span className="font-semibold text-gray-900">₦{stats.average.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Lowest Bid:</span>
-                  <span className="font-semibold text-gray-900">₦{bids.reduce((min, bid) => Math.min(min, bid.amount), Infinity).toLocaleString()}</span>
+                  <span className="font-semibold text-gray-900">₦{stats.lowest.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Highest Bid:</span>
-                  <span className="font-semibold text-gray-900">₦{bids.reduce((max, bid) => Math.max(max, bid.amount), 0).toLocaleString()}</span>
+                  <span className="font-semibold text-gray-900">₦{stats.highest.toLocaleString()}</span>
                 </div>
               </div>
             </CardContent>
