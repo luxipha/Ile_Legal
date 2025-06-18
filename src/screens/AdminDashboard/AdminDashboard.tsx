@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   AlertTriangleIcon, 
   BriefcaseIcon, 
@@ -15,6 +15,7 @@ import { AdminProfile } from "./AdminProfile";
 import { AdminVerifyUser } from "./AdminVerifyUser";
 import { AdminManageGig } from "./AdminManageGig";
 import { AdminLayout } from "./AdminLayout";
+import { api } from "../../services/api";
 
 export type ViewMode = "dashboard" | "verify-user" | "manage-gigs" | "disputes" | "settings" | "profile" | "view-gig-details" | "view-user-details";
 
@@ -63,6 +64,28 @@ export const AdminDashboard = (): JSX.Element => {
   // Removed unused state variable selectedDisputeTab
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
+
+  // Disputes state
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [disputesLoading, setDisputesLoading] = useState(false);
+  const [disputesError, setDisputesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (viewMode === "disputes") {
+      setDisputesLoading(true);
+      setDisputesError(null);
+      api.disputes.getAllDisputes()
+        .then((data) => {
+          setDisputes(data);
+        })
+        .catch((err) => {
+          setDisputesError("Failed to load disputes.");
+        })
+        .finally(() => {
+          setDisputesLoading(false);
+        });
+    }
+  }, [viewMode]);
 
   // Settings component handles its own modal state
 
@@ -159,22 +182,6 @@ export const AdminDashboard = (): JSX.Element => {
     }
   ];
 
-  const disputes: Dispute[] = [
-    {
-      id: 1,
-      title: "Payment Dispute - Land Survey Project",
-      description: "Dispute over final payment for land survey services",
-      buyer: "Evergreen Properties",
-      seller: "Solomon Adebayo",
-      amount: "₦120,000",
-      priority: "High Priority",
-      status: "Pending",
-      openedDate: "24/04/2025",
-      lastActivity: "26/04/2025",
-      type: "Payment Dispute"
-    }
-  ];
-
   const handleVerifyUser = (userId: number): boolean => {
     console.log(`Approving user:`, userId);
     return true;
@@ -257,7 +264,13 @@ export const AdminDashboard = (): JSX.Element => {
   if (viewMode === "disputes") {
     return (
       <AdminLayout viewMode={viewMode} onNavigate={setViewMode} title="Dispute Management">
-        <AdminDisputeManagement disputes={disputes} />
+        {disputesLoading ? (
+          <div className="p-8 text-center text-gray-500">Loading disputes...</div>
+        ) : disputesError ? (
+          <div className="p-8 text-center text-red-500">{disputesError}</div>
+        ) : (
+          <AdminDisputeManagement disputes={disputes} />
+        )}
       </AdminLayout>
     );
   }

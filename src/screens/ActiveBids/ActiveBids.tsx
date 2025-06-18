@@ -79,6 +79,7 @@ export const ActiveBids = (): JSX.Element => {
     try {
       setLoading(true);
       const bids = await api.bids.getActiveBids();
+      console.log("bids", bids);
       setActiveBids(bids);
       setError(null);
     } catch (err) {

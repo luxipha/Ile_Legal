@@ -4,6 +4,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { DisputeReviewPage } from "./DisputeReviewPage";
 import { ContactPartiesPage } from "./ContactPartiesPage";
 import { DollarSignIcon, UserIcon, UsersIcon } from "lucide-react";
+import { api } from "../../services/api";
 
 export interface Dispute {
   id: number;
@@ -17,6 +18,8 @@ export interface Dispute {
   openedDate: string;
   lastActivity: string;
   type: "Payment Dispute" | "Quality Dispute" | "Delivery Dispute";
+  gig_id: string;
+  seller_id: string;
 }
 
 interface DisputeManagementProps {
@@ -32,6 +35,9 @@ export const DisputeManagement = ({
 }: DisputeManagementProps) => {
   const [currentView, setCurrentView] = useState<"list" | "review" | "contact">("list");
   const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const handleReviewCase = (dispute: Dispute) => {
     setSelectedDispute(dispute);
@@ -47,17 +53,34 @@ export const DisputeManagement = ({
     setCurrentView("list");
   };
 
-  const handleReviewSubmit = (resolution: {
+  const handleReviewSubmit = async (resolution: {
     decision: "buyer" | "seller" | "partial";
     reason: string;
     refundAmount?: string;
   }) => {
-    // Here you would typically call an API to update the dispute status
-    console.log("Resolution submitted:", resolution);
-    console.log("For dispute:", selectedDispute?.id);
-    
-    // Return to the list view
-    setCurrentView("list");
+    if (!selectedDispute) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      // Map decision to status
+      let status: 'approved' | 'denied';
+      if (resolution.decision === 'buyer' || resolution.decision === 'partial') {
+        status = 'approved';
+      } else {
+        status = 'denied';
+      }
+      await api.disputes.updateDisputeStatus(selectedDispute.id, status);
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        setCurrentView("list");
+      }, 1200);
+    } catch (err: any) {
+      setError("Failed to update dispute status. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleContactSend = (message: {
@@ -85,6 +108,9 @@ export const DisputeManagement = ({
         dispute={selectedDispute}
         onBack={handleBackToList}
         onSubmit={handleReviewSubmit}
+        loading={loading}
+        error={error}
+        success={success}
       />
     );
   }

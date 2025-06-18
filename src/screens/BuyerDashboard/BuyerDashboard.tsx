@@ -14,6 +14,8 @@ import {
   DollarSignIcon,
   CheckCircleIcon
 } from "lucide-react";
+import { api } from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 type ViewMode = "dashboard" | "view-bids" | "view-details" | "view-deliverables";
 
@@ -84,11 +86,82 @@ interface StoredConversation {
 
 export const BuyerDashboard = (): JSX.Element => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [selectedCompletedGig, setSelectedCompletedGig] = useState<CompletedGig | null>(null);
   const [conversations, setConversations] = useState<StoredConversation[]>([]);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+
+  // New state for gigs
+  const [activeGigs, setActiveGigs] = useState<Gig[]>([]);
+  const [inProgressGigs, setInProgressGigs] = useState<InProgressGig[]>([]);
+  const [completedGigs, setCompletedGigs] = useState<CompletedGig[]>([]);
+  const [loadingGigs, setLoadingGigs] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchGigs = async () => {
+      setLoadingGigs(true);
+      try {
+        // Fetch all gigs for the current user
+        const gigs = await api.gigs.getMyGigs(user.id);
+        console.log("gigs", gigs);
+        // Map and split gigs by status
+        const active: Gig[] = [];
+        const inProgress: InProgressGig[] = [];
+        const completed: CompletedGig[] = [];
+        gigs.forEach((gig: any) => {
+          if (gig.status.toLowerCase() === "active") {
+            active.push({
+              ...gig,
+              statusColor: "bg-green-100 text-green-800",
+              bidsReceived: gig.bidsReceived || 0,
+              budget: gig.budget,
+              deadline: gig.deadline,
+              postedDate: gig.postedDate || "",
+              description: gig.description,
+              company: gig.company || "",
+              price: gig.price || gig.budget,
+              deliveryTime: gig.deliveryTime || "",
+              requirements: gig.requirements || [],
+              companyRating: gig.companyRating || 0,
+              projectsPosted: gig.projectsPosted || 0
+            });
+          } else if (gig.status.toLowerCase() === "in progress") {
+            inProgress.push({
+              id: gig.id,
+              title: gig.title,
+              provider: gig.provider || "",
+              providerAvatar: gig.providerAvatar || "",
+              dueDate: gig.dueDate || gig.deadline,
+              amount: gig.amount || gig.budget,
+              progress: gig.progress || 0,
+              status: "In Progress"
+            });
+          } else if (gig.status.toLowerCase() === "completed") {
+            completed.push({
+              id: gig.id,
+              title: gig.title,
+              provider: gig.provider || "",
+              providerAvatar: gig.providerAvatar || "",
+              amount: gig.amount || gig.budget,
+              completedDate: gig.completedDate || gig.deadline,
+              status: "Completed"
+            });
+          }
+        });
+        setActiveGigs(active);
+        setInProgressGigs(inProgress);
+        setCompletedGigs(completed);
+      } catch (error) {
+        console.error("Failed to fetch gigs:", error);
+      } finally {
+        setLoadingGigs(false);
+      }
+    };
+    fetchGigs();
+  }, [user?.id]);
 
   // Load conversations from localStorage on component mount
   useEffect(() => {
@@ -108,79 +181,6 @@ export const BuyerDashboard = (): JSX.Element => {
       localStorage.setItem('buyerConversations', JSON.stringify(conversations));
     }
   }, [conversations]);
-
-  const activeGigs: Gig[] = [
-    {
-      id: 1,
-      title: "Land Title Verification - Victoria Island",
-      status: "Active",
-      statusColor: "bg-green-100 text-green-800",
-      bidsReceived: 3, // Updated to match ViewBids component
-      budget: "₦65,000",
-      deadline: "15/05/2025",
-      postedDate: "Apr 24, 2024",
-      description: "We are seeking a qualified legal professional to conduct a comprehensive title verification for a property located in Victoria Island, Lagos.",
-      company: "Lagos Properties Ltd.",
-      price: "₦65,000",
-      deliveryTime: "e.g, 5 days",
-      requirements: [
-        "Confirmation of ownership history",
-        "Verification of all relevant documentation",
-        "Checks for any encumbrances or liens",
-        "Validation with the local land registry",
-        "Preparation of a detailed report on findings"
-      ],
-      companyRating: 4.8,
-      projectsPosted: 15
-    },
-    {
-      id: 2,
-      title: "Contract Review for Commercial Lease",
-      status: "Active", 
-      statusColor: "bg-green-100 text-green-800",
-      bidsReceived: 2,
-      budget: "₦45,000",
-      deadline: "12/05/2025",
-      postedDate: "Apr 25, 2024",
-      description: "Review and analysis of commercial lease agreement for office space. Need expert legal opinion on terms and conditions.",
-      company: "Commercial Realty",
-      price: "₦45,000",
-      deliveryTime: "e.g, 3 days",
-      requirements: [
-        "Thorough review of lease terms",
-        "Risk assessment",
-        "Recommendations for amendments",
-        "Legal compliance check"
-      ],
-      companyRating: 4.6,
-      projectsPosted: 8
-    }
-  ];
-
-  const inProgressGigs: InProgressGig[] = [
-    {
-      id: 1,
-      title: "Property Survey - Lekki Phase 1",
-      provider: "Jane Doe",
-      providerAvatar: "JD",
-      dueDate: "20/05/2025",
-      amount: "₦80,000",
-      progress: 65,
-      status: "In Progress"
-    }
-  ];
-
-  const completedGigs: CompletedGig[] = [
-    {
-      id: 1,
-      title: "Contract Review for Software Development Agreement",
-      provider: "Folake Adeyemi",
-      providerAvatar: "FA",
-      amount: "₦65,000",
-      completedDate: "28/04/2025",
-      status: "Completed"
-    }
-  ];
 
   const recentActivity: RecentActivity[] = [
     {
