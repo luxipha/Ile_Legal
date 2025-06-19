@@ -49,7 +49,7 @@ export const FindGigs = (): JSX.Element => {
       try {
         setLoading(true);
         const data = await api.gigs.getAllGigs({
-          status: 'active'
+          status: 'pending'
         });
         setGigs(data);
         setError(null);

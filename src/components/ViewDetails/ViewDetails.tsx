@@ -48,6 +48,9 @@ export interface Gig {
   
   // Attachments
   attachments?: string[];
+  
+  // New field from the code block
+  is_flagged: boolean;
 }
 
 // Unified Bid interface
@@ -438,7 +441,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
           </div>
         </div>
         <span className="bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium">
-          {getStatus() === 'active' ? 'Open for Bids' : 'Closed'}
+          {getStatus() === 'pending' ? 'Open for Bids' : 'Closed'}
         </span>
       </div>
 
@@ -655,8 +658,8 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
             </CardContent>
           </Card>
 
-          {/* Only show Place Bid button if showPlaceBid is true and gig is active */}
-          {showPlaceBid && getStatus() === 'active' && (
+          {/* Only show Place Bid button if showPlaceBid is true and gig is pending */}
+          {showPlaceBid && getStatus() === 'pending' && getStatus() !== 'suspended' && (
             <Button
               onClick={() => onPlaceBid(gig)}
               className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 mb-4"

@@ -43,6 +43,7 @@ interface Gig {
   priority?: "High Value" | "Urgent" | "New";
   postedDate: string;
   dueDate: string;
+  is_flagged: boolean;
 }
 
 interface Dispute {
@@ -63,7 +64,7 @@ interface Dispute {
 
 export const AdminDashboard = (): JSX.Element => {
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
-  const [selectedGigTab] = useState<"all" | "active" | "pending" | "completed" | "flagged">("all");
+  const [selectedGigTab, setSelectedGigTab] = useState<"all" | "active" | "pending" | "completed" | "flagged">("all");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
 
@@ -177,22 +178,51 @@ export const AdminDashboard = (): JSX.Element => {
     }
   };
 
-  const handleFlagGig = (gigId: number) => {
-    console.log("Flag gig:", gigId);
+  const handleFlagGig = async (gigId: number) => {
+    try {
+      await api.admin.setGigFlaggedStatus(gigId.toString(), true);
+      setGigs(gigs => gigs.map(g => g.id === gigId ? { ...g, is_flagged: true } : g));
+    } catch (error) {
+      console.error('Error flagging gig:', error);
+    }
+  };
+
+  const handleUnflagGig = async (gigId: number) => {
+    try {
+      await api.admin.setGigFlaggedStatus(gigId.toString(), false);
+      setGigs(gigs => gigs.map(g => g.id === gigId ? { ...g, is_flagged: false } : g));
+    } catch (error) {
+      console.error('Error unflagging gig:', error);
+    }
   };
 
   const handleReviewGig = (gigId: number) => {
     console.log(`Reviewing gig ${gigId}`);
   };
 
-  const handleSuspendGig = (gigId: number) => {
-    console.log(`Suspending gig ${gigId}`);
+  const handleSuspendGig = async (gigId: number) => {
+    try {
+      await api.admin.suspendGig(gigId.toString());
+      setGigs(gigs => gigs.map(g => g.id === gigId ? { ...g, status: 'suspended' } : g));
+    } catch (error) {
+      console.error('Error suspending gig:', error);
+    }
   };
 
   const filteredGigs = gigs.filter(gig => {
-    if (selectedGigTab === "all") return true;
-    if (selectedGigTab === "active") return gig.status === "Active" || gig.status === "In Progress";
-    return gig.status.toLowerCase().includes(selectedGigTab.toLowerCase());
+    switch (selectedGigTab) {
+      case "active":
+        return gig.status.toLowerCase() === "active" || gig.status.toLowerCase() === "in progress";
+      case "pending":
+        return gig.status.toLowerCase()  === "pending" || gig.status.toLowerCase() === "pending assignment";
+      case "completed":
+        return gig.status.toLowerCase() === "completed";
+      case "flagged":
+        return gig.is_flagged === true;
+      case "all":
+      default:
+        return true;
+    }
   });
 
   if (viewMode === "profile") {
@@ -222,6 +252,10 @@ export const AdminDashboard = (): JSX.Element => {
           gigs={filteredGigs} 
           onViewGigDetails={handleGigClick}
           onFlagGig={handleFlagGig}
+          onUnflagGig={handleUnflagGig}
+          onSuspendGig={handleSuspendGig}
+          selectedGigTab={selectedGigTab}
+          setSelectedGigTab={setSelectedGigTab}
         />
       </AdminLayout>
     );
@@ -256,6 +290,7 @@ export const AdminDashboard = (): JSX.Element => {
           gig={selectedGig} 
           onBack={() => setViewMode("manage-gigs")} 
           onFlag={handleFlagGig}
+          onUnflag={handleUnflagGig}
           onReview={handleReviewGig}
           onSuspend={handleSuspendGig}
         />

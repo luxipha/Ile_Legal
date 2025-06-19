@@ -25,6 +25,7 @@ interface ViewDetailsModalProps {
     requirements: string[];
     companyRating: number;
     projectsPosted: number;
+    status?: string;
   };
 }
 
@@ -117,7 +118,11 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({
               </div>
             </div>
             <span className="bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium">
-              Open for Bids
+              {gig.status === 'active' ? 'Open for Bids' : 
+               gig.status === 'assigned' ? 'In Progress' :
+               gig.status === 'completed' ? 'Completed' :
+               gig.status === 'suspended' ? 'Suspended' : 
+               gig.status === 'pending' ? 'Pending' : 'Open for Bids'}
             </span>
           </div>
 
@@ -282,8 +287,9 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({
               <Button
                 onClick={onPlaceBid}
                 className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3"
+                disabled={gig.status === 'suspended'}
               >
-                Place Bid
+                {gig.status === 'suspended' ? 'Gig Suspended' : 'Place Bid'}
               </Button>
             </div>
           </div>

@@ -17,40 +17,46 @@ interface Gig {
   client: string;
   provider: string;
   amount: string;
-  status: "Active" | "Pending" | "Completed" | "Flagged" | "In Progress" | "Pending Assignment";
+  status: "Active" | "Pending" | "Completed" | "Flagged" | "In Progress" | "Pending Assignment" | "suspended";
   priority?: "High Value" | "Urgent" | "New";
   postedDate: string;
   dueDate: string;
+  is_flagged: boolean;
 }
 
 interface AdminManageGigProps {
   gigs: Gig[];
   onViewGigDetails: (gigId: number) => void;
   onFlagGig: (gigId: number) => void;
+  onUnflagGig: (gigId: number) => void;
+  onSuspendGig: (gigId: number) => void;
+  selectedGigTab: "all" | "active" | "pending" | "completed" | "flagged";
+  setSelectedGigTab: (tab: "all" | "active" | "pending" | "completed" | "flagged") => void;
 }
 
 export const AdminManageGig = ({
   gigs,
   onViewGigDetails,
-  onFlagGig
+  onFlagGig,
+  onUnflagGig,
+  onSuspendGig,
+  selectedGigTab,
+  setSelectedGigTab
 }: AdminManageGigProps) => {
-  const [selectedGigTab, setSelectedGigTab] = useState<"all" | "active" | "pending" | "completed" | "flagged">("all");
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [showFlagModal, setShowFlagModal] = useState(false);
+  const [flagAction, setFlagAction] = useState<'flag' | 'unflag'>('flag');
 
-  // Filter gigs based on selected tab
-  const filteredGigs = gigs.filter(gig => {
-    if (selectedGigTab === "all") return true;
-    if (selectedGigTab === "active") return gig.status === "Active" || gig.status === "In Progress";
-    if (selectedGigTab === "pending") return gig.status === "Pending" || gig.status === "Pending Assignment";
-    if (selectedGigTab === "completed") return gig.status === "Completed";
-    if (selectedGigTab === "flagged") return gig.status === "Flagged";
-    return true;
-  });
+  // Filter gigs based on selected tab (now handled by parent)
+  const filteredGigs = gigs;
 
   const handleFlagConfirm = () => {
     if (selectedGig) {
-      onFlagGig(selectedGig.id);
+      if (flagAction === 'flag') {
+        onFlagGig(selectedGig.id);
+      } else {
+        onUnflagGig(selectedGig.id);
+      }
       setShowFlagModal(false);
       setSelectedGig(null);
     }
@@ -58,6 +64,7 @@ export const AdminManageGig = ({
 
   const handleFlagClick = (gig: Gig) => {
     setSelectedGig(gig);
+    setFlagAction(gig.is_flagged ? 'unflag' : 'flag');
     setShowFlagModal(true);
   };
 
@@ -91,11 +98,18 @@ export const AdminManageGig = ({
       {/* Gig Cards */}
       <div className="space-y-6">
         {filteredGigs.map((gig) => (
-          <Card key={gig.id} className="bg-white border border-gray-200">
+          <Card key={gig.id} className={`bg-white border ${gig.is_flagged ? 'border-red-500' : 'border-gray-200'}` }>
             <CardContent className="p-8">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4">{gig.title}</h3>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    {gig.title}
+                    {gig.is_flagged && (
+                      <span className="ml-2 px-2 py-1 bg-red-100 text-red-700 text-xs rounded flex items-center gap-1">
+                        <FlagIcon className="w-3 h-3" /> Flagged
+                      </span>
+                    )}
+                  </h3>
                   
                   <div className="grid grid-cols-2 gap-6 mb-4">
                     <div className="flex items-center gap-2">
@@ -130,9 +144,17 @@ export const AdminManageGig = ({
                     <Button 
                       onClick={() => handleFlagClick(gig)}
                       variant="outline"
-                      className="border-red-500 text-red-600 hover:bg-red-50"
+                      className={gig.is_flagged ? "border-green-500 text-green-600 hover:bg-green-50" : "border-red-500 text-red-600 hover:bg-red-50"}
                     >
-                      Flag for Review
+                      {gig.is_flagged ? 'Unflag' : 'Flag for Review'}
+                    </Button>
+                    <Button
+                      onClick={() => onSuspendGig(gig.id)}
+                      variant="outline"
+                      className="border-red-500 text-red-600 hover:bg-red-50"
+                      disabled={gig.status.toLowerCase() === 'suspended'}
+                    >
+                      {gig.status.toLowerCase() === 'suspended' ? 'Suspended' : 'Suspend'}
                     </Button>
                   </div>
                 </div>
@@ -163,26 +185,30 @@ export const AdminManageGig = ({
       <Dialog open={showFlagModal} onOpenChange={setShowFlagModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Flag Gig for Review</DialogTitle>
+            <DialogTitle>{flagAction === 'flag' ? 'Flag Gig for Review' : 'Unflag Gig'}</DialogTitle>
             <DialogDescription>
-              You are about to flag "{selectedGig?.title}" for review. This will mark the gig for administrative attention.
+              {flagAction === 'flag'
+                ? `You are about to flag "${selectedGig?.title}" for review. This will mark the gig for administrative attention.`
+                : `You are about to unflag "${selectedGig?.title}". This will remove the administrative flag from this gig.`}
             </DialogDescription>
           </DialogHeader>
-          
           <div className="py-4">
-            <div className="flex items-center gap-3 p-3 bg-red-50 rounded-md">
-              <FlagIcon className="text-red-500 w-5 h-5" />
+            <div className={`flex items-center gap-3 p-3 ${flagAction === 'flag' ? 'bg-red-50' : 'bg-green-50'} rounded-md`}>
+              <FlagIcon className={flagAction === 'flag' ? 'text-red-500 w-5 h-5' : 'text-green-500 w-5 h-5'} />
               <div>
-                <p className="font-medium text-red-700">Flag this gig for review</p>
-                <p className="text-sm text-red-600">This will alert the admin team to investigate</p>
+                <p className={`font-medium ${flagAction === 'flag' ? 'text-red-700' : 'text-green-700'}`}>{flagAction === 'flag' ? 'Flag this gig for review' : 'Unflag this gig'}</p>
+                <p className="text-sm text-gray-600">
+                  {flagAction === 'flag'
+                    ? 'This will alert the admin team to investigate'
+                    : 'This will remove the flag and mark the gig as normal'}
+                </p>
               </div>
             </div>
           </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowFlagModal(false)}>Cancel</Button>
-            <Button onClick={handleFlagConfirm} className="bg-red-600 hover:bg-red-700 text-white">
-              Confirm Flag
+            <Button onClick={handleFlagConfirm} className={flagAction === 'flag' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}>
+              {flagAction === 'flag' ? 'Confirm Flag' : 'Confirm Unflag'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -59,6 +59,8 @@ interface Gig {
   requirements: string[];
   companyRating: number;
   projectsPosted: number;
+  is_flagged: boolean;
+  status?: string;
 }
 
 // Extended messaging service interface to handle optional methods
@@ -406,6 +408,12 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   };
 
   const handleAcceptBid = async (bidId: string) => {
+    // Check if gig is suspended
+    if (gig.status === 'suspended') {
+      addToast("Cannot accept bids on suspended gigs", "error");
+      return;
+    }
+
     if (useStaticData) {
       console.log("Accepting bid:", bidId);
       addToast("Bid accepted (demo mode)", "success");
@@ -413,7 +421,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
     }
 
     try {
-      await api.bids.updateBid(bidId, { status: 'accepted' });
+      await api.bids.updateBid(bidId, { status: 'active' });
       await loadBids();
       addToast("Bid accepted successfully", "success");
     } catch (err) {
@@ -597,8 +605,12 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
             <span>Budget {gig.budget}</span>
           </div>
         </div>
-        <span className="bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium">
-          {bids.length} Bids Received
+        <span className={`px-4 py-2 rounded-lg font-medium ${
+          gig.status === 'suspended' 
+            ? 'bg-red-100 text-red-800' 
+            : 'bg-[#FEC85F] text-[#1B1828]'
+        }`}>
+          {gig.status === 'suspended' ? 'Gig Suspended' : `${bids.length} Bids Received`}
         </span>
       </div>
 
@@ -606,6 +618,13 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
           {error}
+        </div>
+      )}
+
+      {/* Suspended Gig Warning */}
+      {gig.status === 'suspended' && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+          <strong>Gig Suspended:</strong> This gig has been suspended by an administrator. You cannot accept new bids at this time.
         </div>
       )}
 
@@ -689,8 +708,9 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                             <Button 
                               onClick={() => handleAcceptBid(bid.id)}
                               className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"
+                              disabled={gig.status === 'suspended'}
                             >
-                              Accept Bid
+                              {gig.status === 'suspended' ? 'Gig Suspended' : 'Accept Bid'}
                             </Button>
                             <Button 
                               variant="outline"

@@ -152,7 +152,7 @@ export const api = {
     updateBid: async (bidId: string, updates: {
       amount?: number;
       description?: string;
-      status?: 'pending' | 'accepted' | 'rejected';
+      status?: 'pending' | 'active' | 'rejected';
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       console.log("user", user);
@@ -164,7 +164,7 @@ export const api = {
       // First verify that the bid belongs to either the current user (as seller) or the buyer
       const { data: existingBid, error: fetchError } = await supabase
         .from('Bids')
-        .select('seller_id, buyer_id')
+        .select('seller_id, buyer_id, gig_id')
         .eq('id', bidId)
         .single();
 
@@ -187,6 +187,23 @@ export const api = {
       if (existingBid.buyer_id === user.id) {
         if (updates.amount || updates.description) {
           throw new Error('Buyers can only update the status of bids');
+        }
+        
+        // Check if the gig is suspended before allowing status updates
+        if (updates.status && updates.status === 'active') {
+          const { data: gig, error: gigError } = await supabase
+            .from('Gigs')
+            .select('status')
+            .eq('id', existingBid.gig_id)
+            .single();
+            
+          if (gigError) {
+            throw gigError;
+          }
+          
+          if (gig.status === 'suspended') {
+            throw new Error('Cannot accept bids on suspended gigs');
+          }
         }
       }
 
@@ -262,10 +279,11 @@ export const api = {
       status?: string;
       deadline?: { start: number; end: number };
     }) => {
+      console.log("filters:", filters);
       let query = supabase
         .from("Gigs")
         .select("*");
-      console.log("query", query);
+      // console.log("query", query);
       // Apply category filter if provided
       if (filters?.categories && filters.categories.length > 0) {
         query = query.contains('categories', filters.categories);
@@ -291,7 +309,7 @@ export const api = {
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
-      
+      console.log("data:", data);
       if (error) {
         throw error;
       }
@@ -344,7 +362,8 @@ export const api = {
           deadline: gigData.deadline,
           attachments: attachmentUrls,
           buyer_id: gigData.buyer_id,
-          status: 'active'
+          status: 'pending',
+          is_flagged: false // Ensure new gigs are not flagged
         });
       return { data, error };
     },
@@ -421,8 +440,6 @@ export const api = {
       console.log(gigData);
       return error;
     },
-
-
   },
 
   // User Management APIs for Admin
@@ -724,7 +741,61 @@ export const api = {
           throw error;
         }
       }
-    }
+    },
+    /**
+     * Admin-only: Set a gig's is_flagged field to true or false
+     */
+    setGigFlaggedStatus: async (gigId: string, isFlagged: boolean) => {
+      // TODO: Enforce admin check in UI or via RLS
+      const { error } = await supabase
+        .from('Gigs')
+        .update({ is_flagged: isFlagged })
+        .eq('id', gigId);
+      return error;
+    },
+    /**
+     * Admin-only: Suspend a gig (set status to 'suspended')
+     */
+    suspendGig: async (gigId: string, reason?: string) => {
+      // Check if user is admin using session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        throw new Error('Authentication error');
+      }
+      if (!session?.user || session.user.user_metadata.role_title !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+      // Fetch the gig to check its current status
+      const { data: gig, error: fetchError } = await supabase
+        .from('Gigs')
+        .select('status')
+        .eq('id', gigId)
+        .single();
+      if (fetchError) {
+        throw fetchError;
+      }
+      if (!gig || gig.status !== 'pending') {
+        throw new Error('Only gigs with status "pending" can be suspended');
+      }
+      // Update the gig status to 'suspended'
+      const { error } = await supabase
+        .from('Gigs')
+        .update({ status: 'suspended' })
+        .eq('id', gigId);
+      if (error) {
+        throw error;
+      }
+      // Optionally log the suspension action (currently commented out)
+      // await supabase
+      //   .from('admin_actions')
+      //   .insert({
+      //     admin_id: session.user.id,
+      //     action_type: 'gig_suspended',
+      //     target_id: gigId,
+      //     details: { reason }
+      //   });
+      return { success: true };
+    },
   },
 
   disputes: {

@@ -34,12 +34,14 @@ type Gig = {
   budget?: string;
   deadline?: string;
   bids?: Bid[];
+  is_flagged?: boolean;
 };
 
 type AdminViewDetailsProps = {
   gig: Gig | null;
   onBack: () => void;
   onFlag: (gigId: number) => void;
+  onUnflag?: (gigId: number) => void;
   onReview: (gigId: number) => void;
   onSuspend: (gigId: number) => void;
 };
@@ -48,6 +50,7 @@ export const AdminViewDetails = ({
   gig,
   onBack,
   onFlag,
+  onUnflag,
   onReview,
   onSuspend
 }: AdminViewDetailsProps): JSX.Element => {
@@ -59,6 +62,7 @@ export const AdminViewDetails = ({
   const [suspendReason, setSuspendReason] = useState("");
   const [feedback, setFeedback] = useState("");
   const [activeTab, setActiveTab] = useState<"details" | "bids">("details");
+  const [flagAction, setFlagAction] = useState<'flag' | 'unflag'>('flag');
   
   // Sample bids data - in a real app, this would come from the gig object or API
   const bids: Bid[] = gig?.bids || [
@@ -90,13 +94,22 @@ export const AdminViewDetails = ({
     }
   ];
 
+  const handleFlagButtonClick = () => {
+    if (gig?.is_flagged) {
+      setFlagAction('unflag');
+    } else {
+      setFlagAction('flag');
+    }
+    setShowFlagModal(true);
+  };
+
   const handleSubmitFlag = () => {
-    if (!gig || !flagReason.trim()) return;
-    
-    // Call the flag handler
-    onFlag(gig.id);
-    
-    // Reset and close modal
+    if (!gig) return;
+    if (flagAction === 'flag') {
+      onFlag(gig.id);
+    } else if (flagAction === 'unflag' && onUnflag) {
+      onUnflag(gig.id);
+    }
     setFlagReason("");
     setShowFlagModal(false);
   };
@@ -355,12 +368,12 @@ export const AdminViewDetails = ({
               </Button>
               
               <Button 
-                onClick={() => setShowFlagModal(true)}
+                onClick={handleFlagButtonClick}
                 variant="outline"
-                className="border-yellow-500 text-yellow-600 hover:bg-yellow-50 w-full"
+                className={gig.is_flagged ? "border-green-500 text-green-600 hover:bg-green-50 w-full" : "border-yellow-500 text-yellow-600 hover:bg-yellow-50 w-full"}
               >
-                <Flag className="w-4 h-4 mr-2" />
-                Flag for Review
+                <Flag className={gig.is_flagged ? "w-4 h-4 mr-2 text-green-600" : "w-4 h-4 mr-2 text-yellow-600"} />
+                {gig.is_flagged ? 'Unflag' : 'Flag for Review'}
               </Button>
               
               <Button 
@@ -395,26 +408,30 @@ export const AdminViewDetails = ({
       <Dialog open={showFlagModal} onOpenChange={setShowFlagModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Flag Gig for Review</DialogTitle>
+            <DialogTitle>{flagAction === 'flag' ? 'Flag Gig for Review' : 'Unflag Gig'}</DialogTitle>
             <DialogDescription>
-              Please provide a reason for flagging this gig.
+              {flagAction === 'flag'
+                ? 'Please provide a reason for flagging this gig.'
+                : 'Are you sure you want to unflag this gig?'}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="mt-4">
-            <Label htmlFor="flag-reason">Reason</Label>
-            <Textarea 
-              id="flag-reason"
-              value={flagReason}
-              onChange={(e) => setFlagReason(e.target.value)}
-              placeholder="Enter reason for flagging..."
-              className="mt-2"
-            />
-          </div>
+          {flagAction === 'flag' && (
+            <div className="mt-4">
+              <Label htmlFor="flag-reason">Reason</Label>
+              <Textarea 
+                id="flag-reason"
+                value={flagReason}
+                onChange={(e) => setFlagReason(e.target.value)}
+                placeholder="Enter reason for flagging..."
+                className="mt-2"
+              />
+            </div>
+          )}
           
           <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setShowFlagModal(false)}>Cancel</Button>
-            <Button onClick={handleSubmitFlag}>Submit</Button>
+            <Button onClick={handleSubmitFlag}>{flagAction === 'flag' ? 'Submit' : 'Unflag'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

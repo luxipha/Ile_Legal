@@ -38,6 +38,7 @@ interface Gig {
   requirements: string[];
   companyRating: number;
   projectsPosted: number;
+  is_flagged: boolean;
 }
 
 interface CompletedGig {
@@ -126,7 +127,8 @@ export const BuyerDashboard = (): JSX.Element => {
               deliveryTime: gig.deliveryTime || "",
               requirements: gig.requirements || [],
               companyRating: gig.companyRating || 0,
-              projectsPosted: gig.projectsPosted || 0
+              projectsPosted: gig.projectsPosted || 0,
+              is_flagged: gig.is_flagged || false
             });
           } else if (gig.status.toLowerCase() === "in progress") {
             inProgress.push({

@@ -16,7 +16,8 @@ CREATE TABLE gigs (
   deadline TIMESTAMPTZ,
   status TEXT DEFAULT 'active',
   buyer_id UUID REFERENCES auth.users(id),
-  attachments TEXT[] DEFAULT '{}'
+  attachments TEXT[] DEFAULT '{}',
+  is_flagged BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Create Bids table

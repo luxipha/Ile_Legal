@@ -38,6 +38,7 @@ interface Gig {
   bidsReceived: number;
   requirements: string[];
   attachments: string[];
+  is_flagged: boolean;
 }
 
 interface AttachedFile {
@@ -101,7 +102,8 @@ export const MyGigs = (): JSX.Element => {
         postedDate: new Date(gig.created_at).toLocaleDateString(),
         bidsReceived: 0,
         requirements: gig.requirements || [],
-        attachments: gig.attachments || []
+        attachments: gig.attachments || [],
+        is_flagged: false
       }));
 
       setGigs(transformedGigs);
@@ -298,7 +300,7 @@ export const MyGigs = (): JSX.Element => {
             {/* Use the ViewBids component for consistent UI */}
             <ViewBids 
               gig={{
-                id: selectedGig.id,
+                id: selectedGig.id.toString(),
                 title: selectedGig.title,
                 company: "Your Company",
                 price: selectedGig.budget,
@@ -310,7 +312,9 @@ export const MyGigs = (): JSX.Element => {
                 deliveryTime: "14 days",
                 requirements: selectedGig.requirements,
                 companyRating: 4.8,
-                projectsPosted: 12
+                projectsPosted: 12,
+                is_flagged: selectedGig.is_flagged,
+                status: selectedGig.status.toLowerCase()
               }}
               onBack={() => setViewMode("list")}
               backButtonText="Back to My Gigs"

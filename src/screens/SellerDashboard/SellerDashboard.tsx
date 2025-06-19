@@ -34,6 +34,8 @@ interface Gig {
   requirements: string[];
   companyRating: number;
   projectsPosted: number;
+  is_flagged: boolean;
+  status?: string;
 }
 
 interface OngoingGig {
@@ -90,7 +92,9 @@ export const SellerDashboard = (): JSX.Element => {
         "Preparation of a detailed report on findings"
       ],
       companyRating: 4.8,
-      projectsPosted: 15
+      projectsPosted: 15,
+      is_flagged: false,
+      status: "active"
     },
     {
       id: "2",
@@ -109,7 +113,9 @@ export const SellerDashboard = (): JSX.Element => {
         "Legal compliance check"
       ],
       companyRating: 4.6,
-      projectsPosted: 8
+      projectsPosted: 8,
+      is_flagged: false,
+      status: "active"
     }
   ];
 
@@ -900,8 +906,9 @@ export const SellerDashboard = (): JSX.Element => {
                           <Button 
                             onClick={() => handlePlaceBid(gig)}
                             className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                            disabled={gig.status === 'suspended'}
                           >
-                            Place Bid
+                            {gig.status === 'suspended' ? 'Gig Suspended' : 'Place Bid'}
                           </Button>
                           <Button 
                             variant="outline"
@@ -963,7 +970,8 @@ export const SellerDashboard = (): JSX.Element => {
                               "Legal documentation review"
                             ],
                             companyRating: 4.8,
-                            projectsPosted: 12
+                            projectsPosted: 12,
+                            is_flagged: false
                           };
                           handleViewDetails(activeBidGig);
                         }}

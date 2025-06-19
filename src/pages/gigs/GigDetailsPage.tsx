@@ -142,7 +142,8 @@ const GigDetailsPage: React.FC = () => {
               <span className="badge-warning">
                 {gig.status === 'active' ? 'Open for Bids' : 
                  gig.status === 'assigned' ? 'In Progress' :
-                 gig.status === 'completed' ? 'Completed' : 'Cancelled'}
+                 gig.status === 'completed' ? 'Completed' :
+                 gig.status === 'suspended' ? 'Suspended' : 'Cancelled'}
               </span>
             </div>
           </div>
@@ -250,7 +251,7 @@ const GigDetailsPage: React.FC = () => {
               </div>
               
               {/* Action buttons based on user role and gig status */}
-              {isSeller && gig.status === 'active' && (
+              {isSeller && gig.status === 'active' && gig.status !== 'suspended' && (
                 <div className="border-t border-gray-200 pt-6">
                   <div className="flex justify-end">
                     <button className="btn-primary">
@@ -393,7 +394,7 @@ const GigDetailsPage: React.FC = () => {
               )}
               
               {/* Bid action for seller */}
-              {isSeller && gig.status === 'active' && (
+              {isSeller && gig.status === 'active' && gig.status !== 'suspended' && (
                 <div className="border-t border-gray-200 pt-6">
                   <div className="flex justify-end">
                     <button className="btn-primary">
