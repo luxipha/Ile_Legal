@@ -13,7 +13,7 @@ import {
 
 interface Document {
   name: string;
-  status: "Verified" | "Pending" | "Rejected";
+  status: "verified" | "pending" | "rejected";
 }
 
 interface User {
@@ -21,7 +21,7 @@ interface User {
   name: string;
   email: string;
   type: "Property Law" | "Contract Law" | "Business Law";
-  status: "Pending" | "Verified" | "Rejected";
+  status: "pending" | "verified" | "rejected";
   submittedDate: string;
   documents: Document[];
 }
@@ -44,9 +44,9 @@ export const AdminVerifyUser = ({
   // Filter users based on selected tab
   const filteredUsers = users.filter(user => {
     if (selectedUserTab === "all") return true;
-    if (selectedUserTab === "pending") return user.status === "Pending";
-    if (selectedUserTab === "verified") return user.status === "Verified";
-    if (selectedUserTab === "rejected") return user.status === "Rejected";
+    if (selectedUserTab === "pending") return user.status === "pending";
+    if (selectedUserTab === "verified") return user.status === "verified";
+    if (selectedUserTab === "rejected") return user.status === "rejected";
     return true;
   });
 
@@ -102,12 +102,12 @@ export const AdminVerifyUser = ({
                       <p className="text-gray-600">{user.type}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      user.status === "Verified" ? "bg-green-100 text-green-800" :
-                      user.status === "Pending" ? "bg-yellow-100 text-yellow-800" :
+                      user.status === "verified" ? "bg-green-100 text-green-800" :
+                      user.status === "pending" ? "bg-yellow-100 text-yellow-800" :
                       "bg-red-100 text-red-800"
                     }`}>
-                      {user.status === "Verified" ? "Verified" :
-                       user.status === "Pending" ? "Pending Verification" :
+                      {user.status === "verified" ? "Verified" :
+                       user.status === "pending" ? "Pending Verification" :
                        "Rejected"}
                     </span>
                   </div>
@@ -120,11 +120,11 @@ export const AdminVerifyUser = ({
                           <span className="font-medium text-gray-900">{doc.name}</span>
                           <div className="flex items-center gap-3">
                             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                              doc.status === "Verified" ? "bg-green-100 text-green-800" :
-                              doc.status === "Pending" ? "bg-yellow-100 text-yellow-800" :
+                              doc.status === "verified" ? "bg-green-100 text-green-800" :
+                              doc.status === "pending" ? "bg-yellow-100 text-yellow-800" :
                               "bg-red-100 text-red-800"
                             }`}>
-                              {doc.status}
+                              {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                             </span>
                             <Button variant="outline" size="sm">
                               View Details

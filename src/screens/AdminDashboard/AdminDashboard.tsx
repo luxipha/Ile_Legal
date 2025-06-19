@@ -68,7 +68,7 @@ export const AdminDashboard = (): JSX.Element => {
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
 
   // Auth context for admin user and fetching all users
-  const { getAllUsers, user: authUser } = useAuth();
+  const { getAllUsers, user: authUser, updateUserStatus } = useAuth();
 
   // Users state
   const [users, setUsers] = useState<any[]>([]);
@@ -90,8 +90,11 @@ export const AdminDashboard = (): JSX.Element => {
     if (authUser && authUser.user_metadata?.role_title === 'admin') {
       setUsersLoading(true);
       setUsersError(null);
-      getAllUsers()
-        .then((data) => setUsers(data))
+      getAllUsers(true)
+        .then((data) => {
+          console.log("data:", data);
+          setUsers(data)
+        })
         .catch((err) => {
           setUsersError("Failed to load users.");
           setUsers([]);
@@ -132,13 +135,26 @@ export const AdminDashboard = (): JSX.Element => {
 
   // Settings component handles its own modal state
 
-  const handleVerifyUser = (userId: number): boolean => {
-    console.log(`Approving user:`, userId);
-    return true;
+  const handleVerifyUser = async (userId: number): Promise<boolean> => {
+    try {
+      await updateUserStatus(userId.toString(), 'verified');
+      // Optionally refresh users list
+      setUsers(users => users.map(u => u.id === userId ? { ...u, status: 'verified' } : u));
+      return true;
+    } catch (error) {
+      console.error('Error verifying user:', error);
+      return false;
+    }
   };
 
-  const handleRejectUser = (userId: number, reason: string) => {
-    console.log(`Rejecting user ${userId} with reason: ${reason}`);
+  const handleRejectUser = async (userId: number, reason: string) => {
+    try {
+      await updateUserStatus(userId.toString(), 'rejected');
+      // Optionally refresh users list
+      setUsers(users => users.map(u => u.id === userId ? { ...u, status: 'rejected' } : u));
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+    }
   };
 
   const handleRequestInfo = (userId: number, request: string) => {
@@ -355,7 +371,7 @@ export const AdminDashboard = (): JSX.Element => {
               ) : (
                 <div className="space-y-4">
                   {users
-                    .filter(user => (user.status === "Pending" || user.user_metadata?.status === "Pending"))
+                    .filter(user => (user.status.toLowerCase() === "pending" || user.user_metadata?.status.toLowerCase() === "pending"))
                     .slice(0, 2)
                     .map((user) => (
                       <div key={user.id} className="border-b border-gray-100 pb-4">
@@ -398,7 +414,7 @@ export const AdminDashboard = (): JSX.Element => {
                         </div>
                       </div>
                     ))}
-                  {users.filter(user => (user.status === "Pending" || user.user_metadata?.status === "Pending")).length === 0 && (
+                  {users.filter(user => (user.status.toLowerCase() === "pending" || user.user_metadata?.status.toLowerCase() === "pending")).length === 0 && (
                     <div className="text-gray-500">No pending verifications.</div>
                   )}
                 </div>

@@ -19,6 +19,7 @@ import {
   BriefcaseIcon
 } from "lucide-react";
 import { api } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Education {
   degree: string;
@@ -51,50 +52,70 @@ interface Feedback {
 type ViewMode = "profile" | "edit-profile";
 
 export const BuyerProfile = (): JSX.Element => {
+  const { user, updateProfile, getUser, isLoading: authLoading } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "projects">("overview");
   const [newInterest, setNewInterest] = useState("");
   const [reviews, setReviews] = useState<Feedback[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [averageRating, setAverageRating] = useState(0);
-  
-  const [profileData, setProfileData] = useState<ProfileData>({
-    firstName: "Demo",
-    lastName: "Client",
-    email: "client@example.com",
-    phone: "+234 987 654 3210",
-    company: "Lagos Properties Ltd.",
-    industry: "Real Estate Development",
-    about: "Experienced real estate developer with over 10 years in the Nigerian property market. I specialize in residential and commercial developments across Lagos State, with a focus on sustainable and innovative building solutions. My company has successfully completed over 50 projects ranging from luxury residential estates to commercial complexes.",
-    interests: [
-      "Property Development",
-      "Real Estate Investment",
-      "Legal Compliance",
-      "Contract Negotiation",
-      "Property Law",
-      "Urban Planning"
-    ],
-    education: [
-      {
-        degree: "MBA in Real Estate",
-        institution: "Lagos Business School",
-        period: "2015 - 2017"
-      },
-      {
-        degree: "B.Sc. Architecture",
-        institution: "University of Lagos",
-        period: "2008 - 2013"
-      }
-    ]
-  });
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [editFormData, setEditFormData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [myGigsAverageRating, setMyGigsAverageRating] = useState<number | null>(null);
+  const [myGigsCount, setMyGigsCount] = useState<number>(0);
+  const [loadingGigsRating, setLoadingGigsRating] = useState(false);
 
-  const [editFormData, setEditFormData] = useState<ProfileData>(profileData);
+  // Map user/user_metadata to ProfileData
+  const mapUserToProfileData = (userObj: any): ProfileData => {
+    const meta = userObj?.user_metadata || {};
+    // Try to get first/last name from user_metadata, else split user.name
+    let firstName = meta.firstName || '';
+    let lastName = meta.lastName || '';
+    if ((!firstName || !lastName) && userObj?.name) {
+      const parts = userObj.name.split(' ');
+      firstName = firstName || parts[0] || '';
+      lastName = lastName || parts.slice(1).join(' ') || '';
+    }
+    return {
+      firstName,
+      lastName,
+      email: userObj.email || '',
+      phone: meta.phone || '',
+      company: meta.company || '',
+      industry: meta.industry || '',
+      about: meta.about || '',
+      interests: Array.isArray(meta.interests) ? meta.interests : [],
+      education: Array.isArray(meta.education) ? meta.education : [],
+    };
+  };
+
+  // On mount, load user profile
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoadingProfile(true);
+      let freshUser = user;
+      if (!user) {
+        freshUser = await getUser();
+      }
+      if (freshUser) {
+        const pd = mapUserToProfileData(freshUser);
+        setProfileData(pd);
+        setEditFormData(pd);
+      }
+      setLoadingProfile(false);
+    };
+    loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Fetch feedback data when component mounts or when reviews tab is active
   useEffect(() => {
     if (activeTab === "reviews") {
       fetchFeedback();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const fetchFeedback = async () => {
@@ -140,7 +161,7 @@ export const BuyerProfile = (): JSX.Element => {
   const experience = [
     {
       position: "CEO & Founder",
-      company: "Lagos Properties Ltd.",
+      company: profileData?.company || "",
       period: "2018 - Present",
       description: "Leading a team of 50+ professionals in developing premium residential and commercial properties across Lagos State."
     },
@@ -178,59 +199,101 @@ export const BuyerProfile = (): JSX.Element => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setEditFormData(prev => ({ ...prev, [name]: value }));
+    setEditFormData(prev => prev ? { ...prev, [name]: value } : prev);
   };
 
   const handleEducationChange = (index: number, field: keyof Education, value: string) => {
-    setEditFormData(prev => ({
+    setEditFormData(prev => prev ? {
       ...prev,
-      education: prev.education.map((edu, i) => 
+      education: prev.education.map((edu, i) =>
         i === index ? { ...edu, [field]: value } : edu
       )
-    }));
+    } : prev);
   };
 
   const addEducation = () => {
-    setEditFormData(prev => ({
+    setEditFormData(prev => prev ? {
       ...prev,
       education: [...prev.education, { degree: "", institution: "", period: "" }]
-    }));
+    } : prev);
   };
 
   const removeEducation = (index: number) => {
-    setEditFormData(prev => ({
+    setEditFormData(prev => prev ? {
       ...prev,
       education: prev.education.filter((_, i) => i !== index)
-    }));
+    } : prev);
   };
 
   const addInterest = () => {
     if (newInterest.trim()) {
-      setEditFormData(prev => ({
+      setEditFormData(prev => prev ? {
         ...prev,
         interests: [...prev.interests, newInterest.trim()]
-      }));
+      } : prev);
       setNewInterest("");
     }
   };
 
   const removeInterest = (index: number) => {
-    setEditFormData(prev => ({
+    setEditFormData(prev => prev ? {
       ...prev,
       interests: prev.interests.filter((_, i) => i !== index)
-    }));
+    } : prev);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProfileData(editFormData);
-    setViewMode("profile");
+    if (!editFormData) return;
+    setSaving(true);
+    try {
+      // Compose user_metadata update
+      const user_metadata: any = {
+        firstName: editFormData.firstName,
+        lastName: editFormData.lastName,
+        phone: editFormData.phone,
+        company: editFormData.company,
+        industry: editFormData.industry,
+        about: editFormData.about,
+        interests: editFormData.interests,
+        education: editFormData.education,
+      };
+      await updateProfile({ user_metadata });
+      // Refresh user/profileData
+      const freshUser = await getUser();
+      if (freshUser) {
+        const pd = mapUserToProfileData(freshUser);
+        setProfileData(pd);
+        setEditFormData(pd);
+      }
+      setViewMode("profile");
+    } catch (err) {
+      // TODO: show error toast
+      console.error('Error saving profile:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      console.log("Profile picture uploaded:", file);
+      try {
+        setSaving(true);
+        await updateProfile({ profile_picture: file });
+        // Refresh user/profileData
+        const freshUser = await getUser();
+        if (freshUser) {
+          const pd = mapUserToProfileData(freshUser);
+          setProfileData(pd);
+          setEditFormData(pd);
+        }
+      } catch (err) {
+        // TODO: show error toast
+        console.error('Error uploading profile picture:', err);
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -244,6 +307,7 @@ export const BuyerProfile = (): JSX.Element => {
   };
 
   const renderTabContent = () => {
+    if (!profileData) return null;
     switch (activeTab) {
       case "overview":
         return (
@@ -387,6 +451,40 @@ export const BuyerProfile = (): JSX.Element => {
     }
   };
 
+  // Fetch my gigs and their average rating
+  useEffect(() => {
+    const fetchGigsAndRatings = async () => {
+      if (!user?.id) return;
+      setLoadingGigsRating(true);
+      try {
+        // Only fetch completed gigs for the count
+        const gigs = await api.gigs.getMyGigs(user.id, { status: 'completed' });
+        setMyGigsCount(gigs.length);
+        // For the average rating, use all feedback for the user
+        const feedbacks = await api.feedback.getFeedbackForUser();
+        if (!feedbacks || feedbacks.length === 0) {
+          setMyGigsAverageRating(null);
+        } else {
+          const avg = feedbacks.reduce((sum, f) => sum + (f.rating || 0), 0) / feedbacks.length;
+          setMyGigsAverageRating(avg);
+        }
+      } catch (err) {
+        setMyGigsAverageRating(null);
+      } finally {
+        setLoadingGigsRating(false);
+      }
+    };
+    if (user?.id) fetchGigsAndRatings();
+  }, [user]);
+
+  if (authLoading || loadingProfile || !profileData || !editFormData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500 text-lg">Loading profile...</div>
+      </div>
+    );
+  }
+
   if (viewMode === "edit-profile") {
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -395,7 +493,7 @@ export const BuyerProfile = (): JSX.Element => {
 
         {/* Main Content - Edit Profile */}
         <div className="flex-1 flex flex-col">
-          <Header title="Edit Profile" userName="Demo Client" userType="buyer" />
+          <Header title="Edit Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="buyer" />
 
           <main className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
@@ -517,6 +615,7 @@ export const BuyerProfile = (): JSX.Element => {
                             onChange={handleInputChange}
                             className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                             required
+                            disabled
                           />
                         </div>
                       </div>
@@ -570,7 +669,7 @@ export const BuyerProfile = (): JSX.Element => {
                             onChange={(e) => {
                               const newInterests = [...editFormData.interests];
                               newInterests[index] = e.target.value;
-                              setEditFormData(prev => ({ ...prev, interests: newInterests }));
+                              setEditFormData(prev => prev ? { ...prev, interests: newInterests } : prev);
                             }}
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                           />
@@ -682,14 +781,16 @@ export const BuyerProfile = (): JSX.Element => {
                     variant="outline"
                     onClick={() => setViewMode("profile")}
                     className="px-8 py-3"
+                    disabled={saving}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-3"
+                    disabled={saving}
                   >
-                    Save Changes
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </div>
               </form>
@@ -708,7 +809,7 @@ export const BuyerProfile = (): JSX.Element => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header title="Profile" userName="Demo Client" userType="buyer" />
+        <Header title="Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="buyer" />
 
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
@@ -739,12 +840,22 @@ export const BuyerProfile = (): JSX.Element => {
                       
                       <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-1">
-                          {renderStars(5)}
-                          <span className="ml-2 font-semibold text-gray-900">4.8 (45 reviews)</span>
+                          {loadingGigsRating ? (
+                            <span className="text-gray-400">Loading...</span>
+                          ) : (
+                            renderStars(Math.round(myGigsAverageRating ?? 0))
+                          )}
+                          <span className="ml-2 font-semibold text-gray-900">
+                            {loadingGigsRating
+                              ? 'Loading...'
+                              : myGigsAverageRating !== null
+                                ? `${myGigsAverageRating.toFixed(1)} (${myGigsCount} completed gig${myGigsCount === 1 ? '' : 's'})`
+                                : 'No reviewed gigs yet'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                           <BriefcaseIcon className="w-4 h-4" />
-                          <span>50+ projects completed</span>
+                          <span>{myGigsCount > 0 ? `${myGigsCount} completed project${myGigsCount === 1 ? '' : 's'}` : 'No completed projects yet'}</span>
                         </div>
                       </div>
 

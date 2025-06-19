@@ -57,7 +57,7 @@ interface Feedback {
 type ViewMode = "profile" | "edit-profile";
 
 export const Profile = (): JSX.Element => {
-  const { logout } = useAuth();
+  const { user, getUser, updateProfile, uploadProfilePicture, logout } = useAuth();
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "cases">("overview");
@@ -65,43 +65,52 @@ export const Profile = (): JSX.Element => {
   const [reviews, setReviews] = useState<Feedback[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [averageRating, setAverageRating] = useState(0);
-  
-  const [profileData, setProfileData] = useState<ProfileData>({
-    firstName: "Demo",
-    lastName: "Seller",
-    email: "seller@example.com",
-    phone: "+234 987 654 3210",
-    title: "Senior Property Lawyer",
-    about: "Experienced property lawyer with over 8 years of expertise in real estate law and property transactions. I specialize in residential and commercial property matters, providing comprehensive legal support from initial consultation through transaction completion. My practice focuses on ensuring clients receive thorough, professional service with clear communication throughout the process.",
-    specializations: [
-      "Land Title Verification",
-      "Contract Review & Drafting",
-      "Property Due Diligence",
-      "Real Estate Transactions",
-      "Commercial Property Law",
-      "Lease Agreement Review"
-    ],
-    education: [
-      {
-        degree: "LL.B Law Degree",
-        institution: "University of Lagos",
-        period: "2013 - 2017"
-      },
-      {
-        degree: "Nigerian Bar Association",
-        institution: "Called to Bar",
-        period: "2018"
-      }
-    ]
-  });
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [editFormData, setEditFormData] = useState<ProfileData | null>(null);
+  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  const [editFormData, setEditFormData] = useState<ProfileData>(profileData);
+  // Fetch user profile data on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoadingProfile(true);
+      try {
+        const u = user || (await getUser());
+        if (!u) return;
+        // Parse name into first/last
+        const [firstName, ...rest] = (u.name || '').split(' ');
+        const lastName = rest.join(' ');
+        // Get education and specializations from user_metadata with type checks
+        const education = Array.isArray((u.user_metadata as any)?.education) ? (u.user_metadata as any).education : [];
+        const specializations = Array.isArray((u.user_metadata as any)?.specializations) ? (u.user_metadata as any).specializations : [];
+        setProfilePicUrl((u.user_metadata as any)?.profile_picture || null);
+        const profile: ProfileData = {
+          firstName: firstName || '',
+          lastName: lastName || '',
+          email: u.email,
+          phone: (u.user_metadata as any)?.phone || '',
+          title: (u.user_metadata as any)?.title || '',
+          about: (u.user_metadata as any)?.about || '',
+          specializations: specializations,
+          education: education,
+        };
+        setProfileData(profile);
+        setEditFormData(profile);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    fetchProfile();
+    // eslint-disable-next-line
+  }, [user]);
 
   // Fetch feedback data when component mounts or when reviews tab is active
   useEffect(() => {
     if (activeTab === "reviews") {
       fetchFeedback();
     }
+    // eslint-disable-next-line
   }, [activeTab]);
 
   const fetchFeedback = async () => {
@@ -109,11 +118,12 @@ export const Profile = (): JSX.Element => {
     try {
       const feedbackData = await api.feedback.getFeedbackForUser();
       setReviews(feedbackData);
-      
       // Calculate average rating
       if (feedbackData.length > 0) {
         const totalRating = feedbackData.reduce((sum, feedback) => sum + feedback.rating, 0);
         setAverageRating(totalRating / feedbackData.length);
+      } else {
+        setAverageRating(0);
       }
     } catch (error) {
       console.error('Error fetching feedback:', error);
@@ -127,7 +137,6 @@ export const Profile = (): JSX.Element => {
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
     if (diffDays === 1) return "1 day ago";
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
@@ -142,6 +151,7 @@ export const Profile = (): JSX.Element => {
     { id: "cases", label: "Cases" }
   ];
 
+  // Experience and cases can remain static or be made dynamic if needed
   const experience = [
     {
       position: "Senior Associate",
@@ -179,52 +189,80 @@ export const Profile = (): JSX.Element => {
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (!editFormData) return;
     const { name, value } = e.target;
-    setEditFormData(prev => ({ ...prev, [name]: value }));
+    setEditFormData(prev => prev ? { ...prev, [name]: value } : prev);
   };
 
   const handleEducationChange = (index: number, field: keyof Education, value: string) => {
-    setEditFormData(prev => ({
+    if (!editFormData) return;
+    setEditFormData(prev => prev ? {
       ...prev,
       education: prev.education.map((edu, i) => 
         i === index ? { ...edu, [field]: value } : edu
       )
-    }));
+    } : prev);
   };
 
   const addEducation = () => {
-    setEditFormData(prev => ({
+    if (!editFormData) return;
+    setEditFormData(prev => prev ? {
       ...prev,
       education: [...prev.education, { degree: "", institution: "", period: "" }]
-    }));
+    } : prev);
   };
 
   const removeEducation = (index: number) => {
-    setEditFormData(prev => ({
+    if (!editFormData) return;
+    setEditFormData(prev => prev ? {
       ...prev,
       education: prev.education.filter((_, i) => i !== index)
-    }));
+    } : prev);
   };
 
   const addSpecialization = () => {
+    if (!editFormData) return;
     if (newSpecialization.trim()) {
-      setEditFormData(prev => ({
+      setEditFormData(prev => prev ? {
         ...prev,
         specializations: [...prev.specializations, newSpecialization.trim()]
-      }));
+      } : prev);
       setNewSpecialization("");
     }
   };
 
   const removeSpecialization = (index: number) => {
-    setEditFormData(prev => ({
+    if (!editFormData) return;
+    setEditFormData(prev => prev ? {
       ...prev,
       specializations: prev.specializations.filter((_, i) => i !== index)
-    }));
+    } : prev);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!editFormData) return;
+    // Compose name
+    const name = `${editFormData.firstName} ${editFormData.lastName}`.trim();
+    // Prepare user_metadata
+    const user_metadata: any = {
+      phone: editFormData.phone,
+      title: editFormData.title,
+      about: editFormData.about,
+      specializations: editFormData.specializations,
+      education: editFormData.education,
+    };
+    // Handle profile picture upload if changed
+    if (profilePicFile) {
+      const url = await uploadProfilePicture(profilePicFile);
+      user_metadata.profile_picture = url;
+      setProfilePicUrl(url);
+    }
+    await updateProfile({
+      name,
+      email: editFormData.email,
+      user_metadata,
+    });
     setProfileData(editFormData);
     setViewMode("profile");
   };
@@ -232,7 +270,8 @@ export const Profile = (): JSX.Element => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      console.log("Profile picture uploaded:", file);
+      setProfilePicFile(file);
+      setProfilePicUrl(URL.createObjectURL(file));
     }
   };
 
@@ -246,6 +285,7 @@ export const Profile = (): JSX.Element => {
   };
 
   const renderTabContent = () => {
+    if (!profileData) return null;
     switch (activeTab) {
       case "overview":
         return (
@@ -256,7 +296,6 @@ export const Profile = (): JSX.Element => {
                 {profileData.about}
               </p>
             </div>
-
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Specializations</h3>
               <div className="space-y-3">
@@ -270,7 +309,6 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
-
       case "experience":
         return (
           <div className="space-y-8">
@@ -291,7 +329,6 @@ export const Profile = (): JSX.Element => {
                 ))}
               </div>
             </div>
-
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-6">Professional Experience</h3>
               <div className="space-y-6">
@@ -307,7 +344,6 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
-
       case "reviews":
         return (
           <div>
@@ -316,11 +352,10 @@ export const Profile = (): JSX.Element => {
               <div className="flex items-center gap-2">
                 <div className="flex">{renderStars(Math.round(averageRating))}</div>
                 <span className="text-lg font-semibold text-gray-900">
-                  {averageRating > 0 ? `${averageRating.toFixed(1)} out of 5` : "No reviews yet"}
+                  {averageRating > 0 ? `${averageRating.toFixed(1)} (${reviews.length} reviews)` : "No reviews yet"}
                 </span>
               </div>
             </div>
-
             {loadingReviews ? (
               <div className="flex items-center justify-center py-8">
                 <div className="text-gray-500">Loading reviews...</div>
@@ -354,7 +389,6 @@ export const Profile = (): JSX.Element => {
             )}
           </div>
         );
-
       case "cases":
         return (
           <div>
@@ -383,13 +417,20 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
-
       default:
         return null;
     }
   };
 
-  if (viewMode === "edit-profile") {
+  if (loadingProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500 text-lg">Loading profile...</div>
+      </div>
+    );
+  }
+
+  if (viewMode === "edit-profile" && editFormData) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
         {/* Sidebar */}
@@ -404,7 +445,6 @@ export const Profile = (): JSX.Element => {
               </div>
             </Link>
           </div>
-
           <nav className="flex-1 p-4">
             <ul className="space-y-2">
               <li>
@@ -445,24 +485,21 @@ export const Profile = (): JSX.Element => {
               </li>
             </ul>
           </nav>
-
           <div className="p-4 border-t border-gray-700">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">{profileData.firstName} {profileData.lastName}</div>
-                <div className="text-xs text-gray-400">{profileData.email}</div>
+                <div className="text-sm font-medium">{editFormData.firstName} {editFormData.lastName}</div>
+                <div className="text-xs text-gray-400">{editFormData.email}</div>
               </div>
             </div>
           </div>
         </div>
-
         {/* Main Content - Edit Profile */}
         <div className="flex-1 flex flex-col">
-          <Header title="Edit Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="seller" />
-
+          <Header title="Edit Profile" userName={`${editFormData.firstName} ${editFormData.lastName}`} userType="seller" />
           {/* Edit Profile Content */}
           <main className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
@@ -475,15 +512,18 @@ export const Profile = (): JSX.Element => {
                 <ArrowLeftIcon className="w-4 h-4" />
                 Back to Profile
               </Button>
-
               <form onSubmit={handleSaveProfile} className="space-y-8">
                 {/* Profile Picture */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
                     <div className="flex items-center gap-6">
                       <div className="relative">
-                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                          <UserIcon className="w-12 h-12 text-gray-600" />
+                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                          {profilePicUrl ? (
+                            <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <UserIcon className="w-12 h-12 text-gray-600" />
+                          )}
                         </div>
                         <input
                           type="file"
@@ -506,12 +546,10 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
-
                 {/* Basic Information */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">Basic Information</h3>
-                    
                     <div className="grid grid-cols-2 gap-6 mb-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -540,7 +578,6 @@ export const Profile = (): JSX.Element => {
                         />
                       </div>
                     </div>
-
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Professional Title
@@ -555,7 +592,6 @@ export const Profile = (): JSX.Element => {
                         required
                       />
                     </div>
-
                     <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -596,7 +632,6 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
-
                 {/* About */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -611,7 +646,6 @@ export const Profile = (): JSX.Element => {
                     />
                   </CardContent>
                 </Card>
-
                 {/* Specializations */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -625,7 +659,7 @@ export const Profile = (): JSX.Element => {
                             onChange={(e) => {
                               const newSpecs = [...editFormData.specializations];
                               newSpecs[index] = e.target.value;
-                              setEditFormData(prev => ({ ...prev, specializations: newSpecs }));
+                              setEditFormData(prev => prev ? { ...prev, specializations: newSpecs } : prev);
                             }}
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                           />
@@ -662,7 +696,6 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
-
                 {/* Education */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -729,7 +762,6 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
-
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-4 pt-6">
                   <Button
@@ -756,15 +788,20 @@ export const Profile = (): JSX.Element => {
   }
 
   // Default profile view
+  if (!profileData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500 text-lg">No profile data found.</div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <SellerSidebar activePage="profile" />
-
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         <Header title="Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="seller" />
-
         {/* Profile Content */}
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
@@ -774,14 +811,17 @@ export const Profile = (): JSX.Element => {
                 <CardContent className="p-8">
                   <div className="flex items-start gap-6">
                     <div className="relative">
-                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                        <UserIcon className="w-12 h-12 text-gray-600" />
+                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                        {profilePicUrl ? (
+                          <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <UserIcon className="w-12 h-12 text-gray-600" />
+                        )}
                       </div>
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                         <CheckCircleIcon className="w-4 h-4 text-white" />
                       </div>
                     </div>
-
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
@@ -789,20 +829,19 @@ export const Profile = (): JSX.Element => {
                           🔵 Verified Professional
                         </span>
                       </div>
-                      
                       <p className="text-xl text-gray-600 mb-4">{profileData.title}</p>
-                      
                       <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-1">
-                          {renderStars(5)}
-                          <span className="ml-2 font-semibold text-gray-900">4.9 (127 reviews)</span>
+                          {renderStars(Math.round(averageRating))}
+                          <span className="ml-2 font-semibold text-gray-900">
+                            {averageRating > 0 ? `${averageRating.toFixed(1)} (${reviews.length} reviews)` : 'No reviews yet'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                           <BriefcaseIcon className="w-4 h-4" />
                           <span>8+ years experience</span>
                         </div>
                       </div>
-
                       <div className="flex items-center gap-4">
                         <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                           Available Now
@@ -810,7 +849,6 @@ export const Profile = (): JSX.Element => {
                         <span className="text-gray-600">Response within 2 hours</span>
                       </div>
                     </div>
-
                     <Button
                       onClick={() => setViewMode("edit-profile")}
                       className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
@@ -821,7 +859,6 @@ export const Profile = (): JSX.Element => {
                   </div>
                 </CardContent>
               </Card>
-
               {/* Tabs Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-0">
@@ -842,18 +879,15 @@ export const Profile = (): JSX.Element => {
                       ))}
                     </nav>
                   </div>
-
                   <div className="p-8">
                     {renderTabContent()}
                   </div>
                 </CardContent>
               </Card>
-
               {/* Contact Information Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-8">
                   <h3 className="text-xl font-semibold text-gray-900 mb-6">Contact Information</h3>
-                  
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <MailIcon className="w-5 h-5 text-gray-400" />

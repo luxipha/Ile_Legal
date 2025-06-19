@@ -40,7 +40,8 @@ export interface AuthContextType {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   getUser: () => Promise<User | null>;
   resetPassword: (email: string) => Promise<void>;
-  getAllUsers: () => Promise<User[]>;
+  getAllUsers: (sellers?: boolean) => Promise<User[]>;
+  updateUserStatus: (userId: string, status: string) => Promise<void>;
 }
 
 // Mock users for demo
@@ -722,16 +723,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // New getAllUsers function
-  const getAllUsers = async (): Promise<User[]> => {
+  const getAllUsers = async (sellers?: boolean): Promise<User[]> => {
     // Check if current user is admin
     console.log("user", user);
     if (!user || user.user_metadata?.role_title !== 'admin') {
       throw new Error('Access denied. Admin privileges required.');
     }
 
-    const { data, error } = await supabase
-      .from('Profiles')
-      .select('*');
+    let query = supabase.from('Profiles').select('*');
+    if (sellers) {
+      query = query.eq('role_title', 'seller');
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching all users:', error);
@@ -746,8 +750,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: userData.email,
       role: userData.role_title as UserRole,
       isVerified: userData.email_verified,
-      user_metadata: userData.user_metadata
+      user_metadata: userData.user_metadata,
+      status: userData.status
     }));
+  };
+
+  // Admin-only function to update a user's status
+  const updateUserStatus = async (userId: string, status: string): Promise<void> => {
+    if (!user || user.user_metadata?.role_title !== 'admin') {
+      throw new Error('Access denied. Admin privileges required.');
+    }
+    const { error } = await supabase
+      .from('Profiles')
+      .update({ status })
+      .eq('id', userId);
+    if (error) {
+      console.error('Error updating user status:', error);
+      throw error;
+    }
   };
 
   return (
@@ -772,7 +792,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!user) return '';
           await updateProfile({ profile_picture: file });
           return user.user_metadata?.profile_picture || '';
-        }
+        },
+        updateUserStatus
       }}
     >
       {children}
