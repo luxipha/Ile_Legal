@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header/Header";
@@ -46,8 +46,7 @@ interface ProfileData {
 type ViewMode = "profile" | "edit-profile";
 
 export const Profile = (): JSX.Element => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
+  const { } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "cases">("overview");
   const [newSpecialization, setNewSpecialization] = useState("");

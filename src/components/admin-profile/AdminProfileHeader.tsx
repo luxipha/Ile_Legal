@@ -1,23 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UserIcon, PencilIcon, ShieldIcon } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { useAuth } from "../../contexts/AuthContext";
+import { RoleService, UserType } from "../../services/roleService";
+import { usePermissions } from "../../hooks/usePermissions";
+import { supabaseLocal as supabase } from "../../lib/supabaseLocal";
 
 export const AdminProfileHeader = () => {
-  const { user, updateProfile, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
+  const { userRole, permissions } = usePermissions();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [adminProfile, setAdminProfile] = useState<any>(null);
   const [formData, setFormData] = useState({
-    name: user?.name || (user?.user_metadata as any)?.name || "Demo Admin",
-    role: user?.user_metadata?.role_title || "System Administrator",
-    email: user?.email || "admin@example.com",
-    clearance: user?.user_metadata?.clearance_level || "5"
+    firstName: "",
+    lastName: "",
+    phone: "",
+    location: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // For debugging
-  console.log('User data in AdminProfileHeader:', user);
+  // User data loaded
+
+  // Load admin profile data
+  useEffect(() => {
+    const loadAdminProfile = async () => {
+      if (user?.id) {
+        try {
+          const profile = await RoleService.getAdminProfile(user.id);
+          setAdminProfile(profile);
+          if (profile) {
+            setFormData({
+              firstName: profile.first_name || "",
+              lastName: profile.last_name || "",
+              phone: profile.phone || "",
+              location: profile.location || ""
+            });
+          }
+        } catch (error) {
+          console.error('Error loading admin profile:', error);
+        }
+      }
+    };
+
+    loadAdminProfile();
+  }, [user?.id]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -29,30 +57,38 @@ export const AdminProfileHeader = () => {
   
   const handleEditProfile = () => {
     setIsEditDialogOpen(true);
-    // Reset form data to current user values
-    if (user) {
+    // Reset form data to current profile values
+    if (adminProfile) {
       setFormData({
-        name: user.name || "Demo Admin",
-        role: user.user_metadata?.role_title || "System Administrator",
-        email: user.email || "admin@example.com",
-        clearance: user.user_metadata?.clearance_level || "5"
+        firstName: adminProfile.first_name || "",
+        lastName: adminProfile.last_name || "",
+        phone: adminProfile.phone || "",
+        location: adminProfile.location || ""
       });
     }
   };
   
   const handleSaveProfile = async () => {
-    if (!user) return;
+    if (!user?.id) return;
     
     setIsSubmitting(true);
     try {
-      await updateProfile({
-        name: formData.name,
-        user_metadata: {
-          ...user.user_metadata,
-          role_title: formData.role,
-          clearance_level: formData.clearance
-        }
-      });
+      // Update profile in the database
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone: formData.phone,
+          location: formData.location
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Reload profile data
+      const updatedProfile = await RoleService.getAdminProfile(user.id);
+      setAdminProfile(updatedProfile);
       setIsEditDialogOpen(false);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -78,9 +114,19 @@ export const AdminProfileHeader = () => {
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{user?.name || "Demo Admin"}</h2>
-                  <p className="text-gray-600 mt-1">{user?.user_metadata?.role_title || "System Administrator"}</p>
-                  <p className="text-gray-500 text-sm">Full Platform Access</p>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {adminProfile ? 
+                      `${adminProfile.first_name || ''} ${adminProfile.last_name || ''}`.trim() || adminProfile.email :
+                      user?.name || "Demo Admin"
+                    }
+                  </h2>
+                  <p className="text-gray-600 mt-1">
+                    {adminProfile?.user_type ? 
+                      RoleService.getRoleByType(adminProfile.user_type as UserType).display_name :
+                      "Administrator"
+                    }
+                  </p>
+                  <p className="text-gray-500 text-sm">Platform Access</p>
                 </div>
                 
                 <Button 
@@ -95,20 +141,22 @@ export const AdminProfileHeader = () => {
               </div>
               
               <div className="mt-4 flex items-center gap-3">
-                {/* Admin Badge */}
+                {/* Role Badge */}
                 <span className="bg-[#1B1828] text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
                   <ShieldIcon className="w-4 h-4" />
-                  Admin
+                  {userRole?.display_name || 'Admin'}
                 </span>
                 
-                {/* Level 5 Clearance Badge */}
+                {/* Permission Count Badge */}
                 <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                  Level 5 Clearance
+                  {permissions.length} Permission{permissions.length !== 1 ? 's' : ''}
                 </span>
                 
-                {/* System Manager Badge */}
+                {/* Access Level Badge */}
                 <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
-                  System Manager
+                  {adminProfile?.user_type === 'super_admin' ? 'Super Admin' : 
+                   adminProfile?.user_type === 'admin' ? 'Admin Access' : 
+                   'System User'}
                 </span>
               </div>
               
@@ -132,21 +180,21 @@ export const AdminProfileHeader = () => {
           
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="name" className="text-right font-medium">Name</label>
+              <label htmlFor="firstName" className="text-right font-medium">First Name</label>
               <input 
-                id="name" 
-                name="name"
-                value={formData.name} 
+                id="firstName" 
+                name="firstName"
+                value={formData.firstName} 
                 onChange={handleInputChange}
                 className="col-span-3 p-2 border rounded" 
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="role" className="text-right font-medium">Role</label>
+              <label htmlFor="lastName" className="text-right font-medium">Last Name</label>
               <input 
-                id="role" 
-                name="role"
-                value={formData.role} 
+                id="lastName" 
+                name="lastName"
+                value={formData.lastName} 
                 onChange={handleInputChange}
                 className="col-span-3 p-2 border rounded" 
               />
@@ -156,27 +204,30 @@ export const AdminProfileHeader = () => {
               <input 
                 id="email" 
                 name="email"
-                value={formData.email} 
-                onChange={handleInputChange}
-                className="col-span-3 p-2 border rounded" 
+                value={adminProfile?.email || user?.email || ""} 
+                className="col-span-3 p-2 border rounded bg-gray-100" 
                 disabled
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="clearance" className="text-right font-medium">Clearance Level</label>
-              <select 
-                id="clearance" 
-                name="clearance"
-                value={formData.clearance} 
+              <label htmlFor="phone" className="text-right font-medium">Phone</label>
+              <input 
+                id="phone" 
+                name="phone"
+                value={formData.phone} 
                 onChange={handleInputChange}
                 className="col-span-3 p-2 border rounded"
-              >
-                <option value="1">Level 1</option>
-                <option value="2">Level 2</option>
-                <option value="3">Level 3</option>
-                <option value="4">Level 4</option>
-                <option value="5">Level 5</option>
-              </select>
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label htmlFor="location" className="text-right font-medium">Location</label>
+              <input 
+                id="location" 
+                name="location"
+                value={formData.location} 
+                onChange={handleInputChange}
+                className="col-span-3 p-2 border rounded"
+              />
             </div>
           </div>
           

@@ -1,29 +1,44 @@
 import axios from 'axios';
 
-// Circle API configuration
+// Circle API configuration from environment variables
 const CIRCLE_API_URL = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_CIRCLE_API_URL : process.env.VITE_CIRCLE_API_URL) || 'https://api-sandbox.circle.com';
 const CIRCLE_MODULAR_URL = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_CIRCLE_MODULAR_URL : process.env.VITE_CIRCLE_MODULAR_URL) || 'https://modular-sdk.circle.com/v1/rpc/w3s/buidl';
-const CIRCLE_TEST_API_KEY = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_CIRCLE_TEST_API_KEY : process.env.VITE_CIRCLE_TEST_API_KEY) || '';
 const CIRCLE_WALLET_ADDRESS = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_CIRCLE_WALLET_ADDRESS : process.env.VITE_CIRCLE_WALLET_ADDRESS) || '';
-const CIRCLE_ESCROW_WALLET_ID = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_CIRCLE_ESCROW_WALLET_ID : process.env.VITE_CIRCLE_ESCROW_WALLET_ID) || '';
+const CIRCLE_API_KEY = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_CIRCLE_TEST_API_KEY : process.env.VITE_CIRCLE_TEST_API_KEY) || '';
 
-// Create axios instance for Circle API
-const circleClient = axios.create({
-  baseURL: CIRCLE_API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${CIRCLE_TEST_API_KEY}`
+/**
+ * Create axios instance for Circle API
+ */
+const createCircleClient = () => {
+  if (!CIRCLE_API_KEY) {
+    throw new Error('Circle API key not configured');
   }
-});
+  
+  return axios.create({
+    baseURL: CIRCLE_API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${CIRCLE_API_KEY}`
+    }
+  });
+};
 
-// Create axios instance for Circle Modular SDK
-const circleModularClient = axios.create({
-  baseURL: CIRCLE_MODULAR_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${CIRCLE_TEST_API_KEY}`
+/**
+ * Create axios instance for Circle Modular SDK
+ */
+const createCircleModularClient = () => {
+  if (!CIRCLE_API_KEY) {
+    throw new Error('Circle API key not configured');
   }
-});
+  
+  return axios.create({
+    baseURL: CIRCLE_MODULAR_URL,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${CIRCLE_API_KEY}`
+    }
+  });
+};
 
 /**
  * Test the Circle API connection
@@ -31,6 +46,8 @@ const circleModularClient = axios.create({
  */
 export const testCircleConnection = async () => {
   try {
+    const circleModularClient = createCircleModularClient();
+    
     // Test the connection by getting wallet balance
     const response = await circleModularClient.post('', {
       jsonrpc: '2.0',
@@ -65,6 +82,7 @@ export const testCircleConnection = async () => {
  */
 export const createWallet = async (userId: string, description: string) => {
   try {
+    const circleClient = createCircleClient();
     const response = await circleClient.post('/v1/wallets', {
       idempotencyKey: `wallet-${userId}-${Date.now()}`,
       description
@@ -85,6 +103,7 @@ export const createWallet = async (userId: string, description: string) => {
  */
 export const generateWalletAddress = async (walletId: string, chain = 'ETH', currency = 'USD') => {
   try {
+    const circleClient = createCircleClient();
     const response = await circleClient.post(`/v1/wallets/${walletId}/addresses`, {
       idempotencyKey: `address-${walletId}-${chain}-${currency}-${Date.now()}`,
       chain,
@@ -104,6 +123,7 @@ export const generateWalletAddress = async (walletId: string, chain = 'ETH', cur
  */
 export const getWallet = async (walletId: string) => {
   try {
+    const circleClient = createCircleClient();
     const response = await circleClient.get(`/v1/wallets/${walletId}`);
     return response.data.data;
   } catch (error) {
@@ -118,6 +138,7 @@ export const getWallet = async (walletId: string) => {
  */
 export const getWalletBalance = async (walletId: string) => {
   try {
+    const circleClient = createCircleClient();
     const response = await circleClient.get(`/v1/wallets/${walletId}/balances`);
     return response.data.data;
   } catch (error) {
@@ -140,6 +161,7 @@ export const transferBetweenWallets = async (
   idempotencyKey = `transfer-${Date.now()}`
 ) => {
   try {
+    const circleClient = createCircleClient();
     const response = await circleClient.post('/v1/transfers', {
       idempotencyKey,
       source: {
@@ -171,6 +193,7 @@ export const transferBetweenWallets = async (
  */
 export const getTransactionHistory = async (walletId: string, pageSize = 50, pageNumber = 1) => {
   try {
+    const circleClient = createCircleClient();
     const response = await circleClient.get(`/v1/wallets/${walletId}/transactions`, {
       params: {
         pageSize,

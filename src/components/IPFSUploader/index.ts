@@ -1,0 +1,1 @@
+export { IPFSUploader } from './IPFSUploader';
