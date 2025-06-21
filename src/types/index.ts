@@ -1,5 +1,8 @@
-// User role types
+// User role types (legacy - for backward compatibility)
 export type UserRole = 'admin' | 'seller' | 'buyer';
+
+// Enhanced role types (new system)
+export * from './roles';
 
 // User interface
 export interface UserProfile {

@@ -119,6 +119,7 @@ export const TransactionVolumeChart: React.FC<TransactionVolumeChartProps> = ({ 
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
         display: false,
@@ -172,12 +173,14 @@ export const TransactionVolumeChart: React.FC<TransactionVolumeChartProps> = ({ 
   };
 
   return (
-    <div className="w-full h-full">
-      <div className="text-right mb-4">
+    <div className="w-full h-full flex flex-col">
+      <div className="text-right mb-2">
         <div className="text-2xl font-bold text-gray-900">{calculateTotal()}</div>
         <div className="text-sm text-gray-500">Total Volume ({timeframe})</div>
       </div>
-      <Bar data={getChartData()} options={options} />
+      <div className="flex-1 relative">
+        <Bar data={getChartData()} options={options} />
+      </div>
     </div>
   );
 };

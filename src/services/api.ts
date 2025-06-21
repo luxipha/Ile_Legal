@@ -1,4 +1,5 @@
-import { supabase } from '../lib/supabase';
+import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { ipfsService, IPFSUploadResult } from './ipfsService';
 
 
 // Mock API service for frontend-only development
@@ -1064,30 +1065,65 @@ export const api = {
         hash: string;
         txId?: string;
       }>;
+      use_ipfs?: boolean;
     }) => {
       let deliverableFilenames: string[] = [];
+      let ipfsResults: IPFSUploadResult[] = [];
       
       // Upload files if they exist
       if (submissionData.deliverables) {
         // Convert FileList to array of Files
         const files = Array.from(submissionData.deliverables);
         
-        const uploadPromises = files.map(async (file) => {
-          const filePath = `${submissionData.gig_id}/${file.name}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('deliverables')
-            .upload(filePath, file, { contentType: file.type });
+        if (submissionData.use_ipfs) {
+          // Upload to IPFS
+          console.log('Uploading files to IPFS...');
+          try {
+            const ipfsUploadPromises = files.map(async (file) => {
+              // Generate hash if blockchain verification is enabled
+              let fileHash: string | undefined;
+              if (submissionData.blockchain_hashes?.some(bh => bh.fileName === file.name)) {
+                const { HashUtils } = await import('../components/blockchain/shared/hashUtils');
+                const fileResult = await HashUtils.hashFile(file);
+                fileHash = HashUtils.createDocumentHash(fileResult).hash;
+              }
+              
+              return await ipfsService.uploadFile(file, {
+                hash: fileHash
+              });
+            });
             
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-            throw uploadError;
+            ipfsResults = await Promise.all(ipfsUploadPromises);
+            deliverableFilenames = ipfsResults.map(result => result.cid);
+            
+            console.log('Files uploaded to IPFS:', ipfsResults);
+          } catch (ipfsError) {
+            console.error('IPFS upload failed, falling back to Supabase:', ipfsError);
+            // Fallback to Supabase if IPFS fails
+            submissionData.use_ipfs = false;
           }
-          
-          return file.name;
-        });
+        }
         
-        deliverableFilenames = await Promise.all(uploadPromises);
+        if (!submissionData.use_ipfs) {
+          // Upload to Supabase storage (fallback or default)
+          console.log('Uploading files to Supabase storage...');
+          const uploadPromises = files.map(async (file) => {
+            const filePath = `${submissionData.gig_id}/${file.name}`;
+            
+            const { error: uploadError } = await supabase.storage
+              .from('deliverables')
+              .upload(filePath, file, { contentType: file.type });
+              
+            if (uploadError) {
+              console.error('Upload error:', uploadError);
+              throw uploadError;
+            }
+            
+            return file.name;
+          });
+          
+          deliverableFilenames = await Promise.all(uploadPromises);
+        }
       }
 
       // Get current user
@@ -1104,7 +1140,9 @@ export const api = {
           deliverables: deliverableFilenames,
           notes: submissionData.notes || '',
           blockchain_hashes: submissionData.blockchain_hashes || [],
-          status: 'submitted'
+          status: 'submitted',
+          storage_type: submissionData.use_ipfs ? 'ipfs' : 'supabase',
+          ipfs_data: submissionData.use_ipfs ? ipfsResults : null
         });
 
       if (error) {

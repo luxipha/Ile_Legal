@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
-import { AlertCircleIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { AlertCircleIcon } from "lucide-react";
 
 interface DisputeFormProps {
   transactionId: string | number;

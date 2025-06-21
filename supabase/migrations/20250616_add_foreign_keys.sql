@@ -62,10 +62,10 @@ BEGIN
     SELECT 
       c.*,
       b.id AS buyer_id,
-      b.full_name AS buyer_full_name,
+      CONCAT(b.first_name, ' ', b.last_name) AS buyer_full_name,
       b.avatar_url AS buyer_avatar_url,
       s.id AS seller_id,
-      s.full_name AS seller_full_name,
+      CONCAT(s.first_name, ' ', s.last_name) AS seller_full_name,
       s.avatar_url AS seller_avatar_url,
       g.id AS gig_id,
       g.title AS gig_title,

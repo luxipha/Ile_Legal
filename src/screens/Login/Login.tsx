@@ -4,7 +4,8 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { EyeIcon, EyeOffIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon, ArrowLeftIcon } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-import { testDirectLogin } from "../../lib/supabase";
+import { testDirectLogin } from "../../lib/supabaseLocal";
+import { AdminDebug } from "../../components/AdminDebug";
 
 export const Login = (): JSX.Element => {
   const { login, user, isLoading, createTestUser, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
@@ -532,6 +533,13 @@ export const Login = (): JSX.Element => {
           </Button>
         </div>
       </div>
+
+      {/* Development Admin Debug Tool */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 left-4 max-w-sm">
+          <AdminDebug />
+        </div>
+      )}
     </div>
   );
 };

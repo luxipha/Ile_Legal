@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "../ui/modal";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Check, X } from "lucide-react";
+import { SettingsService } from "../../services/settingsService";
 
 interface PaymentProvider {
   name: string;
@@ -11,6 +12,7 @@ interface PaymentProvider {
   secretKey?: string;
   webhookUrl?: string;
   testMode: boolean;
+  escrowWalletId?: string;
 }
 
 interface PaymentProcessingModalProps {
@@ -25,6 +27,13 @@ export const PaymentProcessingModal = ({
   onClose,
   onSave,
   initialProviders = [
+    { 
+      name: "Circle", 
+      enabled: true, 
+      testMode: true,
+      apiKey: "TEST_API_KEY:10a0b7b4cedfaa42d6ce306592fec59f:cfae665cde083f9236de7be92d08f54c",
+      escrowWalletId: "52a2c755-6045-5217-8d70-8ac28dc221ba"
+    },
     { name: "Stripe", enabled: false, testMode: true },
     { name: "PayPal", enabled: false, testMode: true },
     { name: "Flutterwave", enabled: false, testMode: true },
@@ -32,6 +41,27 @@ export const PaymentProcessingModal = ({
   ]
 }: PaymentProcessingModalProps) => {
   const [providers, setProviders] = useState<PaymentProvider[]>(initialProviders);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load current settings when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadCurrentSettings();
+    }
+  }, [isOpen]);
+
+  const loadCurrentSettings = async () => {
+    try {
+      setIsLoading(true);
+      const settings = await SettingsService.getSettings();
+      setProviders(settings.paymentProviders);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleToggleProvider = (name: string) => {
     setProviders(providers.map(provider => 
@@ -51,9 +81,18 @@ export const PaymentProcessingModal = ({
     ));
   };
 
-  const handleSave = () => {
-    onSave(providers);
-    onClose();
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      await SettingsService.updatePaymentProviders(providers);
+      onSave(providers);
+      onClose();
+    } catch (error) {
+      console.error('Error saving payment providers:', error);
+      alert('Failed to save settings. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -63,7 +102,12 @@ export const PaymentProcessingModal = ({
           Configure payment processing providers for your application. Enable or disable providers and set required credentials.
         </p>
 
-        <div className="space-y-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-gray-500">Loading settings...</div>
+          </div>
+        ) : (
+          <div className="space-y-6">
           {providers.map((provider) => (
             <div key={provider.name} className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between p-4 bg-gray-50">
@@ -119,13 +163,19 @@ export const PaymentProcessingModal = ({
                   </div>
                   
                   <div>
-                    <Label htmlFor={`${provider.name}-webhook-url`}>Webhook URL</Label>
+                    <Label htmlFor={`${provider.name}-webhook-url`}>
+                      {provider.name === "Circle" ? "Escrow Wallet ID" : "Webhook URL"}
+                    </Label>
                     <input
                       id={`${provider.name}-webhook-url`}
                       type="text"
-                      value={provider.webhookUrl || ""}
-                      onChange={(e) => handleUpdateProvider(provider.name, "webhookUrl", e.target.value)}
-                      placeholder="https://yourdomain.com/webhooks/payment"
+                      value={provider.name === "Circle" ? (provider.escrowWalletId || "") : (provider.webhookUrl || "")}
+                      onChange={(e) => handleUpdateProvider(
+                        provider.name, 
+                        provider.name === "Circle" ? "escrowWalletId" : "webhookUrl", 
+                        e.target.value
+                      )}
+                      placeholder={provider.name === "Circle" ? "52a2c755-6045-5217-8d70-8ac28dc221ba" : "https://yourdomain.com/webhooks/payment"}
                       className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
@@ -144,7 +194,8 @@ export const PaymentProcessingModal = ({
               )}
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 mt-6">
           <Button variant="outline" onClick={onClose}>
@@ -153,8 +204,9 @@ export const PaymentProcessingModal = ({
           <Button 
             onClick={handleSave}
             className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+            disabled={isSaving}
           >
-            Save Changes
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>
       </div>

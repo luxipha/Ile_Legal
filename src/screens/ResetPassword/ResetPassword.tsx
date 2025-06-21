@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { EyeIcon, EyeOffIcon } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabaseLocal as supabase } from '../../lib/supabaseLocal';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const ResetPassword = (): JSX.Element => {

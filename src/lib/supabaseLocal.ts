@@ -56,4 +56,21 @@ export const getSupabaseClient = async (useAdmin = false) => {
   return supabaseModule.supabase;
 };
 
+// Test direct auth functions
+export const testDirectLogin = async (email: string, password: string) => {
+  try {
+    console.log('Attempting direct login with:', { email })
+    const response = await supabaseLocal.auth.signInWithPassword({
+      email,
+      password,
+    })
+    
+    console.log('Direct login response:', response)
+    return response
+  } catch (error: any) {
+    console.error('Unexpected error in direct login:', error)
+    return { data: null, error }
+  }
+}
+
 export default supabaseLocal;

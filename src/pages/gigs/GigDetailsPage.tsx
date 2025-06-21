@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, Calendar, DollarSign, MessageSquare, FileText, Clock, Shield, CheckCircle } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseLocal as supabase } from '../../lib/supabaseLocal';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
-const supabase = createClient('https://govkkihikacnnyqzhtxv.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvdmtraWhpa2Fjbm55cXpodHh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTgyMjQsImV4cCI6MjA2NDgzNDIyNH0.0WuGDlY-twGxtmHU5XzfMvDQse_G3CuFVxLyCgZlxIQ');
 
 const GigDetailsPage: React.FC = () => {
   const { gigId } = useParams<{ gigId: string }>();

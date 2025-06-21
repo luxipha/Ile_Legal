@@ -6,7 +6,7 @@ import { Header } from "../../components/Header";
 import { ViewBids } from "../../components/ViewBids/ViewBids";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
 import { api } from "../../services/api";
-import { supabase } from "../../lib/supabase";
+import { supabaseLocal as supabase } from "../../lib/supabaseLocal";
 import { 
   UserIcon,
   PlusIcon,

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { createUserWallet } from '../services/walletService';
+import * as circleSdk from '../services/circleSdk';
 
 // User types
 type UserRole = 'buyer' | 'seller' | 'admin';
@@ -151,13 +151,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (userData) {
       setUser(userData);
       setToken(session?.access_token || null);
+      
+      // Set ethAddress from Circle wallet or ETH address
+      const walletAddress = userData.user_metadata?.circle_wallet_address || userData.user_metadata?.eth_address;
+      if (walletAddress) {
+        setEthAddress(walletAddress);
+        localStorage.setItem('ileEthAddress', walletAddress);
+      } else {
+        setEthAddress(null);
+        localStorage.removeItem('ileEthAddress');
+      }
+      
       localStorage.setItem('ileUser', JSON.stringify(userData));
       localStorage.setItem('ileToken', session?.access_token || '');
     } else {
       setUser(null);
       setToken(null);
+      setEthAddress(null);
       localStorage.removeItem('ileUser');
       localStorage.removeItem('ileToken');
+      localStorage.removeItem('ileEthAddress');
     }
   }
 
@@ -290,6 +303,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(user);
       setToken(mockToken);
+      
+      // Set ethAddress from Circle wallet or ETH address
+      const walletAddress = user.user_metadata?.circle_wallet_address || user.user_metadata?.eth_address;
+      if (walletAddress) {
+        setEthAddress(walletAddress);
+        localStorage.setItem('ileEthAddress', walletAddress);
+      }
+      
       localStorage.setItem('ileUser', JSON.stringify(user));
       localStorage.setItem('ileToken', mockToken);
     } catch (error) {
@@ -335,29 +356,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         
         try {
-          // Create a Circle wallet for the new user
+          // Create a Circle wallet for the new user using SDK
           console.log('Creating Circle wallet for new user:', newUser.id);
-          const walletData = await createUserWallet(newUser);
-          console.log('Circle wallet created successfully:', walletData);
+          
+          const walletDescription = `${newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)} wallet for ${newUser.name}`;
+          const wallet = await circleSdk.createWallet(newUser.id, walletDescription);
+          
+          console.log('Circle wallet created:', wallet.walletId);
+          
+          // Generate a wallet address
+          const addressData = await circleSdk.generateWalletAddress(wallet.walletId);
+          
+          console.log('Wallet address generated:', addressData.address);
           
           // Update the user object with wallet information
           newUser.user_metadata = {
             ...newUser.user_metadata,
-            circle_wallet_id: walletData.walletId,
-            circle_wallet_address: walletData.address
+            circle_wallet_id: wallet.walletId,
+            circle_wallet_address: addressData.address
           };
           
           // Update the user in Supabase with the wallet information
           await supabase.auth.updateUser({
             data: {
-              circle_wallet_id: walletData.walletId,
-              circle_wallet_address: walletData.address
+              circle_wallet_id: wallet.walletId,
+              circle_wallet_address: addressData.address
             }
           });
+          
+          console.log('Real Circle wallet setup complete!');
         } catch (walletError) {
           // Log the error but don't fail the registration process
           console.error('Error creating Circle wallet:', walletError);
-          // We'll retry wallet creation later if needed
+          
+          // Fallback to mock wallet if Circle API fails
+          console.log('Falling back to mock wallet...');
+          const mockWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
+          
+          newUser.user_metadata = {
+            ...newUser.user_metadata,
+            circle_wallet_id: `wallet_${newUser.id}`,
+            circle_wallet_address: mockWalletAddress
+          };
+          
+          await supabase.auth.updateUser({
+            data: {
+              circle_wallet_id: `wallet_${newUser.id}`,
+              circle_wallet_address: mockWalletAddress
+            }
+          });
         }
       }
       
@@ -414,6 +461,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(mockToken);
       localStorage.setItem('ileUser', JSON.stringify(newUser));
       localStorage.setItem('ileToken', mockToken);
+      
+      const signupData = await signUpNewUser(email, name, password, role);
+      
+      // Update ethAddress if wallet was created during signup
+      if (signupData?.user?.user_metadata?.circle_wallet_address) {
+        setEthAddress(signupData.user.user_metadata.circle_wallet_address);
+        localStorage.setItem('ileEthAddress', signupData.user.user_metadata.circle_wallet_address);
+      }
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -591,12 +646,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Check if user has a Circle wallet, create one if not
           if (!userData.circle_wallet_id) {
             try {
-              console.log('Creating Circle wallet for existing MetaMask user:', updatedUser.id);
-              const walletData = await createUserWallet(updatedUser);
-              console.log('Circle wallet created successfully:', walletData);
+              console.log('Creating mock wallet for existing MetaMask user:', updatedUser.id);
+              const mockWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
+              console.log('Mock wallet created for MetaMask user:', mockWalletAddress);
             } catch (walletError) {
-              console.error('Error creating Circle wallet for MetaMask user:', walletError);
-              // Don't fail the authentication process if wallet creation fails
+              console.error('Error setting up wallet for MetaMask user:', walletError);
             }
           }
         } else {
@@ -646,14 +700,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem('ileUser', JSON.stringify(createdUser));
               localStorage.setItem('ileEthAddress', address);
               
-              // Create a Circle wallet for the new MetaMask user
+              // Create a mock wallet for the new MetaMask user
               try {
-                console.log('Creating Circle wallet for new MetaMask user:', createdUser.id);
-                const walletData = await createUserWallet(createdUser);
-                console.log('Circle wallet created successfully:', walletData);
+                console.log('Creating mock wallet for new MetaMask user:', createdUser.id);
+                const mockWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
+                console.log('Mock wallet created for MetaMask user:', mockWalletAddress);
               } catch (walletError) {
-                console.error('Error creating Circle wallet for new MetaMask user:', walletError);
-                // Don't fail the authentication process if wallet creation fails
+                console.error('Error setting up wallet for MetaMask user:', walletError);
               }
             }
           }
