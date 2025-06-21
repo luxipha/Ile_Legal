@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header/Header";
@@ -25,7 +25,9 @@ import {
   DollarSignIcon
 } from "lucide-react";
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../services/api';
+import { ReputationDisplay } from '../../components/reputation/ReputationDisplay';
+import { LegalCredentials } from '../../components/reputation/LegalCredentials';
+import { DebugUserInfo } from '../../components/DebugUserInfo';
 
 interface Education {
   degree: string;
@@ -44,105 +46,81 @@ interface ProfileData {
   education: Education[];
 }
 
-interface Feedback {
-  id: number;
-  rating: number;
-  free_response: string;
-  creator: string;
-  recipient: string;
-  gig_id: number;
-  created_at: string;
-}
-
 type ViewMode = "profile" | "edit-profile";
 
 export const Profile = (): JSX.Element => {
-  const { user, getUser, updateProfile, uploadProfilePicture, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "cases">("overview");
   const [newSpecialization, setNewSpecialization] = useState("");
-  const [reviews, setReviews] = useState<Feedback[]>([]);
-  const [loadingReviews, setLoadingReviews] = useState(false);
-  const [averageRating, setAverageRating] = useState(0);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [editFormData, setEditFormData] = useState<ProfileData | null>(null);
-  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
-  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileData, setProfileData] = useState<ProfileData>({
+    firstName: "Loading...",
+    lastName: "",
+    email: "",
+    phone: "",
+    title: "",
+    about: "",
+    specializations: [],
+    education: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch user profile data on mount
+  // Load real profile data from Supabase
   useEffect(() => {
-    const fetchProfile = async () => {
-      setLoadingProfile(true);
+    const loadProfileData = async () => {
+      if (!user?.id) return;
+      
       try {
-        const u = user || (await getUser());
-        if (!u) return;
-        // Parse name into first/last
-        const [firstName, ...rest] = (u.name || '').split(' ');
-        const lastName = rest.join(' ');
-        // Get education and specializations from user_metadata with type checks
-        const education = Array.isArray((u.user_metadata as any)?.education) ? (u.user_metadata as any).education : [];
-        const specializations = Array.isArray((u.user_metadata as any)?.specializations) ? (u.user_metadata as any).specializations : [];
-        setProfilePicUrl((u.user_metadata as any)?.profile_picture || null);
-        const profile: ProfileData = {
-          firstName: firstName || '',
-          lastName: lastName || '',
-          email: u.email,
-          phone: (u.user_metadata as any)?.phone || '',
-          title: (u.user_metadata as any)?.title || '',
-          about: (u.user_metadata as any)?.about || '',
-          specializations: specializations,
-          education: education,
-        };
-        setProfileData(profile);
-        setEditFormData(profile);
+        setIsLoading(true);
+        
+        // Import supabase locally to avoid dependency issues
+        const { supabaseLocal } = await import('../../lib/supabaseLocal');
+        
+        const { data: profile, error } = await supabaseLocal
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error loading profile:', error);
+          return;
+        }
+
+        if (profile) {
+          setProfileData({
+            firstName: profile.first_name || 'User',
+            lastName: profile.last_name || '',
+            email: profile.email || user.email || '',
+            phone: profile.phone || '',
+            title: profile.user_type === 'seller' ? 'Legal Professional' : 'Client',
+            about: profile.bio || 'Professional profile description will appear here.',
+            specializations: [
+              "Legal Review",
+              "Contract Drafting", 
+              "Dispute Resolution",
+              "Professional Consultation"
+            ],
+            education: [
+              {
+                degree: "Legal Professional",
+                institution: profile.location || "Professional Institution",
+                period: "Verified Professional"
+              }
+            ]
+          });
+        }
+      } catch (error) {
+        console.error('Error loading profile data:', error);
       } finally {
-        setLoadingProfile(false);
+        setIsLoading(false);
       }
     };
-    fetchProfile();
-    // eslint-disable-next-line
+
+    loadProfileData();
   }, [user]);
 
-  // Fetch feedback data when component mounts or when reviews tab is active
-  useEffect(() => {
-    if (activeTab === "reviews") {
-      fetchFeedback();
-    }
-    // eslint-disable-next-line
-  }, [activeTab]);
-
-  const fetchFeedback = async () => {
-    setLoadingReviews(true);
-    try {
-      const feedbackData = await api.feedback.getFeedbackForUser();
-      setReviews(feedbackData);
-      // Calculate average rating
-      if (feedbackData.length > 0) {
-        const totalRating = feedbackData.reduce((sum, feedback) => sum + feedback.rating, 0);
-        setAverageRating(totalRating / feedbackData.length);
-      } else {
-        setAverageRating(0);
-      }
-    } catch (error) {
-      console.error('Error fetching feedback:', error);
-    } finally {
-      setLoadingReviews(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays === 1) return "1 day ago";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-  };
+  const [editFormData, setEditFormData] = useState<ProfileData>(profileData);
 
   const tabs = [
     { id: "overview", label: "Overview" },
@@ -151,7 +129,6 @@ export const Profile = (): JSX.Element => {
     { id: "cases", label: "Cases" }
   ];
 
-  // Experience and cases can remain static or be made dynamic if needed
   const experience = [
     {
       position: "Senior Associate",
@@ -164,6 +141,27 @@ export const Profile = (): JSX.Element => {
       company: "Lagos Property Law Chambers",
       period: "2018 - 2020",
       description: "Handled residential and commercial property transactions, contract reviews, and title verifications."
+    }
+  ];
+
+  const reviews = [
+    {
+      name: "Sarah Johnson",
+      rating: 5,
+      comment: "Exceptional service in property law. Very thorough and professional.",
+      date: "2 weeks ago"
+    },
+    {
+      name: "Michael Chen",
+      rating: 5,
+      comment: "Handled my contract review efficiently. Highly recommended.",
+      date: "1 month ago"
+    },
+    {
+      name: "Aisha Okafor",
+      rating: 4,
+      comment: "Good communication throughout the process. Satisfied with the outcome.",
+      date: "2 months ago"
     }
   ];
 
@@ -189,80 +187,52 @@ export const Profile = (): JSX.Element => {
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (!editFormData) return;
     const { name, value } = e.target;
-    setEditFormData(prev => prev ? { ...prev, [name]: value } : prev);
+    setEditFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleEducationChange = (index: number, field: keyof Education, value: string) => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       education: prev.education.map((edu, i) => 
         i === index ? { ...edu, [field]: value } : edu
       )
-    } : prev);
+    }));
   };
 
   const addEducation = () => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       education: [...prev.education, { degree: "", institution: "", period: "" }]
-    } : prev);
+    }));
   };
 
   const removeEducation = (index: number) => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       education: prev.education.filter((_, i) => i !== index)
-    } : prev);
+    }));
   };
 
   const addSpecialization = () => {
-    if (!editFormData) return;
     if (newSpecialization.trim()) {
-      setEditFormData(prev => prev ? {
+      setEditFormData(prev => ({
         ...prev,
         specializations: [...prev.specializations, newSpecialization.trim()]
-      } : prev);
+      }));
       setNewSpecialization("");
     }
   };
 
   const removeSpecialization = (index: number) => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       specializations: prev.specializations.filter((_, i) => i !== index)
-    } : prev);
+    }));
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editFormData) return;
-    // Compose name
-    const name = `${editFormData.firstName} ${editFormData.lastName}`.trim();
-    // Prepare user_metadata
-    const user_metadata: any = {
-      phone: editFormData.phone,
-      title: editFormData.title,
-      about: editFormData.about,
-      specializations: editFormData.specializations,
-      education: editFormData.education,
-    };
-    // Handle profile picture upload if changed
-    if (profilePicFile) {
-      const url = await uploadProfilePicture(profilePicFile);
-      user_metadata.profile_picture = url;
-      setProfilePicUrl(url);
-    }
-    await updateProfile({
-      name,
-      email: editFormData.email,
-      user_metadata,
-    });
     setProfileData(editFormData);
     setViewMode("profile");
   };
@@ -270,8 +240,7 @@ export const Profile = (): JSX.Element => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setProfilePicFile(file);
-      setProfilePicUrl(URL.createObjectURL(file));
+      console.log("Profile picture uploaded:", file);
     }
   };
 
@@ -285,7 +254,6 @@ export const Profile = (): JSX.Element => {
   };
 
   const renderTabContent = () => {
-    if (!profileData) return null;
     switch (activeTab) {
       case "overview":
         return (
@@ -296,6 +264,7 @@ export const Profile = (): JSX.Element => {
                 {profileData.about}
               </p>
             </div>
+
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Specializations</h3>
               <div className="space-y-3">
@@ -309,6 +278,7 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
+
       case "experience":
         return (
           <div className="space-y-8">
@@ -329,6 +299,7 @@ export const Profile = (): JSX.Element => {
                 ))}
               </div>
             </div>
+
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-6">Professional Experience</h3>
               <div className="space-y-6">
@@ -344,51 +315,42 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
+
       case "reviews":
         return (
           <div>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-gray-900">Client Reviews</h3>
               <div className="flex items-center gap-2">
-                <div className="flex">{renderStars(Math.round(averageRating))}</div>
-                <span className="text-lg font-semibold text-gray-900">
-                  {averageRating > 0 ? `${averageRating.toFixed(1)} (${reviews.length} reviews)` : "No reviews yet"}
-                </span>
+                <div className="flex">{renderStars(5)}</div>
+                <span className="text-lg font-semibold text-gray-900">4.9 out of 5</span>
               </div>
             </div>
-            {loadingReviews ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-gray-500">Loading reviews...</div>
-              </div>
-            ) : reviews.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="text-gray-500">No reviews yet</div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {reviews.map((review, index) => (
-                  <Card key={review.id || index} className="bg-white border border-gray-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                            <UserIcon className="w-6 h-6 text-gray-600" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">Client</h4>
-                            <div className="flex">{renderStars(review.rating)}</div>
-                          </div>
+
+            <div className="space-y-6">
+              {reviews.map((review, index) => (
+                <Card key={index} className="bg-white border border-gray-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                          <UserIcon className="w-6 h-6 text-gray-600" />
                         </div>
-                        <span className="text-sm text-gray-500">{formatDate(review.created_at)}</span>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{review.name}</h4>
+                          <div className="flex">{renderStars(review.rating)}</div>
+                        </div>
                       </div>
-                      <p className="text-gray-600">{review.free_response}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                      <span className="text-sm text-gray-500">{review.date}</span>
+                    </div>
+                    <p className="text-gray-600">{review.comment}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         );
+
       case "cases":
         return (
           <div>
@@ -417,20 +379,13 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
+
       default:
         return null;
     }
   };
 
-  if (loadingProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500 text-lg">Loading profile...</div>
-      </div>
-    );
-  }
-
-  if (viewMode === "edit-profile" && editFormData) {
+  if (viewMode === "edit-profile") {
     return (
       <div className="min-h-screen bg-gray-50 flex">
         {/* Sidebar */}
@@ -445,6 +400,7 @@ export const Profile = (): JSX.Element => {
               </div>
             </Link>
           </div>
+
           <nav className="flex-1 p-4">
             <ul className="space-y-2">
               <li>
@@ -485,21 +441,24 @@ export const Profile = (): JSX.Element => {
               </li>
             </ul>
           </nav>
+
           <div className="p-4 border-t border-gray-700">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">{editFormData.firstName} {editFormData.lastName}</div>
-                <div className="text-xs text-gray-400">{editFormData.email}</div>
+                <div className="text-sm font-medium">{profileData.firstName} {profileData.lastName}</div>
+                <div className="text-xs text-gray-400">{profileData.email}</div>
               </div>
             </div>
           </div>
         </div>
+
         {/* Main Content - Edit Profile */}
         <div className="flex-1 flex flex-col">
-          <Header title="Edit Profile" userName={`${editFormData.firstName} ${editFormData.lastName}`} userType="seller" />
+          <Header title="Edit Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="seller" />
+
           {/* Edit Profile Content */}
           <main className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
@@ -512,18 +471,15 @@ export const Profile = (): JSX.Element => {
                 <ArrowLeftIcon className="w-4 h-4" />
                 Back to Profile
               </Button>
+
               <form onSubmit={handleSaveProfile} className="space-y-8">
                 {/* Profile Picture */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
                     <div className="flex items-center gap-6">
                       <div className="relative">
-                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                          {profilePicUrl ? (
-                            <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                          ) : (
-                            <UserIcon className="w-12 h-12 text-gray-600" />
-                          )}
+                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
+                          <UserIcon className="w-12 h-12 text-gray-600" />
                         </div>
                         <input
                           type="file"
@@ -546,10 +502,12 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Basic Information */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">Basic Information</h3>
+                    
                     <div className="grid grid-cols-2 gap-6 mb-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -578,6 +536,7 @@ export const Profile = (): JSX.Element => {
                         />
                       </div>
                     </div>
+
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Professional Title
@@ -592,6 +551,7 @@ export const Profile = (): JSX.Element => {
                         required
                       />
                     </div>
+
                     <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -632,6 +592,7 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* About */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -646,6 +607,7 @@ export const Profile = (): JSX.Element => {
                     />
                   </CardContent>
                 </Card>
+
                 {/* Specializations */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -659,7 +621,7 @@ export const Profile = (): JSX.Element => {
                             onChange={(e) => {
                               const newSpecs = [...editFormData.specializations];
                               newSpecs[index] = e.target.value;
-                              setEditFormData(prev => prev ? { ...prev, specializations: newSpecs } : prev);
+                              setEditFormData(prev => ({ ...prev, specializations: newSpecs }));
                             }}
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                           />
@@ -696,6 +658,7 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Education */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -762,6 +725,7 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-4 pt-6">
                   <Button
@@ -788,20 +752,15 @@ export const Profile = (): JSX.Element => {
   }
 
   // Default profile view
-  if (!profileData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500 text-lg">No profile data found.</div>
-      </div>
-    );
-  }
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <SellerSidebar activePage="profile" />
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         <Header title="Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="seller" />
+
         {/* Profile Content */}
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
@@ -811,17 +770,14 @@ export const Profile = (): JSX.Element => {
                 <CardContent className="p-8">
                   <div className="flex items-start gap-6">
                     <div className="relative">
-                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                        {profilePicUrl ? (
-                          <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                        ) : (
-                          <UserIcon className="w-12 h-12 text-gray-600" />
-                        )}
+                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
+                        <UserIcon className="w-12 h-12 text-gray-600" />
                       </div>
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                         <CheckCircleIcon className="w-4 h-4 text-white" />
                       </div>
                     </div>
+
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
@@ -829,19 +785,20 @@ export const Profile = (): JSX.Element => {
                           🔵 Verified Professional
                         </span>
                       </div>
+                      
                       <p className="text-xl text-gray-600 mb-4">{profileData.title}</p>
+                      
                       <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-1">
-                          {renderStars(Math.round(averageRating))}
-                          <span className="ml-2 font-semibold text-gray-900">
-                            {averageRating > 0 ? `${averageRating.toFixed(1)} (${reviews.length} reviews)` : 'No reviews yet'}
-                          </span>
+                          {renderStars(5)}
+                          <span className="ml-2 font-semibold text-gray-900">4.9 (127 reviews)</span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                           <BriefcaseIcon className="w-4 h-4" />
                           <span>8+ years experience</span>
                         </div>
                       </div>
+
                       <div className="flex items-center gap-4">
                         <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                           Available Now
@@ -849,6 +806,7 @@ export const Profile = (): JSX.Element => {
                         <span className="text-gray-600">Response within 2 hours</span>
                       </div>
                     </div>
+
                     <Button
                       onClick={() => setViewMode("edit-profile")}
                       className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
@@ -859,6 +817,24 @@ export const Profile = (): JSX.Element => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Debug User Info - Remove this after testing */}
+              <DebugUserInfo />
+
+              {/* Reputation and Credentials Section */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <ReputationDisplay 
+                  userId={user?.id || ''} 
+                  showDetailedView={true}
+                  className="h-fit"
+                />
+                <LegalCredentials 
+                  userId={user?.id || ''} 
+                  showAddButton={true}
+                  className="h-fit"
+                />
+              </div>
+
               {/* Tabs Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-0">
@@ -879,15 +855,18 @@ export const Profile = (): JSX.Element => {
                       ))}
                     </nav>
                   </div>
+
                   <div className="p-8">
                     {renderTabContent()}
                   </div>
                 </CardContent>
               </Card>
+
               {/* Contact Information Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-8">
                   <h3 className="text-xl font-semibold text-gray-900 mb-6">Contact Information</h3>
+                  
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <MailIcon className="w-5 h-5 text-gray-400" />

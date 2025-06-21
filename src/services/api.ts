@@ -1,5 +1,6 @@
 import { supabaseLocal as supabase } from '../lib/supabaseLocal';
 import { ipfsService, IPFSUploadResult } from './ipfsService';
+import { reputationService } from './reputationService';
 
 
 // Mock API service for frontend-only development
@@ -999,6 +1000,36 @@ export const api = {
         throw error;
       }
 
+      // Record reputation event for feedback received
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        // Get the gig to find the seller
+        const { data: gig } = await supabase
+          .from('gigs')
+          .select('user_id, seller_id, title')
+          .eq('id', feedbackData.gig_id)
+          .single();
+
+        if (gig && user) {
+          const sellerId = gig.seller_id || gig.user_id;
+          if (sellerId) {
+            await reputationService.recordReputationEvent(
+              sellerId,
+              'review_received',
+              feedbackData.gig_id,
+              user.id,
+              feedbackData.rating,
+              feedbackData.free_response
+            );
+            console.log(`✅ Reputation event recorded for seller ${sellerId}`);
+          }
+        }
+      } catch (reputationError) {
+        console.warn('Failed to record reputation event:', reputationError);
+        // Don't fail the feedback creation if reputation recording fails
+      }
+
       return data;
     },
 
@@ -1170,10 +1201,34 @@ export const api = {
       const { data, error } = await supabase
         .from('Work Submissions')
         .update({ status })
-        .eq('id', submissionId);
+        .eq('id', submissionId)
+        .select()
+        .single();
 
       if (error) {
         throw error;
+      }
+
+      // Record reputation event for approved work
+      if (status === 'approved' && data) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user && data.seller_id && data.gig_id) {
+            await reputationService.recordReputationEvent(
+              data.seller_id,
+              'gig_completed',
+              data.gig_id,
+              user.id,
+              5, // Max rating for approved work
+              'Work submission approved by client'
+            );
+            console.log(`✅ Reputation event recorded for completed gig ${data.gig_id}`);
+          }
+        } catch (reputationError) {
+          console.warn('Failed to record reputation event for gig completion:', reputationError);
+          // Don't fail the status update if reputation recording fails
+        }
       }
 
       return data;
