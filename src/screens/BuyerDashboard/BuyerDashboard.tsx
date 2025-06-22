@@ -85,6 +85,16 @@ interface StoredConversation {
   }>;
 }
 
+// Helper function to format dates to mm/dd/yyyy
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric'
+  });
+};
+
 export const BuyerDashboard = (): JSX.Element => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -312,8 +322,8 @@ export const BuyerDashboard = (): JSX.Element => {
             <ViewDeliverables
               gigId={selectedCompletedGig.id}
               gigTitle={selectedCompletedGig.title}
-              postedDate="12/04/2025" // In a real app, you'd have this data
-              deadline="25/04/2025"
+              postedDate={formatDate(selectedCompletedGig.completedDate)}
+              deadline={formatDate(selectedCompletedGig.completedDate)}
               budget={selectedCompletedGig.amount}
               status={selectedCompletedGig.status}
               provider={{
@@ -334,60 +344,52 @@ export const BuyerDashboard = (): JSX.Element => {
   const renderActiveGigCard = (gig: Gig) => (
     <Card key={gig.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow">
       <CardContent className="p-6">
-        <div className="flex">
-          {/* Left Content - 75% */}
-          <div className="flex-1 pr-6">
-            {/* Title */}
-            <h4 className="text-lg font-semibold text-gray-900 mb-4">{gig.title}</h4>
-            
-            {/* Status Badge */}
-            <div className="mb-4">
-              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${gig.statusColor}`}>
-                {gig.status}
-              </span>
-            </div>
+        {/* Title */}
+        <h4 className="text-lg font-semibold text-gray-900 mb-4">{gig.title}</h4>
+        
+        {/* Status Badge */}
+        <div className="mb-4">
+          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${gig.statusColor}`}>
+            {gig.status}
+          </span>
+        </div>
 
-            {/* Bids Received (only for active gigs) */}
-            {gig.status === "Active" && (
-              <div className="mb-6">
-                <span className="text-blue-600 font-medium text-sm">{gig.bidsReceived} bids received</span>
-              </div>
-            )}
-
-            {/* Budget and Deadline Row */}
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <div className="text-sm font-medium text-gray-900 mb-1">Budget:</div>
-                <div className="text-lg font-bold text-gray-900">{gig.budget}</div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900 mb-1">Deadline:</div>
-                <div className="text-lg font-bold text-gray-900">{gig.deadline}</div>
-              </div>
-            </div>
+        {/* Bids Received (only for active gigs) */}
+        {gig.status === "Active" && (
+          <div className="mb-6">
+            <span className="text-blue-600 font-medium text-sm">{gig.bidsReceived} bids received</span>
           </div>
+        )}
 
-          {/* Vertical Separator */}
-          <div className="w-px bg-gray-200 mx-4"></div>
+        {/* Budget and Deadline Row */}
+        <div className="grid grid-cols-2 gap-8 mb-6">
+          <div>
+            <div className="text-sm font-medium text-gray-900 mb-1">Budget:</div>
+            <div className="text-lg font-bold text-gray-900">{gig.budget}</div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-900 mb-1">Deadline:</div>
+            <div className="text-lg font-bold text-gray-900">{formatDate(gig.deadline)}</div>
+          </div>
+        </div>
 
-          {/* Right Action Buttons - 25% */}
-          <div className="flex flex-col gap-3 justify-center min-w-[140px]">
-            {gig.status === "Active" && (
-              <Button 
-                onClick={() => handleViewBids(gig.id)}
-                className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2 rounded-full w-full"
-              >
-                View Bids
-              </Button>
-            )}
+        {/* Action Buttons at Bottom */}
+        <div className="flex gap-3 pt-4 border-t border-gray-100">
+          {gig.status === "Active" && (
             <Button 
-              variant="outline"
-              onClick={() => handleViewDetails(gig.id)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2 rounded-full w-full"
+              onClick={() => handleViewBids(gig.id)}
+              className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2 rounded-full flex-1"
             >
-              View Details
+              View Bids
             </Button>
-          </div>
+          )}
+          <Button 
+            variant="outline"
+            onClick={() => handleViewDetails(gig.id)}
+            className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2 rounded-full flex-1"
+          >
+            View Details
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -396,58 +398,50 @@ export const BuyerDashboard = (): JSX.Element => {
   const renderCompletedGigCard = (gig: CompletedGig) => (
     <Card key={gig.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow">
       <CardContent className="p-6">
-        <div className="flex">
-          {/* Left Content - 75% */}
-          <div className="flex-1 pr-6">
-            {/* Title */}
-            <h4 className="text-lg font-semibold text-gray-900 mb-4">{gig.title}</h4>
-            
-            {/* Provider Info */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium">
-                {gig.providerAvatar}
-              </div>
-              <div>
-                <div className="font-medium text-gray-900">{gig.provider}</div>
-                <div className="text-sm text-gray-600">Legal Professional</div>
-              </div>
-            </div>
-
-            {/* Amount and Completion Date */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-2xl font-bold text-gray-900">{gig.amount}</div>
-              <div>
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                  Completed
-                </span>
-              </div>
-            </div>
-
-            {/* Completed Date */}
-            <div className="text-sm text-gray-600">
-              Completed: {gig.completedDate}
-            </div>
+        {/* Title */}
+        <h4 className="text-lg font-semibold text-gray-900 mb-4">{gig.title}</h4>
+        
+        {/* Provider Info */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium">
+            {gig.providerAvatar}
           </div>
-
-          {/* Vertical Separator */}
-          <div className="w-px bg-gray-200 mx-4"></div>
-
-          {/* Right Action Buttons - 25% */}
-          <div className="flex flex-col gap-3 justify-center min-w-[140px]">
-            <Button 
-              onClick={() => handleViewDeliverables(gig.id)}
-              variant="outline"
-              className="border-blue-500 text-blue-600 hover:bg-blue-50 px-6 py-2 rounded-full w-full"
-            >
-              View Deliverables
-            </Button>
-            <Button 
-              onClick={() => handleLeaveFeedback(gig.id)}
-              className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-2 rounded-full w-full"
-            >
-              Leave Feedback
-            </Button>
+          <div>
+            <div className="font-medium text-gray-900">{gig.provider}</div>
+            <div className="text-sm text-gray-600">Legal Professional</div>
           </div>
+        </div>
+
+        {/* Amount and Completion Date */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-2xl font-bold text-gray-900">{gig.amount}</div>
+          <div>
+            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+              Completed
+            </span>
+          </div>
+        </div>
+
+        {/* Completed Date */}
+        <div className="text-sm text-gray-600 mb-6">
+          Completed: {formatDate(gig.completedDate)}
+        </div>
+
+        {/* Action Buttons at Bottom */}
+        <div className="flex gap-3 pt-4 border-t border-gray-100">
+          <Button 
+            onClick={() => handleViewDeliverables(gig.id)}
+            variant="outline"
+            className="border-blue-500 text-blue-600 hover:bg-blue-50 px-6 py-2 rounded-full flex-1"
+          >
+            View Deliverables
+          </Button>
+          <Button 
+            onClick={() => handleLeaveFeedback(gig.id)}
+            className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-2 rounded-full flex-1"
+          >
+            Leave Feedback
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -474,7 +468,7 @@ export const BuyerDashboard = (): JSX.Element => {
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="flex items-center gap-2">
             <CalendarIcon className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600">{gig.dueDate}</span>
+            <span className="text-sm text-gray-600">{formatDate(gig.dueDate)}</span>
           </div>
           <div className="flex items-center gap-2">
             <DollarSignIcon className="w-4 h-4 text-gray-400" />

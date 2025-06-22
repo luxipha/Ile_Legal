@@ -61,13 +61,10 @@ BEGIN
     CREATE VIEW conversations_with_profiles AS
     SELECT 
       c.*,
-      b.id AS buyer_id,
       CONCAT(b.first_name, ' ', b.last_name) AS buyer_full_name,
       b.avatar_url AS buyer_avatar_url,
-      s.id AS seller_id,
       CONCAT(s.first_name, ' ', s.last_name) AS seller_full_name,
       s.avatar_url AS seller_avatar_url,
-      g.id AS gig_id,
       g.title AS gig_title,
       g.description AS gig_description
     FROM 

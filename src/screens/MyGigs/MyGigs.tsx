@@ -6,7 +6,7 @@ import { Header } from "../../components/Header";
 import { ViewBids } from "../../components/ViewBids/ViewBids";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
 import { api } from "../../services/api";
-import { supabaseLocal as supabase } from "../../lib/supabaseLocal";
+import { supabase } from "../../lib/supabase";
 import { 
   UserIcon,
   PlusIcon,
@@ -77,6 +77,7 @@ export const MyGigs = (): JSX.Element => {
   const fetchGigs = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("user", user);
       if (!user) return;
 
       const filters = {

@@ -42,6 +42,11 @@ interface ProfileData {
   about: string;
   specializations: string[];
   education: Education[];
+  status?: string;
+  user_metadata?: {
+    status?: string;
+    [key: string]: any;
+  };
 }
 
 interface Feedback {
@@ -52,6 +57,13 @@ interface Feedback {
   recipient: string;
   gig_id: number;
   created_at: string;
+  creator_profile?: {
+    id: string;
+    name?: string;
+    email?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
 }
 
 type ViewMode = "profile" | "edit-profile";
@@ -77,6 +89,7 @@ export const Profile = (): JSX.Element => {
       setLoadingProfile(true);
       try {
         const u = user || (await getUser());
+        console.log("u", u);
         if (!u) return;
         // Parse name into first/last
         const [firstName, ...rest] = (u.name || '').split(' ');
@@ -94,6 +107,7 @@ export const Profile = (): JSX.Element => {
           about: (u.user_metadata as any)?.about || '',
           specializations: specializations,
           education: education,
+          user_metadata: u.user_metadata,
         };
         setProfileData(profile);
         setEditFormData(profile);
@@ -117,6 +131,7 @@ export const Profile = (): JSX.Element => {
     setLoadingReviews(true);
     try {
       const feedbackData = await api.feedback.getFeedbackForUser();
+      console.log("feedbackData", feedbackData);
       setReviews(feedbackData);
       // Calculate average rating
       if (feedbackData.length > 0) {
@@ -375,7 +390,9 @@ export const Profile = (): JSX.Element => {
                             <UserIcon className="w-6 h-6 text-gray-600" />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-900">Client</h4>
+                            <h4 className="font-semibold text-gray-900">
+                              {review.creator_profile?.name || review.creator_profile?.email || 'Anonymous Client'}
+                            </h4>
                             <div className="flex">{renderStars(review.rating)}</div>
                           </div>
                         </div>
@@ -826,7 +843,7 @@ export const Profile = (): JSX.Element => {
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
                         <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                          🔵 Verified Professional
+                          {profileData.user_metadata?.status === "verified" ? "🔵 Verified Professional" : "🔴 Unverified Professional"}
                         </span>
                       </div>
                       <p className="text-xl text-gray-600 mb-4">{profileData.title}</p>

@@ -142,22 +142,25 @@ export const AdminVerifyUser = ({
                     >
                       View Details
                     </button>
-                    <Button 
-                      onClick={() => onVerifyUser(user.id, "verify")}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      Approve
-                    </Button>
-                    <button
-                      className="text-green-600 hover:text-green-900 mr-3"
-                      onClick={() => {
-                        setSelectedUser(user);
-                        setShowVerifyModal(true);
-                      }}
-                    >
-                      Verify
-                    </button>
-
+                    {user.status !== "verified" && (
+                      <>
+                        <Button 
+                          onClick={() => onVerifyUser(user.id, "verify")}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          Approve
+                        </Button>
+                        <button
+                          className="text-green-600 hover:text-green-900 mr-3"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowVerifyModal(true);
+                          }}
+                        >
+                          Verify
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

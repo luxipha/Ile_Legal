@@ -21,6 +21,7 @@ export interface User {
     eth_address?: string;
     circle_wallet_id?: string;
     circle_wallet_address?: string;
+    status?: string;
   };
 }
 
@@ -42,6 +43,7 @@ export interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   getAllUsers: (sellers?: boolean) => Promise<User[]>;
   updateUserStatus: (userId: string, status: string) => Promise<void>;
+  getUserStats: () => Promise<{ recentAccounts: number; recentSignIns: number }>;
 }
 
 // Mock users for demo
@@ -148,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   async function getCurrentUser() {
     const { data: { session } } = await supabase.auth.getSession();
     const userData = await getUser();
+
     if (userData) {
       setUser(userData);
       setToken(session?.access_token || null);
@@ -182,12 +185,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return null;
     }
     if (session) {
-      // Enhanced role detection logic from first file
+      // Get user data from Profiles table
+      if (!session.user.id) {
+        console.error('No user ID in session');
+        return createUserFromSession(session);
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('Profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile data:', profileError);
+        // Fallback to session data if profile fetch fails
+        return createUserFromSession(session);
+      }
+
+      // Enhanced role detection logic
       let detectedRole: UserRole = 'buyer'; // Default fallback
       const email = session.user.email || '';
       
-      // Try to get role from user metadata first
-      if (session.user.user_metadata?.role_title) {
+      // Try to get role from profile data first, then user metadata
+      if (profileData.role_title) {
+        detectedRole = profileData.role_title as UserRole;
+      } else if (profileData.role) {
+        detectedRole = profileData.role as UserRole;
+      } else if (session.user.user_metadata?.role_title) {
         detectedRole = session.user.user_metadata.role_title as UserRole;
       } else if (session.user.user_metadata?.role) {
         detectedRole = session.user.user_metadata.role as UserRole;
@@ -204,7 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Handle profile picture
       let profilePictureUrl = null;
-      if (session.user.user_metadata.user_metadata) {
+      if (profileData.profile_picture || session.user.user_metadata.user_metadata) {
         const { data } = await supabase
           .storage
           .from('profile-pictures')
@@ -214,17 +239,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return {
         id: session.user.id,
-        name: session.user.user_metadata.name || '',
+        name: profileData.name || session.user.user_metadata.name || '',
         email: email,
         role: detectedRole,
-        isVerified: session.user.user_metadata.email_verified || false,
+        isVerified: profileData.email_verified || session.user.user_metadata.email_verified || false,
         user_metadata: {
           ...session.user.user_metadata,
-          profile_picture: profilePictureUrl?.publicUrl || session.user.user_metadata.profile_picture
+          ...profileData,
+          profile_picture: profilePictureUrl?.publicUrl || profileData.profile_picture || session.user.user_metadata.profile_picture
         }
       };
     }
     return null;
+  }
+
+  // Helper function to create user from session data (fallback)
+  function createUserFromSession(session: any): User {
+    let detectedRole: UserRole = 'buyer';
+    const email = session.user.email || '';
+    
+    if (session.user.user_metadata?.role_title) {
+      detectedRole = session.user.user_metadata.role_title as UserRole;
+    } else if (session.user.user_metadata?.role) {
+      detectedRole = session.user.user_metadata.role as UserRole;
+    } else {
+      if (email.includes('admin') || email === 'admin.test@ile-legal.com') {
+        detectedRole = 'admin';
+      } else if (email.includes('seller') || email === 'seller1@ile-legal.com') {
+        detectedRole = 'seller';
+      } else if (email.includes('buyer') || email === 'buyer@ile-legal.com') {
+        detectedRole = 'buyer';
+      }
+    }
+    
+    return {
+      id: session.user.id,
+      name: session.user.user_metadata.name || '',
+      email: email,
+      role: detectedRole,
+      isVerified: session.user.user_metadata.email_verified || false,
+      user_metadata: session.user.user_metadata
+    };
   }
 
   // Call getCurrentUser on mount and when session changes
@@ -359,13 +414,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Create a Circle wallet for the new user using SDK
           console.log('Creating Circle wallet for new user:', newUser.id);
           
+          if (!newUser.id) {
+            throw new Error('No user ID available for wallet creation');
+          }
+          
+          const userId = newUser.id; // Store in variable to satisfy TypeScript
           const walletDescription = `${newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)} wallet for ${newUser.name}`;
-          const wallet = await circleSdk.createWallet(newUser.id, walletDescription);
+          const wallet = await circleSdk.createWallet(userId, walletDescription);
+          
+          if (!wallet) {
+            throw new Error('Failed to create Circle wallet');
+          }
           
           console.log('Circle wallet created:', wallet.walletId);
           
           // Generate a wallet address
           const addressData = await circleSdk.generateWalletAddress(wallet.walletId);
+          
+          if (!addressData) {
+            throw new Error('Failed to generate wallet address');
+          }
           
           console.log('Wallet address generated:', addressData.address);
           
@@ -395,13 +463,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           newUser.user_metadata = {
             ...newUser.user_metadata,
-            circle_wallet_id: `wallet_${newUser.id}`,
+            circle_wallet_id: `wallet_${newUser.id || 'unknown'}`,
             circle_wallet_address: mockWalletAddress
           };
           
           await supabase.auth.updateUser({
             data: {
-              circle_wallet_id: `wallet_${newUser.id}`,
+              circle_wallet_id: `wallet_${newUser.id || 'unknown'}`,
               circle_wallet_address: mockWalletAddress
             }
           });
@@ -823,6 +891,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Admin-only function to get user statistics
+  const getUserStats = async (): Promise<{ recentAccounts: number; recentSignIns: number }> => {
+    // Check if current user is admin
+    if (!user || user.user_metadata?.role_title !== 'admin') {
+      throw new Error('Access denied. Admin privileges required.');
+    }
+
+    try {
+      // Use supabase.auth.admin.listUsers() to get all users
+      const { data: users, error } = await supabase.auth.admin.listUsers();
+      
+      if (error) {
+        console.error('Error fetching users with admin API:', error);
+        throw error;
+      }
+
+      if (!users || !users.users) {
+        console.warn('No users data returned from admin API');
+        return { recentAccounts: 0, recentSignIns: 0 };
+      }
+
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      // Count accounts created in the last 7 days
+      const recentAccounts = users.users.filter(user => {
+        const createdAt = new Date(user.created_at);
+        return createdAt >= sevenDaysAgo;
+      }).length;
+
+      // Count accounts that signed in within the last 7 days
+      const recentSignIns = users.users.filter(user => {
+        if (!user.last_sign_in_at) return false;
+        const lastSignIn = new Date(user.last_sign_in_at);
+        return lastSignIn >= sevenDaysAgo;
+      }).length;
+
+      console.log(`User stats: ${recentAccounts} recent accounts, ${recentSignIns} recent sign-ins`);
+      
+      return { recentAccounts, recentSignIns };
+    } catch (error) {
+      console.error('Error in getUserStats:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -846,7 +960,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await updateProfile({ profile_picture: file });
           return user.user_metadata?.profile_picture || '';
         },
-        updateUserStatus
+        updateUserStatus,
+        getUserStats
       }}
     >
       {children}

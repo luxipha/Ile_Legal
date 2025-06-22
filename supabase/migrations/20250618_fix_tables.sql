@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS bids (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   gig_id UUID REFERENCES gigs(id) ON DELETE CASCADE,
   seller_id UUID REFERENCES auth.users(id),
-  buyer_id UUID REFERENCES auth.users(id),
   amount DECIMAL(10, 2) NOT NULL,
   description TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected'))
@@ -39,7 +38,6 @@ CREATE INDEX IF NOT EXISTS idx_gigs_status ON gigs(status);
 CREATE INDEX IF NOT EXISTS idx_gigs_created_at ON gigs(created_at);
 CREATE INDEX IF NOT EXISTS idx_bids_gig_id ON bids(gig_id);
 CREATE INDEX IF NOT EXISTS idx_bids_seller_id ON bids(seller_id);
-CREATE INDEX IF NOT EXISTS idx_bids_buyer_id ON bids(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_bids_status ON bids(status);
 
 -- Enable RLS
@@ -68,7 +66,6 @@ CREATE POLICY "Bids are viewable by gig owner and bidder"
   ON bids FOR SELECT
   USING (
     auth.uid() = seller_id OR 
-    auth.uid() = buyer_id OR
     auth.uid() IN (SELECT buyer_id FROM gigs WHERE gigs.id = bids.gig_id)
   );
 
@@ -80,7 +77,6 @@ CREATE POLICY "Sellers and buyers can update bids"
   ON bids FOR UPDATE
   USING (
     auth.uid() = seller_id OR 
-    auth.uid() = buyer_id OR
     auth.uid() IN (SELECT buyer_id FROM gigs WHERE gigs.id = bids.gig_id)
   );
 

@@ -10,16 +10,32 @@ export interface Dispute {
   id: number;
   title: string;
   description: string;
-  buyer: string;
-  seller: string;
   amount: string;
   status: string;
   priority: string;
   openedDate: string;
   lastActivity: string;
+  created_at: string;
+  resolution_comment?: string;
+  outcome?: string;
   type: "Payment Dispute" | "Quality Dispute" | "Delivery Dispute";
   gig_id: string;
   seller_id: string;
+  buyer_id: string;
+  buyer?: {
+    id: string;
+    name?: string;
+    email?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
+  seller?: {
+    id: string;
+    name?: string;
+    email?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
 }
 
 interface DisputeManagementProps {
@@ -27,6 +43,16 @@ interface DisputeManagementProps {
   selectedTab: "all" | "pending" | "review" | "resolved";
   onTabChange: (tab: "all" | "pending" | "review" | "resolved") => void;
 }
+
+// Helper function to format dates
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'Unknown';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric'
+  });
+};
 
 export const DisputeManagement = ({ 
   disputes, 
@@ -98,7 +124,7 @@ export const DisputeManagement = ({
 
   const filteredDisputes = disputes.filter(dispute => {
     if (selectedTab === "all") return true;
-    if (selectedTab === "review") return dispute.status === "In Review";
+    if (selectedTab === "review") return dispute.status.toLowerCase() === "in review";
     return dispute.status.toLowerCase() === selectedTab;
   });
 
@@ -107,10 +133,6 @@ export const DisputeManagement = ({
       <DisputeReviewPage
         dispute={selectedDispute}
         onBack={handleBackToList}
-        onSubmit={handleReviewSubmit}
-        loading={loading}
-        error={error}
-        success={success}
       />
     );
   }
@@ -168,6 +190,14 @@ export const DisputeManagement = ({
                       <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
                         {dispute.priority}
                       </span>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        dispute.status.toLowerCase() === "pending" ? "bg-yellow-100 text-yellow-800" :
+                        dispute.status.toLowerCase() === "in review" ? "bg-blue-100 text-blue-800" :
+                        dispute.status.toLowerCase() === "resolved" ? "bg-green-100 text-green-800" :
+                        "bg-gray-100 text-gray-800"
+                      }`}>
+                        {dispute.status}
+                      </span>
                     </div>
                     
                     <p className="text-gray-600 mb-4">{dispute.description}</p>
@@ -176,14 +206,14 @@ export const DisputeManagement = ({
                       <div className="flex items-center gap-2">
                         <UsersIcon className="w-4 h-4 text-gray-400" />
                         <div>
-                          <span className="text-gray-600">Buyer: {dispute.buyer}</span>
+                          <span className="text-gray-600">Buyer: {dispute.buyer?.name || dispute.buyer?.email || 'Unknown Buyer'}</span>
                           <div className="text-sm text-gray-500">Property developer</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <UserIcon className="w-4 h-4 text-gray-400" />
                         <div>
-                          <span className="text-gray-600">Seller: {dispute.seller}</span>
+                          <span className="text-gray-600">Seller: {dispute.seller?.name || dispute.seller?.email || 'Unknown Seller'}</span>
                           <div className="text-sm text-gray-500">Legal professional</div>
                         </div>
                       </div>
@@ -209,8 +239,8 @@ export const DisputeManagement = ({
                   <div className="text-right ml-6">
                     <div className="text-2xl font-bold text-gray-900 mb-2">{dispute.amount}</div>
                     <div className="text-sm text-gray-500 mb-2">
-                      <div>Opened: {dispute.openedDate}</div>
-                      <div>Last Activity: {dispute.lastActivity}</div>
+                      <div>Opened: {formatDate(dispute.created_at)}</div>
+                      <div>Last Activity: {formatDate(dispute.lastActivity)}</div>
                     </div>
                     <div className="flex items-center gap-2 justify-end">
                       <DollarSignIcon className="w-4 h-4 text-gray-400" />

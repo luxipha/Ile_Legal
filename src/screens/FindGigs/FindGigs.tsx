@@ -5,6 +5,7 @@ import { ViewDetails, Gig } from "../../components/ViewDetails";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { api } from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 import { 
   SearchIcon, 
@@ -12,12 +13,18 @@ import {
   GridIcon, 
   ListIcon,
   CalendarIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  MapPinIcon,
+  DollarSignIcon,
+  UserIcon,
+  StarIcon,
+  ClockIcon
 } from "lucide-react";
 
 type ViewMode = "list" | "view-details" | "place-bid";
 
 export const FindGigs = (): JSX.Element => {
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [gridViewMode, setGridViewMode] = useState<"grid" | "list">("grid");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
@@ -78,6 +85,10 @@ export const FindGigs = (): JSX.Element => {
   };
 
   const handlePlaceBid = (gig: Gig) => {
+    if (user?.user_metadata?.status !== "verified") {
+      alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
+      return;
+    }
     setSelectedGig(gig);
     setViewMode("place-bid");
   };
@@ -85,6 +96,11 @@ export const FindGigs = (): JSX.Element => {
   const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedGig) return;
+
+    if (user?.user_metadata?.status !== "verified") {
+      alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
+      return;
+    }
 
     try {
       setIsSubmittingBid(true);
@@ -405,7 +421,7 @@ export const FindGigs = (): JSX.Element => {
                         <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
                       </div>
                       
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-4">
                         <span className="text-lg font-bold text-gray-900">
                           {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
                         </span>
@@ -455,7 +471,7 @@ export const FindGigs = (): JSX.Element => {
                           </div>
                         </div>
                         
-                        <div className="text-right ml-6">
+                        <div className="ml-6">
                           <div className="text-2xl font-bold text-gray-900 mb-4">
                             {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
                           </div>

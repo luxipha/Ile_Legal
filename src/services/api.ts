@@ -1,4 +1,5 @@
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+// import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 import { ipfsService, IPFSUploadResult } from './ipfsService';
 
 
@@ -138,7 +139,13 @@ export const api = {
 
       const { data, error } = await supabase
         .from('Bids')
-        .select('*')
+        .select(`
+          *,
+          gig:Gigs!gig_id(
+            *,
+            buyer:Profiles!buyer_id(*)
+          )
+        `)
         .eq('seller_id', sellerId)
         .in('status', ['pending', 'accepted'])
         .order('created_at', { ascending: false });
@@ -283,8 +290,11 @@ export const api = {
       console.log("filters:", filters);
       let query = supabase
         .from("Gigs")
-        .select("*");
-      // console.log("query", query);
+        .select(`
+          *,
+          buyer:Profiles!buyer_id(*)
+        `);
+
       // Apply category filter if provided
       if (filters?.categories && filters.categories.length > 0) {
         query = query.contains('categories', filters.categories);
@@ -836,9 +846,8 @@ export const api = {
 
     getAllDisputes: async () => {
       // Check if user is admin using session
-      console.log("getAllDisputes");
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log("session", session);
+
       if (sessionError) {
         throw new Error('Authentication error');
       }
@@ -847,12 +856,19 @@ export const api = {
         throw new Error('Unauthorized: Admin access required');
       }
 
-      // If user is admin, fetch all disputes
+      // If user is admin, fetch all disputes with buyer and seller information
       const { data: disputes, error: disputesError } = await supabase
         .from('Disputes')
-        .select('*')
+        .select(`
+          *,
+          buyer:Profiles!buyer_id(*),
+          seller:Profiles!seller_id(*)
+        `)
         .order('created_at', { ascending: false });
       console.log("disputes", disputes);
+      if (disputes && disputes.length > 0) {
+        console.log(disputes[0]);
+      }
       if (disputesError) {
         throw disputesError;
       }
@@ -1043,7 +1059,10 @@ export const api = {
 
       const { data, error } = await supabase
         .from('Feedback')
-        .select('*')
+        .select(`
+          *,
+          creator_profile:Profiles!creator(*)
+        `)
         .eq('recipient', user.id)
         .order('created_at', { ascending: false });
 
