@@ -123,7 +123,7 @@ export class ReputationService {
 
       // Get user's wallet address for blockchain recording
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('circle_wallet_address')
         .eq('id', userId)
         .single();
@@ -200,7 +200,7 @@ export class ReputationService {
 
       // Get user's wallet address
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('circle_wallet_address')
         .eq('id', userId)
         .single();
@@ -293,13 +293,13 @@ export class ReputationService {
 
       // Get wallet addresses
       const { data: lawyerProfile } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('circle_wallet_address')
         .eq('id', lawyerId)
         .single();
 
       const { data: clientProfile } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('circle_wallet_address')
         .eq('id', clientId)
         .single();
@@ -451,7 +451,7 @@ export class ReputationService {
     try {
       // Get attester's wallet address
       const { data: attesterProfile } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('circle_wallet_address')
         .eq('id', attesterId)
         .single();

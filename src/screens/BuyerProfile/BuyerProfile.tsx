@@ -16,15 +16,32 @@ import {
   CheckCircleIcon,
   BuildingIcon,
   PlusIcon,
-  BriefcaseIcon
+  BriefcaseIcon,
+  EyeIcon
 } from "lucide-react";
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import ClientProfileView from './ClientProfileView';
 
 interface Education {
   degree: string;
   institution: string;
   period: string;
+}
+
+interface Experience {
+  position: string;
+  company: string;
+  period: string;
+  description: string;
+}
+
+interface Project {
+  title: string;
+  date: string;
+  status: string;
+  statusColor: string;
+  value: string;
 }
 
 interface ProfileData {
@@ -37,6 +54,8 @@ interface ProfileData {
   about: string;
   interests: string[];
   education: Education[];
+  experience: Experience[];
+  projects: Project[];
 }
 
 interface Feedback {
@@ -49,7 +68,7 @@ interface Feedback {
   created_at: string;
 }
 
-type ViewMode = "profile" | "edit-profile";
+type ViewMode = "profile" | "edit-profile" | "public-view";
 
 export const BuyerProfile = (): JSX.Element => {
   const { user, updateProfile, getUser, isLoading: authLoading } = useAuth();
@@ -88,6 +107,8 @@ export const BuyerProfile = (): JSX.Element => {
       about: meta.about || '',
       interests: Array.isArray(meta.interests) ? meta.interests : [],
       education: Array.isArray(meta.education) ? meta.education : [],
+      experience: Array.isArray(meta.experience) ? meta.experience : [],
+      projects: Array.isArray(meta.projects) ? meta.projects : [],
     };
   };
 
@@ -158,44 +179,11 @@ export const BuyerProfile = (): JSX.Element => {
 
   // Notifications removed as they're not used in this component
 
-  const experience = [
-    {
-      position: "CEO & Founder",
-      company: profileData?.company || "",
-      period: "2018 - Present",
-      description: "Leading a team of 50+ professionals in developing premium residential and commercial properties across Lagos State."
-    },
-    {
-      position: "Senior Project Manager",
-      company: "Evergreen Estates",
-      period: "2014 - 2018",
-      description: "Managed large-scale residential developments with budgets exceeding ₦5 billion."
-    }
-  ];
+  // Get professional experience from profileData (which is derived from user metadata)
+  const experience = profileData?.experience || [];
 
-  const projects = [
-    {
-      title: "Victoria Island Commercial Complex",
-      date: "2024",
-      status: "Completed",
-      statusColor: "bg-green-100 text-green-800",
-      value: "₦2.5B"
-    },
-    {
-      title: "Lekki Residential Estate",
-      date: "2023",
-      status: "Completed",
-      statusColor: "bg-green-100 text-green-800",
-      value: "₦1.8B"
-    },
-    {
-      title: "Ikoyi Mixed-Use Development",
-      date: "2024",
-      status: "In Progress",
-      statusColor: "bg-blue-100 text-blue-800",
-      value: "₦3.2B"
-    }
-  ];
+  // Get recent projects from profileData (which is derived from user metadata)
+  const projects = profileData?.projects || [];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -247,6 +235,7 @@ export const BuyerProfile = (): JSX.Element => {
     if (!editFormData) return;
     setSaving(true);
     try {
+      console.log('Starting profile update...');
       // Compose user_metadata update
       const user_metadata: any = {
         firstName: editFormData.firstName,
@@ -257,19 +246,29 @@ export const BuyerProfile = (): JSX.Element => {
         about: editFormData.about,
         interests: editFormData.interests,
         education: editFormData.education,
+        experience: editFormData.experience,
+        projects: editFormData.projects,
       };
+      
+      console.log('Calling updateProfile with data:', user_metadata);
       await updateProfile({ user_metadata });
+      console.log('Profile updated successfully');
+      
       // Refresh user/profileData
+      console.log('Refreshing user data...');
       const freshUser = await getUser();
+      console.log('Fresh user data:', freshUser);
+      
       if (freshUser) {
         const pd = mapUserToProfileData(freshUser);
         setProfileData(pd);
         setEditFormData(pd);
       }
       setViewMode("profile");
-    } catch (err) {
-      // TODO: show error toast
+      console.log('Profile save completed');
+    } catch (err: any) {
       console.error('Error saving profile:', err);
+      alert(`Error saving profile: ${err?.message || err}`); // Temporary alert for debugging
     } finally {
       setSaving(false);
     }
@@ -356,16 +355,23 @@ export const BuyerProfile = (): JSX.Element => {
 
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-6">Professional Experience</h3>
-              <div className="space-y-6">
-                {experience.map((exp, index) => (
-                  <div key={index} className="border-l-4 border-blue-500 pl-6">
-                    <h4 className="font-semibold text-gray-900">{exp.position}</h4>
-                    <p className="text-gray-600">{exp.company}</p>
-                    <p className="text-sm text-gray-500 mb-2">{exp.period}</p>
-                    <p className="text-gray-600">{exp.description}</p>
-                  </div>
-                ))}
-              </div>
+              {experience.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500">No professional experience added yet</div>
+                  <p className="text-sm text-gray-400 mt-2">Use the edit profile form to add your experience</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {experience.map((exp, index) => (
+                    <div key={index} className="border-l-4 border-blue-500 pl-6">
+                      <h4 className="font-semibold text-gray-900">{exp.position}</h4>
+                      <p className="text-gray-600">{exp.company}</p>
+                      <p className="text-sm text-gray-500 mb-2">{exp.period}</p>
+                      <p className="text-gray-600">{exp.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -421,28 +427,35 @@ export const BuyerProfile = (): JSX.Element => {
         return (
           <div>
             <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Projects</h3>
-            <div className="space-y-4">
-              {projects.map((project, index) => (
-                <Card key={index} className="bg-white border border-gray-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <BuildingIcon className="w-5 h-5 text-gray-600" />
+            {projects.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-500">No projects added yet</div>
+                <p className="text-sm text-gray-400 mt-2">Use the edit profile form to add your projects</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {projects.map((project, index) => (
+                  <Card key={index} className="bg-white border border-gray-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <BuildingIcon className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">{project.title}</h4>
+                            <p className="text-sm text-gray-500">{project.date} • {project.value}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{project.title}</h4>
-                          <p className="text-sm text-gray-500">{project.date} • {project.value}</p>
-                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${project.statusColor}`}>
+                          {project.status}
+                        </span>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${project.statusColor}`}>
-                        {project.status}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         );
 
@@ -485,6 +498,11 @@ export const BuyerProfile = (): JSX.Element => {
     );
   }
 
+  // Render public profile view
+  if (viewMode === 'public-view') {
+    return <ClientProfileView isOwnProfile={true} onBack={() => setViewMode('profile')} />;
+  }
+
   if (viewMode === "edit-profile") {
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -493,7 +511,7 @@ export const BuyerProfile = (): JSX.Element => {
 
         {/* Main Content - Edit Profile */}
         <div className="flex-1 flex flex-col">
-          <Header title="Edit Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="buyer" />
+          <Header title="Edit Profile" userType="buyer" />
 
           <main className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
@@ -809,7 +827,7 @@ export const BuyerProfile = (): JSX.Element => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header title="Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="buyer" />
+        <Header title="Profile" userType="buyer" />
 
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
@@ -863,17 +881,27 @@ export const BuyerProfile = (): JSX.Element => {
                         <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                           Active Client
                         </span>
-                        <span className="text-gray-600">Member since 2020</span>
+                        <span className="text-gray-600">New member</span>
                       </div>
                     </div>
 
-                    <Button
-                      onClick={() => setViewMode("edit-profile")}
-                      className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                    >
-                      <EditIcon className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => setViewMode("edit-profile")}
+                        className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                      >
+                        <EditIcon className="w-4 h-4 mr-2" />
+                        Edit Profile
+                      </Button>
+                      <Button
+                        onClick={() => setViewMode('public-view')}
+                        variant="outline"
+                        className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                      >
+                        <EyeIcon className="w-4 h-4 mr-2" />
+                        View Public Profile
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -921,7 +949,7 @@ export const BuyerProfile = (): JSX.Element => {
                     </div>
                     <div className="flex items-center gap-3">
                       <MapPinIcon className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-700">Victoria Island, Lagos</span>
+                      <span className="text-gray-700">Location not specified</span>
                     </div>
                   </div>
                 </CardContent>

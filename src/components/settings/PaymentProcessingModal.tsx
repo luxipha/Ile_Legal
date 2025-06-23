@@ -11,6 +11,7 @@ interface PaymentProvider {
   apiKey?: string;
   secretKey?: string;
   webhookUrl?: string;
+  callbackUrl?: string;
   testMode: boolean;
   escrowWalletId?: string;
 }
@@ -34,8 +35,6 @@ export const PaymentProcessingModal = ({
       apiKey: "TEST_API_KEY:10a0b7b4cedfaa42d6ce306592fec59f:cfae665cde083f9236de7be92d08f54c",
       escrowWalletId: "52a2c755-6045-5217-8d70-8ac28dc221ba"
     },
-    { name: "Stripe", enabled: false, testMode: true },
-    { name: "PayPal", enabled: false, testMode: true },
     { name: "Flutterwave", enabled: false, testMode: true },
     { name: "Paystack", enabled: false, testMode: true }
   ]
@@ -47,6 +46,8 @@ export const PaymentProcessingModal = ({
   // Load current settings when modal opens
   useEffect(() => {
     if (isOpen) {
+      // Clear cache to ensure fresh data
+      SettingsService.clearCache();
       loadCurrentSettings();
     }
   }, [isOpen]);
@@ -55,7 +56,11 @@ export const PaymentProcessingModal = ({
     try {
       setIsLoading(true);
       const settings = await SettingsService.getSettings();
-      setProviders(settings.paymentProviders);
+      // Filter out Stripe and PayPal from loaded settings
+      const filteredProviders = settings.paymentProviders.filter(
+        provider => provider.name !== 'Stripe' && provider.name !== 'PayPal'
+      );
+      setProviders(filteredProviders);
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
@@ -84,8 +89,12 @@ export const PaymentProcessingModal = ({
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      await SettingsService.updatePaymentProviders(providers);
-      onSave(providers);
+      // Filter out Stripe and PayPal before saving
+      const filteredProviders = providers.filter(
+        provider => provider.name !== 'Stripe' && provider.name !== 'PayPal'
+      );
+      await SettingsService.updatePaymentProviders(filteredProviders);
+      onSave(filteredProviders);
       onClose();
     } catch (error) {
       console.error('Error saving payment providers:', error);
@@ -139,13 +148,15 @@ export const PaymentProcessingModal = ({
                 <div className="p-4 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor={`${provider.name}-api-key`}>API Key</Label>
+                      <Label htmlFor={`${provider.name}-api-key`}>
+                        {provider.name === "Paystack" ? "Public Key" : "API Key"}
+                      </Label>
                       <input
                         id={`${provider.name}-api-key`}
                         type="text"
                         value={provider.apiKey || ""}
                         onChange={(e) => handleUpdateProvider(provider.name, "apiKey", e.target.value)}
-                        placeholder="Enter API key"
+                        placeholder={provider.name === "Paystack" ? "pk_test_..." : "Enter API key"}
                         className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -156,29 +167,58 @@ export const PaymentProcessingModal = ({
                         type="password"
                         value={provider.secretKey || ""}
                         onChange={(e) => handleUpdateProvider(provider.name, "secretKey", e.target.value)}
-                        placeholder="Enter secret key"
+                        placeholder={provider.name === "Paystack" ? "sk_test_..." : "Enter secret key"}
                         className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>
                   
-                  <div>
-                    <Label htmlFor={`${provider.name}-webhook-url`}>
-                      {provider.name === "Circle" ? "Escrow Wallet ID" : "Webhook URL"}
-                    </Label>
-                    <input
-                      id={`${provider.name}-webhook-url`}
-                      type="text"
-                      value={provider.name === "Circle" ? (provider.escrowWalletId || "") : (provider.webhookUrl || "")}
-                      onChange={(e) => handleUpdateProvider(
-                        provider.name, 
-                        provider.name === "Circle" ? "escrowWalletId" : "webhookUrl", 
-                        e.target.value
+                  {provider.name === "Circle" ? (
+                    <div>
+                      <Label htmlFor={`${provider.name}-escrow-wallet`}>Escrow Wallet ID</Label>
+                      <input
+                        id={`${provider.name}-escrow-wallet`}
+                        type="text"
+                        value={provider.escrowWalletId || ""}
+                        onChange={(e) => handleUpdateProvider(provider.name, "escrowWalletId", e.target.value)}
+                        placeholder="52a2c755-6045-5217-8d70-8ac28dc221ba"
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`${provider.name}-webhook-url`}>
+                          Webhook URL
+                          <span className="text-xs text-gray-500 block">For payment notifications</span>
+                        </Label>
+                        <input
+                          id={`${provider.name}-webhook-url`}
+                          type="text"
+                          value={provider.webhookUrl || ""}
+                          onChange={(e) => handleUpdateProvider(provider.name, "webhookUrl", e.target.value)}
+                          placeholder="https://yourdomain.com/api/paystack/webhook"
+                          className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      {provider.name === "Paystack" && (
+                        <div>
+                          <Label htmlFor={`${provider.name}-callback-url`}>
+                            Callback URL
+                            <span className="text-xs text-gray-500 block">For payment redirects</span>
+                          </Label>
+                          <input
+                            id={`${provider.name}-callback-url`}
+                            type="text"
+                            value={provider.callbackUrl || ""}
+                            onChange={(e) => handleUpdateProvider(provider.name, "callbackUrl", e.target.value)}
+                            placeholder="https://yourdomain.com/payment/callback"
+                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
                       )}
-                      placeholder={provider.name === "Circle" ? "52a2c755-6045-5217-8d70-8ac28dc221ba" : "https://yourdomain.com/webhooks/payment"}
-                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
+                    </div>
+                  )}
 
                   <div className="flex items-center space-x-2">
                     <input

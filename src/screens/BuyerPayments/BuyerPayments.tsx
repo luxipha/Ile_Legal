@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { PaymentMethods } from "../../components/PaymentMethods";
+import { Wallet } from "../../components/Wallet/Wallet";
+import { PaymentMethodModal } from "../../components/PaymentMethodModal/PaymentMethodModal";
 import { Header } from "../../components/Header";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
+import { useAuth } from "../../contexts/AuthContext";
+import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
+import { paymentIntegrationService } from "../../services/paymentIntegrationService";
+import { usePaystackInline } from "../../hooks/usePaystackInline";
 import { 
   TrendingUpIcon,
   TrendingDownIcon,
@@ -25,7 +31,7 @@ interface BankAccount {
 }
 
 interface Task {
-  id: number;
+  id: string;
   title: string;
   provider: string;
   providerAvatar: string;
@@ -38,8 +44,18 @@ interface Task {
 }
 
 export const BuyerPayments = (): JSX.Element => {
+  const { user } = useAuth();
+  const { initializePayment } = usePaystackInline();
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedTaskForPayment, setSelectedTaskForPayment] = useState<Task | null>(null);
+  const [fullWalletData, setFullWalletData] = useState<UnifiedWalletData | null>(null);
+  const [walletData, setWalletData] = useState<{
+    balance: string;
+    address: string;
+    currency: string;
+  } | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
     {
       id: "1",
@@ -51,9 +67,30 @@ export const BuyerPayments = (): JSX.Element => {
     }
   ]);
 
+  // Load wallet data
+  useEffect(() => {
+    const loadWalletData = async () => {
+      if (user?.id) {
+        try {
+          const data = await getUserWalletData(user.id);
+          setFullWalletData(data);
+          setWalletData({
+            balance: data.balance,
+            address: data.ethAddress || data.circleWalletAddress || '',
+            currency: data.currency
+          });
+        } catch (error) {
+          console.error('Error loading wallet data:', error);
+        }
+      }
+    };
+
+    loadWalletData();
+  }, [user?.id]);
+
   const tasks: Task[] = [
     {
-      id: 1,
+      id: "550e8400-e29b-41d4-a716-446655440001",
       title: "Land Title Verification - Victoria Island",
       provider: "Chioma Okonkwo",
       providerAvatar: "CO",
@@ -65,7 +102,7 @@ export const BuyerPayments = (): JSX.Element => {
       category: "Title Verification"
     },
     {
-      id: 2,
+      id: "550e8400-e29b-41d4-a716-446655440002",
       title: "Contract Review for Commercial Lease",
       provider: "Adebayo Ogundimu",
       providerAvatar: "AO",
@@ -77,7 +114,7 @@ export const BuyerPayments = (): JSX.Element => {
       category: "Contract Review"
     },
     {
-      id: 3,
+      id: "550e8400-e29b-41d4-a716-446655440003",
       title: "Property Survey - Lekki Phase 1",
       provider: "Funmi Adebisi",
       providerAvatar: "FA",
@@ -89,7 +126,7 @@ export const BuyerPayments = (): JSX.Element => {
       category: "Property Survey"
     },
     {
-      id: 4,
+      id: "550e8400-e29b-41d4-a716-446655440004",
       title: "Due Diligence Report",
       provider: "Kemi Adeyemi",
       providerAvatar: "KA",
@@ -101,7 +138,7 @@ export const BuyerPayments = (): JSX.Element => {
       category: "Due Diligence"
     },
     {
-      id: 5,
+      id: "550e8400-e29b-41d4-a716-446655440005",
       title: "Legal Documentation Review",
       provider: "Tunde Bakare",
       providerAvatar: "TB",
@@ -181,11 +218,88 @@ export const BuyerPayments = (): JSX.Element => {
   };
 
   const handlePayNow = (taskId: number) => {
-    console.log("Processing payment for task:", taskId);
-    // Handle payment logic
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      setSelectedTaskForPayment(task);
+      setShowPaymentModal(true);
+    }
   };
 
-  const handleViewDetails = (taskId: number) => {
+  const handlePaymentMethodSelect = async (method: 'wallet' | 'paystack', details?: any) => {
+    if (!selectedTaskForPayment || !user) return;
+
+    try {
+      const amountNum = parseFloat(selectedTaskForPayment.amount.replace(/[₦,]/g, ''));
+      
+      const paymentRequest = {
+        taskId: selectedTaskForPayment.id,
+        amount: amountNum,
+        currency: 'NGN',
+        buyerId: user.id,
+        sellerId: user.id, // Use current user as seller for demo
+        method: method,
+        description: selectedTaskForPayment.title
+      };
+
+      console.log('Processing payment:', paymentRequest);
+      const result = await paymentIntegrationService.processPayment(paymentRequest);
+      
+      if (result.success) {
+        console.log('Payment successful:', result);
+        
+        if (result.useInline && result.inlineConfig) {
+          // Use Paystack Inline for better UX
+          console.log('Starting Paystack inline payment:', result.inlineConfig);
+          
+          initializePayment({
+            key: result.inlineConfig.publicKey,
+            email: result.inlineConfig.email,
+            amount: result.inlineConfig.amount,
+            currency: result.inlineConfig.currency,
+            ref: result.inlineConfig.reference,
+            metadata: result.inlineConfig.metadata,
+            channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
+            onSuccess: (transaction) => {
+              console.log('Payment completed successfully:', transaction);
+              alert(`Payment successful! Reference: ${transaction.reference}`);
+              
+              // Update payment status in database
+              paymentIntegrationService.updatePaymentStatus(result.transactionId, 'completed', transaction);
+              
+              // Close modal and refresh
+              setShowPaymentModal(false);
+              setSelectedTaskForPayment(null);
+            },
+            onCancel: () => {
+              console.log('Payment cancelled by user');
+              alert('Payment was cancelled.');
+            },
+            onClose: () => {
+              console.log('Payment popup closed');
+            }
+          });
+          
+        } else if (result.paymentUrl) {
+          // Fallback to redirect for demo/mock payments
+          console.log('Redirecting to Paystack:', result.paymentUrl);
+          window.location.href = result.paymentUrl;
+          return;
+        } else {
+          alert(`Payment ${result.success ? 'successful' : 'failed'}: ${result.message}`);
+        }
+      } else {
+        alert(`Payment failed: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Payment processing failed. Please try again.');
+    }
+    
+    setShowPaymentModal(false);
+    setSelectedTaskForPayment(null);
+  };
+
+  const handleViewDetails = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (task) {
       setSelectedTask(task);
@@ -372,7 +486,7 @@ export const BuyerPayments = (): JSX.Element => {
                     </div>
               </div>
 
-                  {/* Payment Methods - 40% width (2 columns) */}
+                  {/* Payment Methods & Wallet - 40% width (2 columns) */}
                   <div className="col-span-2">
                     <PaymentMethods
                       bankAccounts={bankAccounts}
@@ -380,6 +494,15 @@ export const BuyerPayments = (): JSX.Element => {
                       onSetDefault={handleSetDefault}
                       onRemoveAccount={handleRemoveAccount}
                     />
+                    
+                    {/* My Wallet Section */}
+                    {walletData && (
+                      <Wallet
+                        balance={walletData.balance}
+                        address={walletData.address}
+                        currency={walletData.currency}
+                      />
+                    )}
               </div>
             </div>
               </>
@@ -456,6 +579,23 @@ export const BuyerPayments = (): JSX.Element => {
           </div>
         </main>
       </div>
+
+      {/* Payment Method Selection Modal */}
+      {selectedTaskForPayment && (
+        <PaymentMethodModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedTaskForPayment(null);
+          }}
+          onSelectMethod={handlePaymentMethodSelect}
+          amount={selectedTaskForPayment.amount}
+          taskTitle={selectedTaskForPayment.title}
+          walletBalance={walletData?.balance}
+          walletAddress={walletData?.address}
+          hasWallet={fullWalletData?.hasEthWallet || fullWalletData?.hasCircleWallet || false}
+        />
+      )}
     </div>
   );
 };

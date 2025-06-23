@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>App Settings Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .console-log { background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 3px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>🔍 App Settings Verification</h1>
+    <p>This page will test if the app_settings table is working correctly.</p>
+    
+    <div id="results"></div>
+    
+    <button onclick="runAllTests()">🚀 Run All Tests</button>
+    <button onclick="testDatabaseConnection()">Test 1: Database Connection</button>
+    <button onclick="testSettingsLoad()">Test 2: Settings Load</button>
+    <button onclick="testSettingsSave()">Test 3: Settings Save</button>
+    <button onclick="testPaystackConfig()">Test 4: Paystack Config</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <script type="module">
+        // Import the settings service (you'll need to adjust the path)
+        import { SettingsService } from './src/services/settingsService.js';
+        import { paymentIntegrationService } from './src/services/paymentIntegrationService.js';
+
+        window.SettingsService = SettingsService;
+        window.paymentIntegrationService = paymentIntegrationService;
+
+        function addResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const testDiv = document.createElement('div');
+            testDiv.className = `test ${type}`;
+            testDiv.innerHTML = `
+                <h3>${title}</h3>
+                <div class="console-log">${content}</div>
+            `;
+            resultsDiv.appendChild(testDiv);
+        }
+
+        window.addResult = addResult;
+
+        async function runAllTests() {
+            clearResults();
+            addResult('🚀 Starting Verification Tests', 'Running comprehensive app_settings table verification...', 'info');
+            
+            await testDatabaseConnection();
+            await testSettingsLoad();
+            await testSettingsSave();
+            await testPaystackConfig();
+            
+            addResult('✅ Verification Complete', 'All tests completed. Check results above.', 'success');
+        }
+
+        async function testDatabaseConnection() {
+            try {
+                addResult('Test 1: Database Connection', 'Testing Supabase connection...', 'info');
+                
+                // Import supabase client
+                const { supabase } = await import('./src/lib/supabase.js');
+                
+                // Test basic query
+                const { data, error } = await supabase
+                    .from('app_settings')
+                    .select('key')
+                    .limit(1);
+                
+                if (error) {
+                    addResult('❌ Database Connection Failed', `Error: ${error.message}`, 'error');
+                } else {
+                    addResult('✅ Database Connection Success', `Connected to app_settings table. Found ${data?.length || 0} records.`, 'success');
+                }
+            } catch (error) {
+                addResult('❌ Database Connection Error', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSettingsLoad() {
+            try {
+                addResult('Test 2: Settings Load', 'Testing settings load from database...', 'info');
+                
+                // Clear cache first
+                SettingsService.clearCache();
+                
+                const settings = await SettingsService.getSettings();
+                
+                const result = {
+                    hasPaymentProviders: Array.isArray(settings.paymentProviders),
+                    providerCount: settings.paymentProviders?.length || 0,
+                    providers: settings.paymentProviders?.map(p => ({ name: p.name, enabled: p.enabled })) || [],
+                    lastUpdated: settings.lastUpdated
+                };
+                
+                addResult('✅ Settings Load Success', `Settings loaded successfully:
+${JSON.stringify(result, null, 2)}`, 'success');
+                
+            } catch (error) {
+                addResult('❌ Settings Load Failed', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSettingsSave() {
+            try {
+                addResult('Test 3: Settings Save', 'Testing settings save to database...', 'info');
+                
+                // Get current settings
+                const currentSettings = await SettingsService.getSettings();
+                
+                // Make a small change
+                const testSettings = {
+                    ...currentSettings,
+                    paymentProviders: currentSettings.paymentProviders.map(p => 
+                        p.name === 'Paystack' 
+                            ? { ...p, testMode: !p.testMode } // Toggle test mode
+                            : p
+                    )
+                };
+                
+                // Save the settings
+                await SettingsService.saveSettings(testSettings);
+                
+                // Reload and verify
+                SettingsService.clearCache();
+                const reloadedSettings = await SettingsService.getSettings();
+                
+                const paystackProvider = reloadedSettings.paymentProviders.find(p => p.name === 'Paystack');
+                
+                addResult('✅ Settings Save Success', `Settings saved and reloaded successfully:
+Paystack testMode: ${paystackProvider?.testMode}
+Last updated: ${reloadedSettings.lastUpdated}`, 'success');
+                
+            } catch (error) {
+                addResult('❌ Settings Save Failed', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPaystackConfig() {
+            try {
+                addResult('Test 4: Paystack Config', 'Testing Paystack configuration for payment flow...', 'info');
+                
+                // Get settings
+                const settings = await SettingsService.getSettings();
+                const paystackProvider = settings.paymentProviders.find(p => p.name === 'Paystack');
+                
+                if (!paystackProvider) {
+                    addResult('❌ Paystack Provider Not Found', 'Paystack provider not found in settings', 'error');
+                    return;
+                }
+                
+                const configResult = {
+                    found: !!paystackProvider,
+                    enabled: paystackProvider.enabled,
+                    hasPublicKey: !!paystackProvider.apiKey,
+                    hasSecretKey: !!paystackProvider.secretKey,
+                    testMode: paystackProvider.testMode,
+                    publicKeyPreview: paystackProvider.apiKey ? paystackProvider.apiKey.substring(0, 8) + '...' : 'Not set',
+                    secretKeyPreview: paystackProvider.secretKey ? paystackProvider.secretKey.substring(0, 8) + '...' : 'Not set'
+                };
+                
+                // Test payment initialization (mock)
+                try {
+                    const mockPaymentRequest = {
+                        taskId: 999,
+                        amount: 65000,
+                        currency: 'NGN',
+                        buyerId: 'test-buyer',
+                        sellerId: 'test-seller',
+                        method: 'paystack',
+                        description: 'Test payment verification'
+                    };
+                    
+                    // This will test the Paystack config loading
+                    const paymentResponse = await paymentIntegrationService.processPayment(mockPaymentRequest);
+                    
+                    addResult('✅ Paystack Config Success', `Paystack configuration working:
+${JSON.stringify(configResult, null, 2)}
+
+Payment test result:
+Success: ${paymentResponse.success}
+Message: ${paymentResponse.message}
+Payment URL: ${paymentResponse.paymentUrl || 'None'}`, 'success');
+                    
+                } catch (paymentError) {
+                    addResult('⚠️ Paystack Config Partial', `Config loaded but payment test failed:
+${JSON.stringify(configResult, null, 2)}
+
+Payment error: ${paymentError.message}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult('❌ Paystack Config Failed', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Expose functions globally
+        window.runAllTests = runAllTests;
+        window.testDatabaseConnection = testDatabaseConnection;
+        window.testSettingsLoad = testSettingsLoad;
+        window.testSettingsSave = testSettingsSave;
+        window.testPaystackConfig = testPaystackConfig;
+        window.clearResults = clearResults;
+    </script>
+</body>
+</html>

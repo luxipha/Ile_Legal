@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { formatCurrency, formatDate, formatUser } from "../../utils/formatters";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { ViewDetails, Gig } from "../../components/ViewDetails";
+import { ViewDetails, Gig as ViewDetailsGig } from "../../components/ViewDetails";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { SecureLegalUpload, SecureUploadResult } from "../../components/SecureLegalUpload";
 import { api } from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 import { 
   GavelIcon, 
   BriefcaseIcon, 
@@ -20,14 +22,14 @@ import {
 
 type ViewMode = "dashboard" | "place-bid" | "view-details" | "submit-work" | "edit-bid";
 
-interface Gig {
+interface SellerGig {
   id: string;
   title: string;
   company: string;
   price: string;
   deadline: string;
   postedDate: string;
-  budget: string;
+  budget: number;
   deliveryTime: string;
   description: string;
   requirements: string[];
@@ -49,9 +51,19 @@ interface OngoingGig {
 
 export const SellerDashboard = (): JSX.Element => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
-  const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
+  const [selectedGig, setSelectedGig] = useState<SellerGig | null>(null);
   const [selectedOngoingGig, setSelectedOngoingGig] = useState<OngoingGig | null>(null);
+  
+  // Real data state
+  const [availableGigs, setAvailableGigs] = useState<SellerGig[]>([]);
+  const [ongoingGigs, setOngoingGigs] = useState<OngoingGig[]>([]);
+  const [completedGigs, setCompletedGigs] = useState<any[]>([]);
+  const [activeBids, setActiveBids] = useState<any[]>([]);
+  const [loadingGigs, setLoadingGigs] = useState(false);
+  const [loadingOngoing, setLoadingOngoing] = useState(false);
+  const [loadingActiveBids, setLoadingActiveBids] = useState(false);
   const [bidFormData, setBidFormData] = useState({
     bidAmount: "",
     deliveryTime: "",
@@ -66,98 +78,170 @@ export const SellerDashboard = (): JSX.Element => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const availableGigs: Gig[] = [
-    {
-      id: "1",
-      title: "Land Title Verification - Victoria Island Property",
-      company: "Lagos Properties Ltd.",
-      price: "₦65,000",
-      deadline: "16/05/2025",
-      postedDate: "Apr 24, 2024",
-      budget: 65000,
-      deliveryTime: "e.g, 5 days",
-      description: "We are seeking a qualified legal professional to conduct a comprehensive title verification for a property located in Victoria Island, Lagos.",
-      requirements: [
-        "Confirmation of ownership history",
-        "Verification of all relevant documentation", 
-        "Checks for any encumbrances or liens",
-        "Validation with the local land registry",
-        "Preparation of a detailed report on findings"
-      ],
-      companyRating: 4.8,
-      projectsPosted: 15,
-      is_flagged: false,
-      status: "active"
-    },
-    {
-      id: "2",
-      title: "Contract Review for Commercial Lease",
-      company: "Commercial Realty",
-      price: "₦45,000",
-      deadline: "10/05/2025",
-      postedDate: "Apr 25, 2024",
-      budget: 45000,
-      deliveryTime: "e.g, 3 days",
-      description: "Review and analysis of commercial lease agreement for office space. Need expert legal opinion on terms and conditions.",
-      requirements: [
-        "Thorough review of lease terms",
-        "Risk assessment",
-        "Recommendations for amendments",
-        "Legal compliance check"
-      ],
-      companyRating: 4.6,
-      projectsPosted: 8,
-      is_flagged: false,
-      status: "active"
-    }
-  ];
+  // Load available gigs from API
+  useEffect(() => {
+    const loadAvailableGigs = async () => {
+      setLoadingGigs(true);
+      try {
+        const gigs = await api.gigs.getAllGigs();
+        
+        // Convert API gigs to SellerGig format
+        const formattedGigs: SellerGig[] = gigs.map((gig: any) => ({
+          id: gig.id.toString(),
+          title: gig.title || "Legal Service",
+          company: gig.buyer_name || "Client",
+          price: formatCurrency.naira(gig.budget, "Budget not specified"),
+          deadline: formatDate.full(gig.deadline),
+          postedDate: formatDate.full(gig.created_at),
+          budget: gig.budget || 0,
+          deliveryTime: "To be negotiated",
+          description: gig.description || "No description provided",
+          requirements: gig.categories || [],
+          companyRating: 0, // Will be calculated from buyer feedback
+          projectsPosted: 0, // Will be calculated from buyer's total gigs
+          is_flagged: gig.is_flagged || false,
+          status: gig.status || "active"
+        }));
+        
+        // Only show active gigs for sellers to bid on
+        const activeGigs = formattedGigs.filter(gig => gig.status?.toLowerCase() === 'active' || gig.status?.toLowerCase() === 'pending');
+        setAvailableGigs(activeGigs);
+      } catch (error) {
+        console.error('Error loading available gigs:', error);
+        setAvailableGigs([]);
+      } finally {
+        setLoadingGigs(false);
+      }
+    };
 
-  const ongoingGigs: OngoingGig[] = [
-    {
-      id: "1",
-      title: "Due Diligence on Residential Development",
-      company: "Evergreen Estates",
-      price: "₦90,000",
-      dueDate: "18/05/2025",
-      progress: 40,
-      description: "Complete due diligence investigation for a 50-unit residential complex including title verification, compliance checks, and risk assessment."
-    }
-  ];
+    loadAvailableGigs();
+  }, []);
 
-  const handleViewDetails = (gig: Gig) => {
+  // Load ongoing gigs (seller's accepted/in-progress gigs)
+  useEffect(() => {
+    const loadOngoingGigs = async () => {
+      if (!user?.id) return;
+      
+      setLoadingOngoing(true);
+      try {
+        // For sellers, we need to get gigs where they have accepted bids
+        // This is a simplified approach - in reality you'd need to join bids and gigs tables
+        const myGigs = await api.gigs.getMyGigs(user.id);
+        
+        // Convert to OngoingGig format for accepted/in-progress gigs
+        const ongoing: OngoingGig[] = myGigs
+          .filter((gig: any) => gig.status?.toLowerCase() === 'in progress' || gig.status?.toLowerCase() === 'accepted')
+          .map((gig: any) => ({
+            id: gig.id.toString(),
+            title: gig.title || "Legal Service",
+            company: gig.buyer_name || "Client",
+            price: formatCurrency.naira(gig.budget, "Budget not specified"),
+            dueDate: formatDate.full(gig.deadline),
+            progress: gig.progress || 0, // Use real progress if available
+            description: gig.description || "No description provided"
+          }));
+        
+        setOngoingGigs(ongoing);
+        
+        // Also load completed gigs
+        const completed = myGigs
+          .filter((gig: any) => gig.status?.toLowerCase() === 'completed')
+          .map((gig: any) => ({
+            id: gig.id.toString(),
+            title: gig.title || "Legal Service",
+            company: gig.buyer_name || "Client",
+            price: formatCurrency.naira(gig.budget, "Budget not specified"),
+            completedDate: formatDate.full(gig.updated_at || gig.created_at),
+            description: gig.description || "No description provided"
+          }));
+        
+        setCompletedGigs(completed);
+      } catch (error) {
+        console.error('Error loading ongoing gigs:', error);
+        setOngoingGigs([]);
+        setCompletedGigs([]);
+      } finally {
+        setLoadingOngoing(false);
+      }
+    };
+
+    loadOngoingGigs();
+  }, [user?.id]);
+
+  // Load active bids (seller's pending bids)
+  useEffect(() => {
+    const loadActiveBids = async () => {
+      if (!user?.id) return;
+      
+      setLoadingActiveBids(true);
+      try {
+        const bids = await api.bids.getActiveBids(user.id);
+        setActiveBids(bids);
+      } catch (error) {
+        console.error('Error loading active bids:', error);
+        setActiveBids([]);
+      } finally {
+        setLoadingActiveBids(false);
+      }
+    };
+
+    loadActiveBids();
+  }, [user?.id]);
+
+  const handleViewDetails = (gig: SellerGig) => {
     setSelectedGig(gig);
     setViewMode("view-details");
   };
 
-  const handlePlaceBid = (gig?: Gig) => {
+  const handlePlaceBid = (gig?: SellerGig) => {
     if (gig) {
       setSelectedGig(gig);
     }
     setViewMode("place-bid");
   };
 
-
-  const handleEditBid = () => {
-    // Navigate to ActiveBids with state to indicate we want to edit a specific bid
-    navigate('/active-bids', { 
-      state: { 
-        viewMode: 'edit-bid',
-        bidId: 1, // Using a placeholder ID for the active bid
-        bidData: {
-          id: 1,
-          title: "Property Survey - Lekki Phase 1",
-          client: "Prestige Homes",
-          bidAmount: "₦75,000",
-          deliveryTime: "7 days",
-          dueDate: "10/06/2025",
-          status: "active",
-          proposal: "I'll provide a comprehensive property survey including boundary markers, topographical analysis, and legal documentation review.",
-          originalBudget: "₦80,000",
-          previousBid: "₦75,000"
-        }
-      }
-    });
+  // Convert SellerGig to ViewDetailsGig
+  const convertToViewDetailsGig = (gig: SellerGig): ViewDetailsGig => {
+    return {
+      id: gig.id,
+      title: gig.title,
+      company: gig.company,
+      price: gig.price,
+      deadline: gig.deadline,
+      postedDate: gig.postedDate,
+      budget: gig.budget,
+      deliveryTime: gig.deliveryTime,
+      description: gig.description,
+      requirements: gig.requirements,
+      companyRating: gig.companyRating,
+      projectsPosted: gig.projectsPosted,
+      is_flagged: gig.is_flagged,
+      status: gig.status
+    };
   };
+
+  // Handle ViewDetails onPlaceBid callback
+  const handleViewDetailsPlaceBid = (gig: ViewDetailsGig) => {
+    const sellerGig: SellerGig = {
+      id: gig.id,
+      title: gig.title,
+      company: gig.company || "Client",
+      price: gig.price || "Price not specified",
+      deadline: gig.deadline,
+      postedDate: gig.postedDate || new Date().toLocaleDateString(),
+      budget: gig.budget || 0,
+      deliveryTime: gig.deliveryTime || "To be negotiated",
+      description: gig.description,
+      requirements: gig.requirements || [],
+      companyRating: gig.companyRating || 4.5,
+      projectsPosted: gig.projectsPosted || 1,
+      is_flagged: gig.is_flagged,
+      status: gig.status
+    };
+    handlePlaceBid(sellerGig);
+  };
+
+
 
   const handleSubmitWork = (gig: OngoingGig) => {
     setSelectedOngoingGig(gig);
@@ -296,8 +380,8 @@ export const SellerDashboard = (): JSX.Element => {
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
+                <div className="text-sm font-medium">{formatUser.displayName(user, 'Seller')}</div>
+                <div className="text-xs text-gray-400">{user?.email || 'No email'}</div>
               </div>
             </div>
           </div>
@@ -472,8 +556,8 @@ export const SellerDashboard = (): JSX.Element => {
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
+                <div className="text-sm font-medium">{formatUser.displayName(user, 'Seller')}</div>
+                <div className="text-xs text-gray-400">{user?.email || 'No email'}</div>
               </div>
             </div>
           </div>
@@ -485,12 +569,21 @@ export const SellerDashboard = (): JSX.Element => {
 
           {/* View Details Content */}
           <main className="flex-1 p-6">
-            <ViewDetails
-              gig={selectedGig}
-              onBack={() => setViewMode("dashboard")}
-              onPlaceBid={handlePlaceBid}
-              backButtonText="Back to Dashboard"
-            />
+            {selectedGig ? (
+              <ViewDetails
+                gig={convertToViewDetailsGig(selectedGig)}
+                onBack={() => setViewMode("dashboard")}
+                onPlaceBid={handleViewDetailsPlaceBid}
+                backButtonText="Back to Dashboard"
+              />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No gig selected</p>
+                <Button onClick={() => setViewMode("dashboard")} className="mt-4">
+                  Back to Dashboard
+                </Button>
+              </div>
+            )}
           </main>
         </div>
       </div>
@@ -563,8 +656,8 @@ export const SellerDashboard = (): JSX.Element => {
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
+                <div className="text-sm font-medium">{formatUser.displayName(user, 'Seller')}</div>
+                <div className="text-xs text-gray-400">{user?.email || 'No email'}</div>
               </div>
             </div>
           </div>
@@ -713,7 +806,7 @@ export const SellerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Active Bids</div>
-                    <div className="text-2xl font-bold text-gray-900">1</div>
+                    <div className="text-2xl font-bold text-gray-900">{activeBids.length}</div>
                   </div>
                 </div>
               </CardContent>
@@ -727,7 +820,7 @@ export const SellerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Ongoing Gigs</div>
-                    <div className="text-2xl font-bold text-gray-900">1</div>
+                    <div className="text-2xl font-bold text-gray-900">{ongoingGigs.length}</div>
                   </div>
                 </div>
               </CardContent>
@@ -741,7 +834,7 @@ export const SellerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Completed</div>
-                    <div className="text-2xl font-bold text-gray-900">12</div>
+                    <div className="text-2xl font-bold text-gray-900">{completedGigs.length}</div>
                   </div>
                 </div>
               </CardContent>
@@ -755,35 +848,46 @@ export const SellerDashboard = (): JSX.Element => {
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Available Gigs</h3>
               <p className="text-gray-600 mb-6">Recently posted gigs that matches your expertise</p>
               
-              <div className="space-y-4">
-                {availableGigs.map((gig) => (
-                  <Card key={gig.id} className="bg-white border border-gray-200">
-                    <CardContent className="p-6">
-                      <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
-                      <p className="text-sm text-gray-600 mb-2">Posted by {gig.company}</p>
-                      <p className="text-sm text-gray-600 mb-4">Deadline: {gig.deadline}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-gray-900">{gig.price}</span>
-                        <div className="flex gap-2">
-                          <Button 
-                            onClick={() => handlePlaceBid(gig)}
-                            className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                            disabled={gig.status === 'suspended'}
-                          >
-                            {gig.status === 'suspended' ? 'Gig Suspended' : 'Place Bid'}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            onClick={() => handleViewDetails(gig)}
-                          >
-                            View Details
-                          </Button>
+              {loadingGigs ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">Loading available gigs...</p>
+                </div>
+              ) : availableGigs.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No available gigs at the moment</p>
+                  <p className="text-sm text-gray-400 mt-2">Check back later for new opportunities</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {availableGigs.map((gig) => (
+                    <Card key={gig.id} className="bg-white border border-gray-200">
+                      <CardContent className="p-6">
+                        <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
+                        <p className="text-sm text-gray-600 mb-2">Posted by {gig.company}</p>
+                        <p className="text-sm text-gray-600 mb-4">Deadline: {gig.deadline}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-bold text-gray-900">{gig.price}</span>
+                          <div className="flex gap-2">
+                            <Button 
+                              onClick={() => handlePlaceBid(gig)}
+                              className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                              disabled={gig.status === 'suspended'}
+                            >
+                              {gig.status === 'suspended' ? 'Gig Suspended' : 'Place Bid'}
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => handleViewDetails(gig)}
+                            >
+                              View Details
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Right Column */}
@@ -793,56 +897,54 @@ export const SellerDashboard = (): JSX.Element => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Your Active Bids</h3>
                 <p className="text-gray-600 mb-6">Bids you've placed that are awaiting client decisions</p>
                 
-                <Card className="bg-white border border-gray-200">
-                  <CardContent className="p-6">
-                    <h4 className="font-semibold text-gray-900 mb-2">Property Survey - Lekki Phase 1</h4>
-                    <p className="text-sm text-gray-600 mb-2">Client: Prestige Homes</p>
-                    <p className="text-sm text-gray-600 mb-4">Bid placed on: 25/04/2025</p>
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <span className="text-lg font-bold text-gray-900">₦75,000</span>
-                        <span className="text-sm text-gray-500 ml-2">Original: ₦80,000</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828]"
-                        onClick={() => handleEditBid()}
-                      >
-                        Edit Bid
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={() => {
-                          // Create a gig object from the active bid data
-                          const activeBidGig: Gig = {
-                            id: "101", // Using a unique ID for this active bid
-                            title: "Property Survey - Lekki Phase 1",
-                            company: "Prestige Homes",
-                            price: "₦75,000",
-                            deadline: "10/06/2025",
-                            postedDate: "25/04/2025",
-                            budget: 80000,
-                            deliveryTime: "7 days",
-                            description: "Complete property survey for a residential plot in Lekki Phase 1.",
-                            requirements: [
-                              "Detailed boundary survey",
-                              "Topographical analysis",
-                              "Legal documentation review"
-                            ],
-                            companyRating: 4.8,
-                            projectsPosted: 12,
-                            is_flagged: false
-                          };
-                          handleViewDetails(activeBidGig);
-                        }}
-                      >
-                        View Details
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                {loadingActiveBids ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">Loading active bids...</p>
+                  </div>
+                ) : activeBids.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">No active bids</p>
+                    <p className="text-sm text-gray-400 mt-2">Place bids on available gigs to see them here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {activeBids.map((bid) => (
+                      <Card key={bid.id} className="bg-white border border-gray-200">
+                        <CardContent className="p-6">
+                          <h4 className="font-semibold text-gray-900 mb-2">Bid #{bid.id}</h4>
+                          <p className="text-sm text-gray-600 mb-2">Gig ID: {bid.gig_id}</p>
+                          <p className="text-sm text-gray-600 mb-4">Status: {bid.status}</p>
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <span className="text-lg font-bold text-gray-900">₦{bid.amount?.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4">{bid.description}</p>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828]"
+                              onClick={() => navigate('/active-bids', { 
+                                state: { 
+                                  viewMode: 'edit-bid',
+                                  bidData: bid
+                                }
+                              })}
+                            >
+                              Edit Bid
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => navigate('/active-bids')}
+                            >
+                              View Details
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Ongoing Gigs */}
@@ -850,42 +952,53 @@ export const SellerDashboard = (): JSX.Element => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Ongoing Gigs</h3>
                 <p className="text-gray-600 mb-6">Gigs you are currently working on</p>
                 
-                {ongoingGigs.map((gig) => (
-                  <Card key={gig.id} className="bg-white border border-gray-200">
-                    <CardContent className="p-6">
-                      <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
-                      <p className="text-sm text-gray-600 mb-2">Client: {gig.company}</p>
-                      <p className="text-sm text-gray-600 mb-2">Due: {gig.dueDate}</p>
-                      <p className="text-lg font-bold text-gray-900 mb-4">{gig.price}</p>
-                      
-                      {/* Progress Bar */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-gray-600">Progress: {gig.progress}%</span>
+                {loadingOngoing ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">Loading ongoing gigs...</p>
+                  </div>
+                ) : ongoingGigs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">No ongoing gigs</p>
+                    <p className="text-sm text-gray-400 mt-2">Place bids on available gigs to start working</p>
+                  </div>
+                ) : (
+                  ongoingGigs.map((gig) => (
+                    <Card key={gig.id} className="bg-white border border-gray-200">
+                      <CardContent className="p-6">
+                        <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
+                        <p className="text-sm text-gray-600 mb-2">Client: {gig.company}</p>
+                        <p className="text-sm text-gray-600 mb-2">Due: {gig.dueDate}</p>
+                        <p className="text-lg font-bold text-gray-900 mb-4">{gig.price}</p>
+                        
+                        {/* Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-gray-600">Progress: {gig.progress}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="bg-green-500 h-2 rounded-full" style={{ width: `${gig.progress}%` }}></div>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="bg-green-500 h-2 rounded-full" style={{ width: `${gig.progress}%` }}></div>
+                        
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => navigate("/seller-messages")}
+                            className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                          >
+                            Message Client
+                          </Button>
+                          <Button 
+                            onClick={() => handleSubmitWork(gig)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Submit Work
+                          </Button>
                         </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => navigate("/seller-messages")}
-                          className="border-blue-500 text-blue-500 hover:bg-blue-50"
-                        >
-                          Message Client
-                        </Button>
-                        <Button 
-                          onClick={() => handleSubmitWork(gig)}
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          Submit Work
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </div>
           </div>

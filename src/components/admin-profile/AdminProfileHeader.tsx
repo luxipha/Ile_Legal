@@ -75,7 +75,7 @@ export const AdminProfileHeader = () => {
     try {
       // Update profile in the database
       const { error } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .update({
           first_name: formData.firstName,
           last_name: formData.lastName,

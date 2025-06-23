@@ -1,0 +1,497 @@
+import React, { useState } from 'react';
+import { Card, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+// Tabs are implemented manually with buttons instead of the Tabs component
+import { 
+  Star, 
+  MapPin, 
+  Calendar, 
+  CheckCircle, 
+  Award, 
+  Users, 
+  Shield, 
+  Wallet,
+  ArrowLeftIcon
+} from 'lucide-react';
+import { Header } from '../../components/Header/Header';
+import { SellerSidebar } from '../../components/SellerSidebar/SellerSidebar';
+// import { useAuth } from '../../contexts/AuthContext'; // Will be used when implementing real user data
+
+interface LawyerProfileViewProps {
+  isOwnProfile?: boolean;
+}
+
+const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = false }) => {
+  // We can use the useAuth context in the future to get real user data
+  // const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Mock data - in real implementation, this would come from props or API
+  const lawyerData = {
+    name: "Sarah Mitchell",
+    title: "Real Estate Attorney",
+    location: "San Francisco, CA",
+    rating: 4.9,
+    totalReviews: 247,
+    completedTasks: 189,
+    yearsExperience: 12,
+    specializations: ["Commercial Real Estate", "Residential Transactions", "Property Law", "Contract Negotiation"],
+    verificationAccuracy: "99%",
+    avgCompletionTime: "3 days",
+    responseTime: "< 2 hours",
+    avatar: "https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=300&h=300&fit=crop&crop=face",
+    walletAddress: "0x742...A8C9",
+    verified: true,
+    bio: "Experienced real estate attorney specializing in complex commercial transactions and residential property law. Licensed in California with over 12 years of expertise in Web3 and traditional real estate matters.",
+    education: [
+      { degree: "J.D. Law", school: "Stanford Law School", year: "2012" },
+      { degree: "B.A. Economics", school: "UC Berkeley", year: "2009" }
+    ],
+    certifications: ["Licensed Attorney - California State Bar", "Real Estate Law Specialist", "Blockchain Legal Expert"],
+    badges: [
+      { name: "Top Performer", color: "bg-yellow-100 text-yellow-800", icon: Award },
+      { name: "Verified Pro", color: "bg-purple-100 text-purple-800", icon: Shield },
+      { name: "Quick Responder", color: "bg-green-100 text-green-800", icon: CheckCircle },
+      { name: "Web3 Expert", color: "bg-blue-100 text-blue-800", icon: Wallet }
+    ]
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar - only show if it's own profile */}
+      {isOwnProfile && <SellerSidebar activePage="profile" />}
+
+      {/* Main Content */}
+      <div className={`flex-1 flex flex-col ${!isOwnProfile ? 'ml-0' : ''}`}>
+        <Header 
+          title={isOwnProfile ? "Public Profile View" : "Lawyer Profile"} 
+          userName={lawyerData.name} 
+          userType="seller" 
+        />
+
+        <main className="flex-1 p-6">
+          <div className="max-w-6xl mx-auto">
+            {/* Back button for own profile view */}
+            {isOwnProfile && (
+              <Button
+                variant="ghost"
+                onClick={() => window.history.back()}
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
+              >
+                <ArrowLeftIcon className="w-4 h-4" />
+                Back to Profile
+              </Button>
+            )}
+
+            <div className="space-y-6">
+              {/* Header Section */}
+              <Card className="border-0 shadow-xl bg-white">
+                <CardContent className="p-8">
+                  <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Profile Image & Basic Info */}
+                    <div className="flex flex-col items-center lg:items-start space-y-4">
+                      <div className="relative">
+                        <img
+                          src={lawyerData.avatar}
+                          alt={lawyerData.name}
+                          className="w-32 h-32 rounded-full border-4 border-purple-200 shadow-lg"
+                        />
+                        {lawyerData.verified && (
+                          <div className="absolute -bottom-2 -right-2 bg-purple-500 rounded-full p-2">
+                            <Shield className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-purple-600">
+                        <Wallet className="w-4 h-4" />
+                        <span className="text-sm font-mono">{lawyerData.walletAddress}</span>
+                      </div>
+                    </div>
+
+                    {/* Main Profile Info */}
+                    <div className="flex-1 space-y-4">
+                      <div>
+                        <h1 className="text-3xl font-bold text-gray-900">{lawyerData.name}</h1>
+                        <p className="text-xl text-purple-600 font-medium">{lawyerData.title}</p>
+                        <div className="flex items-center gap-2 text-gray-600 mt-2">
+                          <MapPin className="w-4 h-4" />
+                          <span>{lawyerData.location}</span>
+                        </div>
+                      </div>
+
+                      {/* Rating & Stats */}
+                      <div className="flex flex-wrap gap-6">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-5 h-5 ${
+                                  i < Math.floor(lawyerData.rating)
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="font-semibold">{lawyerData.rating}</span>
+                          <span className="text-gray-600">({lawyerData.totalReviews} reviews)</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Users className="w-4 h-4" />
+                          <span>{lawyerData.completedTasks} tasks completed</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Calendar className="w-4 h-4" />
+                          <span>{lawyerData.yearsExperience} years experience</span>
+                        </div>
+                      </div>
+
+                      {/* Badges */}
+                      <div className="flex flex-wrap gap-2">
+                        {lawyerData.badges.map((badge, index) => {
+                          const IconComponent = badge.icon;
+                          return (
+                            <span
+                              key={index}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color}`}
+                            >
+                              <IconComponent className="w-3 h-3 mr-1" />
+                              {badge.name}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      {/* Quick Stats */}
+                      <div className="grid grid-cols-3 gap-4 p-4 bg-gradient-to-r from-purple-50 to-yellow-50 rounded-lg">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">{lawyerData.verificationAccuracy}</div>
+                          <div className="text-sm text-gray-600">Verification Accuracy</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-yellow-600">{lawyerData.responseTime}</div>
+                          <div className="text-sm text-gray-600">Response Time</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">{lawyerData.avgCompletionTime}</div>
+                          <div className="text-sm text-gray-600">Avg. Completion Time</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col gap-3 lg:w-48">
+                      {isOwnProfile && (
+                        <Button 
+                          variant="outline" 
+                          className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                          onClick={() => window.history.back()}
+                        >
+                          Edit Profile
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Tabs Section */}
+              <div className="mt-8">
+                {/* Tabs Navigation */}
+                <div className="border-b border-gray-200 mb-6">
+                  <nav className="flex">
+                    {['overview', 'reviews', 'projects', 'credentials'].map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-12 py-4 text-sm font-medium border-b-2 ${
+                          activeTab === tab
+                            ? 'border-purple-600 text-purple-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-lg">
+                  {activeTab === 'overview' && (
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {/* About Card */}
+                      <Card className="bg-white border border-gray-100 shadow-sm">
+                        <CardContent className="p-6">
+                          <h3 className="text-xl font-semibold text-gray-900 mb-4">About</h3>
+                          <p className="text-gray-700 leading-relaxed mb-6">{lawyerData.bio}</p>
+                          
+                          <div>
+                            <h4 className="font-semibold mb-3">Specializations</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {lawyerData.specializations.map((spec, index) => (
+                                <span 
+                                  key={index} 
+                                  className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium"
+                                >
+                                  {spec}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Task Distribution Card */}
+                      <Card className="bg-white border border-gray-100 shadow-sm">
+                        <CardContent className="p-6">
+                          <h3 className="text-xl font-semibold text-gray-900 mb-4">Task Distribution</h3>
+                          <div className="space-y-4">
+                            {[
+                              { type: "Commercial Purchases", count: 45, percentage: 24 },
+                              { type: "Residential Sales", count: 67, percentage: 35 },
+                              { type: "Lease Agreements", count: 38, percentage: 20 },
+                              { type: "Contract Reviews", count: 39, percentage: 21 }
+                            ].map((task, index) => (
+                              <div key={index} className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="font-medium">{task.type}</span>
+                                  <span className="text-gray-600">{task.count} tasks</span>
+                                </div>
+                                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-purple-600" 
+                                    style={{ width: `${task.percentage}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+
+                  {activeTab === 'reviews' && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-gray-900">Client Reviews</h3>
+                        <div className="flex items-center gap-2">
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-4 h-4 ${
+                                  i < Math.floor(lawyerData.rating)
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {lawyerData.rating} out of 5 ({lawyerData.totalReviews} reviews)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[
+                          {
+                            id: 1,
+                            clientName: "David Chen",
+                            clientAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+                            rating: 5,
+                            date: "2024-01-15",
+                            comment: "Exceptional service on my commercial property acquisition. Sarah's expertise in Web3 contracts was invaluable.",
+                            taskType: "Commercial Property Purchase"
+                          },
+                          {
+                            id: 2,
+                            clientName: "Maria Rodriguez",
+                            clientAvatar: "https://images.unsplash.com/photo-1494790108755-2616b612b647?w=100&h=100&fit=crop&crop=face",
+                            rating: 5,
+                            date: "2024-01-10",
+                            comment: "Professional, thorough, and responsive. Made the complex process seamless.",
+                            taskType: "Residential Sale"
+                          },
+                          {
+                            id: 3,
+                            clientName: "James Wilson",
+                            clientAvatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+                            rating: 4,
+                            date: "2024-01-05",
+                            comment: "Great communication throughout the process. Highly recommend for property law matters.",
+                            taskType: "Lease Agreement Review"
+                          }
+                        ].map((review) => (
+                          <Card key={review.id} className="border border-gray-200 hover:shadow-lg transition-shadow">
+                            <CardContent className="p-6">
+                              <div className="flex items-center gap-3 mb-4">
+                                <img
+                                  src={review.clientAvatar}
+                                  alt={review.clientName}
+                                  className="w-12 h-12 rounded-full border-2 border-yellow-200"
+                                />
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-gray-900">{review.clientName}</h4>
+                                  <p className="text-sm text-gray-600">{review.taskType}</p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-4 h-4 ${
+                                        i < review.rating
+                                          ? 'fill-yellow-400 text-yellow-400'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <p className="text-gray-700 leading-relaxed mb-3">{review.comment}</p>
+                              <div className="text-sm text-gray-500">{new Date(review.date).toLocaleDateString()}</div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'projects' && (
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Projects</h3>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {[
+                          {
+                            title: "Downtown Commercial Complex Acquisition",
+                            type: "Commercial Real Estate",
+                            value: "$2.5M",
+                            status: "Completed",
+                            date: "Jan 2024"
+                          },
+                          {
+                            title: "Residential Property Portfolio Review",
+                            type: "Contract Analysis",
+                            value: "$500K",
+                            status: "Completed",
+                            date: "Dec 2023"
+                          },
+                          {
+                            title: "Web3 Property Token Launch",
+                            type: "Blockchain Legal",
+                            value: "$1.2M",
+                            status: "Completed",
+                            date: "Nov 2023"
+                          },
+                          {
+                            title: "Multi-Family Development Legal Support",
+                            type: "Development Law",
+                            value: "$3.8M",
+                            status: "Completed",
+                            date: "Oct 2023"
+                          }
+                        ].map((project, index) => (
+                          <div key={index} className="p-4 border border-purple-100 rounded-lg hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-semibold text-gray-900">{project.title}</h4>
+                              <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                {project.status}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">{project.type}</p>
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium text-yellow-600">{project.value}</span>
+                              <span className="text-gray-500">{project.date}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'credentials' && (
+                    <div className="space-y-8">
+                      {/* Project Statistics Cards */}
+                      <div className="grid md:grid-cols-3 gap-6">
+                        <Card className="border border-gray-200 bg-white">
+                          <CardContent className="p-6 text-center">
+                            <div className="text-4xl font-bold text-orange-500 mb-1">89</div>
+                            <div className="text-sm text-gray-600">Projects Posted</div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border border-gray-200 bg-white">
+                          <CardContent className="p-6 text-center">
+                            <div className="text-4xl font-bold text-green-500 mb-1">92%</div>
+                            <div className="text-sm text-gray-600">Completion Rate</div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border border-gray-200 bg-white">
+                          <CardContent className="p-6 text-center">
+                            <div className="text-4xl font-bold text-purple-500 mb-1">$2.8M</div>
+                            <div className="text-sm text-gray-600">Lifetime Value</div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {/* Education Card */}
+                        <Card className="bg-white border border-gray-100 shadow-sm">
+                          <CardContent className="p-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-6">Education</h3>
+                            <div className="space-y-6">
+                              {[
+                                { degree: "J.D. Law", school: "Stanford Law School", year: "2012" },
+                                { degree: "B.A. Economics", school: "UC Berkeley", year: "2009" }
+                              ].map((edu, index) => (
+                                <div key={index} className="pb-4 last:border-0">
+                                  <div className="flex justify-between items-center">
+                                    <h4 className="font-semibold text-gray-900">{edu.degree}</h4>
+                                    <span className="text-purple-600">{edu.year}</span>
+                                  </div>
+                                  <p className="text-gray-600">{edu.school}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                      </Card>
+                      
+                      {/* Certifications Card */}
+                      <Card className="bg-white border border-gray-100 shadow-sm">
+                        <CardContent className="p-6">
+                          <h3 className="text-xl font-semibold text-gray-900 mb-6">Certifications</h3>
+                          <div className="space-y-4">
+                            {[
+                              "Licensed Attorney - California State Bar",
+                              "Real Estate Law Specialist",
+                              "Blockchain Legal Expert"
+                            ].map((cert, index) => (
+                              <div key={index} className="flex items-start">
+                                <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                                <span className="text-gray-700">{cert}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default LawyerProfileView;

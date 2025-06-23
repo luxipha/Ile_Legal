@@ -178,7 +178,7 @@ export const AdminViewDetails = ({
           {gig.status === "pending" && (
             <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
               <AlertTriangle className="w-4 h-4 inline mr-1" />
-              Pending Review
+              Open for Bids {/* Display "Open for Bids" but backend status is still "pending" */}
             </span>
           )}
           {gig.status === "approved" && (
@@ -306,7 +306,7 @@ export const AdminViewDetails = ({
                           {bid.status === "pending" && (
                             <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
                               <AlertTriangle className="w-4 h-4 inline mr-1" />
-                              Pending
+                              Open {/* Display "Open" for pending bid status */}
                             </span>
                           )}
                           {bid.status === "accepted" && (

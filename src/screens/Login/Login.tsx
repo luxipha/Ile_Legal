@@ -2,13 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { EyeIcon, EyeOffIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon, ArrowLeftIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, ArrowLeftIcon } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-import { testDirectLogin } from "../../lib/supabaseLocal";
-import { AdminDebug } from "../../components/AdminDebug";
+import { TavusChat } from "../../components/TavusChat";
 
 export const Login = (): JSX.Element => {
-  const { login, user, isLoading, createTestUser, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
+  const { login, user, isLoading, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
@@ -373,101 +372,6 @@ export const Login = (): JSX.Element => {
                   {isLoading ? 'Connecting...' : 'Continue with Google'}
                 </Button>
 
-                {/* Test Admin Login Button */}
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      setIsSubmitting(true);
-                      // Fill the form
-                      const testCredentials = {
-                        email: "admin.test@ile-legal.com",
-                        password: "Password123!",
-                        rememberMe: true
-                      };
-                      setFormData(testCredentials);
-                      
-                      // Directly login
-                      console.log('Logging in with test credentials...');
-                      await login(testCredentials.email, testCredentials.password);
-                      // Redirection will be handled by the useEffect
-                    } catch (error) {
-                      console.error('Test login error:', error);
-                      setLoginError('Failed to login with test credentials');
-                    } finally {
-                      setIsSubmitting(false);
-                    }
-                  }}
-                  variant="outline"
-                  className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 bg-blue-50"
-                  disabled={isSubmitting || isLoading}
-                >
-                  {isSubmitting ? 'Logging in...' : 'Test Admin Login'}
-                </Button>
-
-                {/* Direct Test Login Button */}
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      setIsSubmitting(true);
-                      console.log('Attempting direct login...');
-                      
-                      const result = await testDirectLogin("admin.test@ile-legal.com", "Password123!");
-                      console.log('Direct login result:', result);
-                      
-                      if (result.data?.user) {
-                        alert('Direct login successful! Redirecting to dashboard...');
-                        navigate('/admin-dashboard');
-                      } else {
-                        const errorMessage = result.error ? result.error.message : 'Unknown error';
-                        alert(`Direct login failed: ${errorMessage}`);
-                      }
-                    } catch (error: any) {
-                      console.error('Error in direct login:', error);
-                      alert(`Error in direct login: ${error?.message || 'Unknown error'}`);
-                    } finally {
-                      setIsSubmitting(false);
-                    }
-                  }}
-                  variant="outline"
-                  className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 bg-yellow-50"
-                  disabled={isSubmitting || isLoading}
-                >
-                  {isSubmitting ? 'Logging in...' : 'Direct Test Login'}
-                </Button>
-                
-                {/* Create Test User Button */}
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      setIsSubmitting(true);
-                      console.log('Creating test user...');
-                      
-                      await createTestUser('admin');
-                      console.log('Test user created successfully');
-                      
-                      alert('Test user created successfully');
-                      // Always proceed since the function doesn't return success status anymore
-                      setFormData({
-                        email: "admin.test@ile-legal.com",
-                        password: "Password123!",
-                        rememberMe: true
-                      });
-                    } catch (error: any) {
-                      console.error('Error creating test user:', error);
-                      alert(`Error creating test user: ${error?.message || 'Unknown error'}`);
-                    } finally {
-                      setIsSubmitting(false);
-                    }
-                  }}
-                  variant="outline"
-                  className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 bg-green-50"
-                  disabled={isSubmitting || isLoading}
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Test Admin User'}
-                </Button>
               </div>
 
               {/* Sign Up Link */}
@@ -489,57 +393,13 @@ export const Login = (): JSX.Element => {
         </div>
       </div>
 
-      {/* Right Section - AI Customer Support */}
+      {/* Right Section - Tavus AI Video Chat */}
       <div className="w-1/2 bg-gradient-to-br from-[#1B1828] to-[#2a2438] flex items-center justify-center p-8">
-        <div className="text-center text-white max-w-md">
-          {/* AI Support Icon */}
-          <div className="w-32 h-32 mx-auto mb-8 bg-white/10 rounded-full flex items-center justify-center">
-            <div className="w-20 h-20 bg-[#FEC85F] rounded-full flex items-center justify-center">
-              <MessageCircleIcon className="w-10 h-10 text-[#1B1828]" />
-            </div>
-          </div>
-
-          <h2 className="text-3xl font-bold mb-4">Need Help?</h2>
-          <p className="text-gray-300 mb-8 text-lg leading-relaxed">
-            Our AI-powered customer support is here to assist you 24/7. Get instant answers to your questions about legal services, platform features, and more.
-          </p>
-
-          {/* AI Support Features */}
-          <div className="space-y-4 mb-8">
-            <div className="flex items-center gap-3 text-left">
-              <div className="w-8 h-8 bg-[#FEC85F] rounded-full flex items-center justify-center flex-shrink-0">
-                <HelpCircleIcon className="w-4 h-4 text-[#1B1828]" />
-              </div>
-              <span className="text-gray-300">Instant legal guidance</span>
-            </div>
-            <div className="flex items-center gap-3 text-left">
-              <div className="w-8 h-8 bg-[#FEC85F] rounded-full flex items-center justify-center flex-shrink-0">
-                <MessageCircleIcon className="w-4 h-4 text-[#1B1828]" />
-              </div>
-              <span className="text-gray-300">24/7 platform support</span>
-            </div>
-            <div className="flex items-center gap-3 text-left">
-              <div className="w-8 h-8 bg-[#FEC85F] rounded-full flex items-center justify-center flex-shrink-0">
-                <CheckCircleIcon className="w-4 h-4 text-[#1B1828]" />
-              </div>
-              <span className="text-gray-300">Quick problem resolution</span>
-            </div>
-          </div>
-
-          <Button 
-            className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-3 rounded-lg font-medium"
-          >
-            Start Chat with AI
-          </Button>
+        <div className="w-full max-w-md">
+          <TavusChat className="w-full" />
         </div>
       </div>
 
-      {/* Development Admin Debug Tool */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 left-4 max-w-sm">
-          <AdminDebug />
-        </div>
-      )}
     </div>
   );
 };

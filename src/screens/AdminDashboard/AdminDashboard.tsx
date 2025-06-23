@@ -16,7 +16,7 @@ import { AdminVerifyUser } from "./AdminVerifyUser";
 import { AdminManageGig } from "./AdminManageGig";
 import { AdminLayout } from "./AdminLayout";
 import { api } from "../../services/api";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth, User as AuthUser } from "../../contexts/AuthContext";
 
 export type ViewMode = "dashboard" | "verify-user" | "manage-gigs" | "disputes" | "settings" | "profile" | "view-gig-details" | "view-user-details";
 
@@ -72,7 +72,7 @@ export const AdminDashboard = (): JSX.Element => {
   const { getAllUsers, user: authUser, updateUserStatus } = useAuth();
 
   // Users state
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AuthUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
 
@@ -196,8 +196,14 @@ export const AdminDashboard = (): JSX.Element => {
     }
   };
 
-  const handleReviewGig = (gigId: number) => {
-    console.log(`Reviewing gig ${gigId}`);
+  const handleReviewGig = async (gigId: number) => {
+    try {
+      await api.admin.approveGig(gigId.toString());
+      setGigs(gigs => gigs.map(g => g.id === gigId ? { ...g, status: 'active' } : g));
+      console.log(`✅ Gig ${gigId} approved successfully`);
+    } catch (error) {
+      console.error('Error approving gig:', error);
+    }
   };
 
   const handleSuspendGig = async (gigId: number) => {
@@ -406,7 +412,7 @@ export const AdminDashboard = (): JSX.Element => {
               ) : (
                 <div className="space-y-4">
                   {users
-                    .filter(user => (user.status.toLowerCase() === "pending" || user.user_metadata?.status.toLowerCase() === "pending"))
+                    .filter(user => (user.status?.toLowerCase() === "pending" || user.user_metadata?.status?.toLowerCase() === "pending"))
                     .slice(0, 2)
                     .map((user) => (
                       <div key={user.id} className="border-b border-gray-100 pb-4">
@@ -449,7 +455,7 @@ export const AdminDashboard = (): JSX.Element => {
                         </div>
                       </div>
                     ))}
-                  {users.filter(user => (user.status.toLowerCase() === "pending" || user.user_metadata?.status.toLowerCase() === "pending")).length === 0 && (
+                  {users.filter(user => (user.status?.toLowerCase() === "pending" || user.user_metadata?.status?.toLowerCase() === "pending")).length === 0 && (
                     <div className="text-gray-500">No pending verifications.</div>
                   )}
                 </div>

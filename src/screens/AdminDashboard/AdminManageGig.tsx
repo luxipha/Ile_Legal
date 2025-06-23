@@ -76,7 +76,7 @@ export const AdminManageGig = ({
           {[
             { id: "all", label: "All Gigs" },
             { id: "active", label: "Active" },
-            { id: "pending", label: "Pending" },
+            { id: "pending", label: "Open" }, // Display "Open" but backend still uses "pending"
             { id: "completed", label: "Completed" },
             { id: "flagged", label: "Flagged" }
           ].map((tab) => (

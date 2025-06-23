@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { PaymentMethods } from "../../components/PaymentMethods";
@@ -8,6 +8,9 @@ import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { DisputeForm, DisputeData } from "../../components/DisputeForm/DisputeForm";
 import { useToast } from "../../components/ui/toast";
+import { useAuth } from "../../contexts/AuthContext";
+import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
+import { paymentIntegrationService } from "../../services/paymentIntegrationService";
 import { 
   TrendingUpIcon,
   TrendingDownIcon,
@@ -35,8 +38,10 @@ interface Transaction {
 }
 
 export const Earnings = (): JSX.Element => {
+  const { user } = useAuth();
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [disputeTransactionId, setDisputeTransactionId] = useState<number | null>(null);
+  const [walletData, setWalletData] = useState<UnifiedWalletData | null>(null);
   const { addToast } = useToast();
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
     {
@@ -48,6 +53,22 @@ export const Earnings = (): JSX.Element => {
       currency: "NGN"
     }
   ]);
+
+  // Load wallet data
+  useEffect(() => {
+    const loadWalletData = async () => {
+      if (user?.id) {
+        try {
+          const data = await getUserWalletData(user.id);
+          setWalletData(data);
+        } catch (error) {
+          console.error('Error loading wallet data:', error);
+        }
+      }
+    };
+
+    loadWalletData();
+  }, [user?.id]);
 
   const transactions: Transaction[] = [
     {
@@ -258,11 +279,13 @@ export const Earnings = (): JSX.Element => {
               {/* Payment Methods - 40% width (2 columns) */}
               <div className="col-span-2">
                 {/* Crypto Wallet */}
-                <Wallet 
-                  balance="125.00"
-                  address="0x742d1235f6b5c2c2"
-                  currency="USDC"
-                />
+                {walletData && (
+                  <Wallet 
+                    balance={walletData.balance}
+                    address={walletData.ethAddress || walletData.circleWalletAddress || ''}
+                    currency={walletData.currency}
+                  />
+                )}
                 
                 <div className="mt-6">
                   <PaymentMethods
@@ -284,6 +307,13 @@ export const Earnings = (): JSX.Element => {
         onClose={() => setShowWithdrawModal(false)}
         availableBalance="₦150,000"
         bankAccounts={bankAccounts}
+        walletAddress={walletData?.ethAddress || walletData?.circleWalletAddress}
+        hasWallet={walletData?.hasEthWallet || walletData?.hasCircleWallet || false}
+        userId={user?.id}
+        onWithdrawalSuccess={(withdrawalId, method) => {
+          console.log(`Withdrawal ${withdrawalId} via ${method} completed`);
+          addToast(`Withdrawal request submitted successfully via ${method}`, "success");
+        }}
       />
     </div>
   );

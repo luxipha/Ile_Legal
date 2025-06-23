@@ -160,18 +160,70 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
     return bidCount ?? bids.length;
   };
 
-  // Fetch bids using API (from first component)
+  // Fetch bids using API and enrich with seller profile data
   useEffect(() => {
     const fetchBids = async () => {
       if (activeTab === "bids" && api?.bids?.getBidsByGigId) {
         try {
           setLoading(true);
           setError(null);
-          const data = await api.bids.getBidsByGigId(gig.id);
-          setBids(data);
+          const bidsData = await api.bids.getBidsByGigId(gig.id);
+          
+          // Enrich bids with real seller profile data
+          const enrichedBids = await Promise.all(
+            bidsData.map(async (bid: any) => {
+              try {
+                // Get seller profile data from Profiles table (accessible to all users)
+                const { supabaseLocal } = await import('../../lib/supabaseLocal');
+                const { data: profileData } = await supabaseLocal
+                  .from('Profiles')
+                  .select('*')
+                  .eq('id', bid.seller_id)
+                  .single();
+                
+                if (profileData) {
+                  return {
+                    ...bid,
+                    seller: {
+                      full_name: profileData.name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Anonymous Seller',
+                      avatar: profileData.avatar_url || profileData.name?.charAt(0)?.toUpperCase() || 'S',
+                      rating: profileData.rating || 0,
+                      completed_jobs: profileData.completed_jobs || 0
+                    },
+                    title: profileData.title || 'Legal Professional'
+                  };
+                }
+                return {
+                  ...bid,
+                  seller: {
+                    full_name: 'Anonymous Seller',
+                    avatar: 'S',
+                    rating: 0,
+                    completed_jobs: 0
+                  },
+                  title: 'Legal Professional'
+                };
+              } catch (profileError) {
+                console.log('Could not load seller profile for bid:', bid.id);
+                return {
+                  ...bid,
+                  seller: {
+                    full_name: 'Anonymous Seller',
+                    avatar: 'S',
+                    rating: 0,
+                    completed_jobs: 0
+                  },
+                  title: 'Legal Professional'
+                };
+              }
+            })
+          );
+          
+          setBids(enrichedBids);
         } catch (err) {
           console.error('Error fetching bids:', err);
           setError('Failed to load bids. Please try again.');
+          setBids([]);
         } finally {
           setLoading(false);
         }
@@ -246,11 +298,24 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
     setIsLoadingMessages(true);
     
     try {
-      const conversation = await messagingService.getOrCreateConversation(
-        buyerId,
-        user.id,
-        gig.id
-      );
+      // Determine if current user is buyer or seller
+      const isCurrentUserBuyer = user.id === buyerId;
+      
+      let conversation;
+      if (isCurrentUserBuyer) {
+        // Current user is the buyer - need to specify which seller to message
+        // This case should redirect to Bids tab for seller selection
+        addToast?.("Please select a bidder from the Bids tab to start messaging", "info");
+        setActiveTab("bids");
+        return;
+      } else {
+        // Current user is a seller wanting to message the buyer
+        conversation = await messagingService.getOrCreateConversation(
+          buyerId,  // buyer_id
+          user.id,  // seller_id (current user)
+          gig.id
+        );
+      }
       
       setActiveConversation(conversation.id);
       
@@ -540,79 +605,152 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
 
           {activeTab === "messages" && (
             <div className="space-y-4">
-              {/* Messages */}
-              <div className="h-96 overflow-y-auto space-y-4 mb-6 border border-gray-200 rounded-lg bg-gray-50 p-4">
-                {isLoadingMessages ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B1828]"></div>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>No messages yet. Start the conversation!</p>
-                  </div>
-                ) : (
-                  messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                          message.sender === 'user'
-                            ? message.pending 
-                              ? 'bg-[#1B1828]/70 text-white' 
-                              : 'bg-[#1B1828] text-white'
-                            : 'bg-gray-100 text-gray-900'
-                        }`}
-                      >
-                        <p className="text-sm">{message.text}</p>
-                        <div className="flex items-center justify-between">
-                          <p className={`text-xs mt-1 ${
-                            message.sender === 'user' ? 'text-gray-300' : 'text-gray-500'
-                          }`}>
-                            {message.timestamp}
+              {(() => {
+                const buyerId = getBuyerId();
+                const isCurrentUserBuyer = user?.id === buyerId;
+                
+                if (isCurrentUserBuyer) {
+                  // Buyer view - show bidder list
+                  return (
+                    <>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-4">Bidder Messages</h3>
+                      {loading ? (
+                        <div className="text-center py-8">Loading conversations...</div>
+                      ) : bids.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <p>No bids yet. Once you receive bids, you can message bidders from the Bids tab.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <p className="text-gray-600 mb-4">
+                            To message a specific bidder, go to the Bids tab and click "Message" on their bid.
                           </p>
-                          {message.pending && (
-                            <span className="ml-2 text-xs text-gray-300">Sending...</span>
-                          )}
+                          <div className="grid gap-4">
+                            {bids.map((bid) => (
+                              <Card key={bid.id} className="border border-gray-200 hover:border-gray-300 transition-colors">
+                                <CardContent className="p-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
+                                        {bid.seller?.avatar || 'S'}
+                                      </div>
+                                      <div>
+                                        <h4 className="font-medium text-gray-900">
+                                          {bid.seller?.full_name || 'Anonymous Seller'}
+                                        </h4>
+                                        <p className="text-sm text-gray-600">
+                                          Bid: {typeof bid.amount === 'string' ? bid.amount : `₦${bid.amount?.toLocaleString()}`}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      onClick={() => setActiveTab("bids")}
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-[#1B1828] text-[#1B1828] hover:bg-[#1B1828]/10"
+                                    >
+                                      View & Message
+                                    </Button>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                } else {
+                  // Seller view - show direct messaging with buyer
+                  return (
+                    <>
+                      <div className="flex items-center gap-4 p-4 border-b border-gray-200 bg-[#1B1828]/5 mb-4">
+                        <div className="w-12 h-12 bg-[#FEC85F]/20 rounded-full flex items-center justify-center text-sm font-medium text-[#1B1828]">
+                          {gig.company?.charAt(0) || 'B'}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-[#1B1828]">{gig.company || 'Buyer'}</h4>
+                          <p className="text-gray-600">Gig Owner</p>
                         </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                      
+                      {/* Messages */}
+                      <div className="h-96 overflow-y-auto space-y-4 mb-6 border border-gray-200 rounded-lg bg-gray-50 p-4">
+                        {isLoadingMessages ? (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B1828]"></div>
+                          </div>
+                        ) : messages.length === 0 ? (
+                          <div className="flex items-center justify-center h-full text-gray-500">
+                            <p>No messages yet. Start the conversation!</p>
+                          </div>
+                        ) : (
+                          messages.map((message) => (
+                            <div
+                              key={message.id}
+                              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
+                                  message.sender === 'user'
+                                    ? message.pending 
+                                      ? 'bg-[#1B1828]/70 text-white' 
+                                      : 'bg-[#1B1828] text-white'
+                                    : 'bg-gray-100 text-gray-900'
+                                }`}
+                              >
+                                <p className="text-sm">{message.text}</p>
+                                <div className="flex items-center justify-between">
+                                  <p className={`text-xs mt-1 ${
+                                    message.sender === 'user' ? 'text-gray-300' : 'text-gray-500'
+                                  }`}>
+                                    {message.timestamp}
+                                  </p>
+                                  {message.pending && (
+                                    <span className="ml-2 text-xs text-gray-300">Sending...</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
 
-              {/* Message Input */}
-              <div className="flex items-end gap-3 p-4 border border-gray-200 rounded-lg">
-                <Button variant="ghost" size="sm" disabled={isSending}>
-                  <PaperclipIcon className="w-5 h-5 text-gray-400" />
-                </Button>
-                
-                <div className="flex-1">
-                  <textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className="w-full px-3 py-2 border-0 resize-none focus:outline-none"
-                    rows={1}
-                    disabled={isSending}
-                  />
-                </div>
-                
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || isSending}
-                  className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] p-2 relative"
-                >
-                  {isSending ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-4 h-4 border-2 border-b-transparent border-white rounded-full animate-spin"></div>
-                    </div>
-                  ) : (
-                    <SendIcon className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
+                      {/* Message Input */}
+                      <div className="flex items-end gap-3 p-4 border border-gray-200 rounded-lg">
+                        <Button variant="ghost" size="sm" disabled={isSending}>
+                          <PaperclipIcon className="w-5 h-5 text-gray-400" />
+                        </Button>
+                        
+                        <div className="flex-1">
+                          <textarea
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Type a message..."
+                            className="w-full px-3 py-2 border-0 resize-none focus:outline-none"
+                            rows={1}
+                            disabled={isSending}
+                          />
+                        </div>
+                        
+                        <Button
+                          onClick={handleSendMessage}
+                          disabled={!newMessage.trim() || isSending}
+                          className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] p-2 relative"
+                        >
+                          {isSending ? (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-4 h-4 border-2 border-b-transparent border-white rounded-full animate-spin"></div>
+                            </div>
+                          ) : (
+                            <SendIcon className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  );
+                }
+              })()}
             </div>
           )}
         </div>

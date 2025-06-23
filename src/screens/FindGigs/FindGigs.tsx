@@ -48,10 +48,17 @@ export const FindGigs = (): JSX.Element => {
     const fetchGigs = async () => {
       try {
         setLoading(true);
-        const data = await api.gigs.getAllGigs({
-          status: 'pending'
+        const data = await api.gigs.getAllGigs();
+        
+        // Filter to show only gigs available for bidding (not ongoing or completed)
+        const availableForBidding = data.filter(gig => {
+          const status = gig.status?.toLowerCase();
+          return status !== 'ongoing' && 
+                 status !== 'in progress' && 
+                 status !== 'completed' && 
+                 status !== 'closed';
         });
-        setGigs(data);
+        setGigs(availableForBidding);
         setError(null);
       } catch (err) {
         setError('Failed to fetch gigs. Please try again later.');

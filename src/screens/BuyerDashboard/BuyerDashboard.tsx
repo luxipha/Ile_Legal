@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { formatDate } from "../../utils/formatters";
 import { Header } from "../../components/Header";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -15,6 +16,7 @@ import {
   CheckCircleIcon
 } from "lucide-react";
 import { api } from "../../services/api";
+import { messagingService } from "../../services/messagingService";
 import { useAuth } from "../../contexts/AuthContext";
 
 type ViewMode = "dashboard" | "view-bids" | "view-details" | "view-deliverables";
@@ -22,7 +24,7 @@ type ViewMode = "dashboard" | "view-bids" | "view-details" | "view-deliverables"
 interface Gig {
   id: number;
   title: string;
-  status: "Active" | "In Progress" | "Completed";
+  status: "Active" | "Open" | "In Progress" | "Completed";
   statusColor: string;
   bidsReceived: number;
   budget: string;
@@ -48,6 +50,8 @@ interface CompletedGig {
   providerAvatar: string;
   amount: string;
   completedDate: string;
+  postedDate: string;
+  deadline: string;
   status: "Completed";
 }
 
@@ -91,14 +95,16 @@ export const BuyerDashboard = (): JSX.Element => {
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [selectedCompletedGig, setSelectedCompletedGig] = useState<CompletedGig | null>(null);
-  const [conversations, setConversations] = useState<StoredConversation[]>([]);
+  const [, setConversations] = useState<StoredConversation[]>([]);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
   // New state for gigs
   const [activeGigs, setActiveGigs] = useState<Gig[]>([]);
   const [inProgressGigs, setInProgressGigs] = useState<InProgressGig[]>([]);
   const [completedGigs, setCompletedGigs] = useState<CompletedGig[]>([]);
-  const [loadingGigs, setLoadingGigs] = useState(true);
+  const [, setLoadingGigs] = useState(true);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [stats, setStats] = useState({ inProgress: 0, active: 0, completed: 0 });
 
   useEffect(() => {
     if (!user?.id) return;
@@ -113,10 +119,11 @@ export const BuyerDashboard = (): JSX.Element => {
         const inProgress: InProgressGig[] = [];
         const completed: CompletedGig[] = [];
         gigs.forEach((gig: any) => {
-          if (gig.status.toLowerCase() === "active") {
+          if (gig.status?.toLowerCase() === "active" || gig.status?.toLowerCase() === "pending") {
             active.push({
               ...gig,
-              statusColor: "bg-green-100 text-green-800",
+              status: gig.status?.toLowerCase() === "pending" ? "Open" : gig.status, // Display "Open" for pending
+              statusColor: gig.status?.toLowerCase() === "pending" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800",
               bidsReceived: gig.bidsReceived || 0,
               budget: gig.budget,
               deadline: gig.deadline,
@@ -130,7 +137,7 @@ export const BuyerDashboard = (): JSX.Element => {
               projectsPosted: gig.projectsPosted || 0,
               is_flagged: gig.is_flagged || false
             });
-          } else if (gig.status.toLowerCase() === "in progress") {
+          } else if (gig.status?.toLowerCase() === "in progress") {
             inProgress.push({
               id: gig.id,
               title: gig.title,
@@ -141,7 +148,7 @@ export const BuyerDashboard = (): JSX.Element => {
               progress: gig.progress || 0,
               status: "In Progress"
             });
-          } else if (gig.status.toLowerCase() === "completed") {
+          } else if (gig.status?.toLowerCase() === "completed") {
             completed.push({
               id: gig.id,
               title: gig.title,
@@ -149,6 +156,8 @@ export const BuyerDashboard = (): JSX.Element => {
               providerAvatar: gig.providerAvatar || "",
               amount: gig.amount || gig.budget,
               completedDate: gig.completedDate || gig.deadline,
+              postedDate: gig.postedDate || gig.created_at || "",
+              deadline: gig.deadline || "",
               status: "Completed"
             });
           }
@@ -156,6 +165,48 @@ export const BuyerDashboard = (): JSX.Element => {
         setActiveGigs(active);
         setInProgressGigs(inProgress);
         setCompletedGigs(completed);
+        
+        // Calculate real stats
+        setStats({
+          inProgress: inProgress.length,
+          active: active.length,
+          completed: completed.length
+        });
+        
+        // Generate recent activity from real data
+        const activities: RecentActivity[] = [];
+        
+        // Add recent gigs as activities
+        [...active, ...inProgress, ...completed]
+          .sort((a, b) => {
+            const aDate = (a as any).postedDate || (a as any).created_at || (a as any).completedDate || '';
+            const bDate = (b as any).postedDate || (b as any).created_at || (b as any).completedDate || '';
+            return new Date(bDate).getTime() - new Date(aDate).getTime();
+          })
+          .slice(0, 3)
+          .forEach((gig, index) => {
+            if (gig.status?.toLowerCase() === 'active' || gig.status?.toLowerCase() === 'pending') {
+              activities.push({
+                id: index + 1,
+                type: 'posted',
+                title: 'You posted a new gig:',
+                subtitle: gig.title,
+                time: formatDate.full((gig as any).postedDate || (gig as any).created_at || ''),
+                icon: '🟡'
+              });
+            } else if (gig.status?.toLowerCase() === 'completed') {
+              activities.push({
+                id: index + 1,
+                type: 'completed',
+                title: 'Completed:',
+                subtitle: gig.title,
+                time: formatDate.full((gig as any).completedDate || (gig as any).created_at || ''),
+                icon: '🟢'
+              });
+            }
+          });
+        
+        setRecentActivity(activities);
       } catch (error) {
         console.error("Failed to fetch gigs:", error);
       } finally {
@@ -165,51 +216,43 @@ export const BuyerDashboard = (): JSX.Element => {
     fetchGigs();
   }, [user?.id]);
 
-  // Load conversations from localStorage on component mount
+  // Load real conversations using messaging API
   useEffect(() => {
-    const storedConversations = localStorage.getItem('buyerConversations');
-    if (storedConversations) {
+    if (!user?.id) return;
+    
+    const loadConversations = async () => {
       try {
-        setConversations(JSON.parse(storedConversations));
+        const realConversations = await messagingService.getConversations(user.id, 'buyer');
+        
+        // Convert to StoredConversation format
+        const formattedConversations: StoredConversation[] = realConversations.map((conv: any) => ({
+          id: conv.id,
+          name: conv.seller?.full_name || conv.seller?.first_name || 'Legal Professional',
+          lastMessage: conv.last_message?.content || 'No messages yet',
+          timestamp: conv.last_message?.created_at ? new Date(conv.last_message.created_at).toLocaleTimeString() : '',
+          gigTitle: conv.gig?.title,
+          messages: [] // Messages would be loaded when conversation is opened
+        }));
+        
+        setConversations(formattedConversations);
       } catch (error) {
-        console.error('Error parsing stored conversations:', error);
+        console.error('Failed to load conversations:', error);
+        // Fallback to localStorage for now
+        const storedConversations = localStorage.getItem('buyerConversations');
+        if (storedConversations) {
+          try {
+            setConversations(JSON.parse(storedConversations));
+          } catch (parseError) {
+            console.error('Error parsing stored conversations:', parseError);
+          }
+        }
       }
-    }
-  }, []);
-  
-  // Save conversations to localStorage whenever they change
-  useEffect(() => {
-    if (conversations.length > 0) {
-      localStorage.setItem('buyerConversations', JSON.stringify(conversations));
-    }
-  }, [conversations]);
+    };
+    
+    loadConversations();
+  }, [user?.id]);
 
-  const recentActivity: RecentActivity[] = [
-    {
-      id: 1,
-      type: "posted",
-      title: "You posted a new gig:",
-      subtitle: "Land Title Verification",
-      time: "2 hours ago",
-      icon: "🟡"
-    },
-    {
-      id: 2,
-      type: "bid_received",
-      title: "New bid received on:",
-      subtitle: "Contract Review",
-      time: "5 hours ago",
-      icon: "🔵"
-    },
-    {
-      id: 3,
-      type: "completed",
-      title: "Completed:",
-      subtitle: "Regulatory Compliance Check",
-      time: "1 day ago",
-      icon: "🟢"
-    }
-  ];
+  // recentActivity is now managed by state and loaded from real data
 
   const handleViewBids = (gigId: number) => {
     const gig = activeGigs.find(g => g.id === gigId);
@@ -249,16 +292,7 @@ export const BuyerDashboard = (): JSX.Element => {
     }
   };
 
-  const handleSubmitFeedback = (gigId: number, rating: number, feedback: string) => {
-    // In a real app, this would send the feedback to an API
-    console.log("Submitting feedback for gig:", gigId, "Rating:", rating, "Feedback:", feedback);
-    
-    // Close the modal after submission
-    setFeedbackModalOpen(false);
-    
-    // Show a success message (in a real app, you'd use a toast notification)
-    alert("Feedback submitted successfully!");
-  };
+  // Feedback is now handled directly in the LeaveFeedback component
 
   const handleMessageProvider = (providerId: string) => {
     navigate("/buyer-messages", { state: { providerId } });
@@ -279,12 +313,12 @@ export const BuyerDashboard = (): JSX.Element => {
 
         {/* Main Content - View Bids */}
         <div className="flex-1 flex flex-col">
-          <Header title="View Bids" userName="Demo Client" userType="buyer" />
+          <Header title="View Bids" userType="buyer" />
 
           {/* View Bids Content */}
           <main className="flex-1 p-6">
             <ViewBids
-              gig={selectedGig}
+              gig={{...selectedGig, id: selectedGig.id.toString()}}
               onBack={handleBackToDashboard}
               backButtonText="Back to Dashboard"
             />
@@ -305,15 +339,15 @@ export const BuyerDashboard = (): JSX.Element => {
 
         {/* Main Content - View Deliverables */}
         <div className="flex-1 flex flex-col">
-          <Header title="View Deliverables" userName="Demo Client" userType="buyer" />
+          <Header title="View Deliverables" userType="buyer" />
 
           {/* View Deliverables Content */}
           <main className="flex-1 p-6">
             <ViewDeliverables
               gigId={selectedCompletedGig.id}
               gigTitle={selectedCompletedGig.title}
-              postedDate="12/04/2025" // In a real app, you'd have this data
-              deadline="25/04/2025"
+              postedDate={selectedCompletedGig.postedDate}
+              deadline={selectedCompletedGig.deadline}
               budget={selectedCompletedGig.amount}
               status={selectedCompletedGig.status}
               provider={{
@@ -347,8 +381,8 @@ export const BuyerDashboard = (): JSX.Element => {
               </span>
             </div>
 
-            {/* Bids Received (only for active gigs) */}
-            {gig.status === "Active" && (
+            {/* Bids Received (only for active/open gigs) */}
+            {(gig.status === "Active" || gig.status === "Open") && (
               <div className="mb-6">
                 <span className="text-blue-600 font-medium text-sm">{gig.bidsReceived} bids received</span>
               </div>
@@ -372,7 +406,7 @@ export const BuyerDashboard = (): JSX.Element => {
 
           {/* Right Action Buttons - 25% */}
           <div className="flex flex-col gap-3 justify-center min-w-[140px]">
-            {gig.status === "Active" && (
+            {(gig.status === "Active" || gig.status === "Open") && (
               <Button 
                 onClick={() => handleViewBids(gig.id)}
                 className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2 rounded-full w-full"
@@ -527,7 +561,6 @@ export const BuyerDashboard = (): JSX.Element => {
           provider={selectedCompletedGig.provider}
           providerAvatar={selectedCompletedGig.providerAvatar}
           completedDate={selectedCompletedGig.completedDate}
-          onSubmit={handleSubmitFeedback}
         />
       )}
       
@@ -536,7 +569,7 @@ export const BuyerDashboard = (): JSX.Element => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header title="Dashboard" userName="Demo Client" userType="buyer" />
+        <Header title="Dashboard" userType="buyer" />
 
         {/* Dashboard Content */}
         <main className="flex-1 p-6">
@@ -565,7 +598,7 @@ export const BuyerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">In Progress</div>
-                    <div className="text-2xl font-bold text-gray-900">1</div>
+                    <div className="text-2xl font-bold text-gray-900">{stats.inProgress}</div>
                   </div>
                 </div>
               </CardContent>
@@ -579,7 +612,7 @@ export const BuyerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Active Gigs</div>
-                    <div className="text-2xl font-bold text-gray-900">2</div>
+                    <div className="text-2xl font-bold text-gray-900">{stats.active}</div>
                   </div>
                 </div>
               </CardContent>
@@ -593,7 +626,7 @@ export const BuyerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Completed</div>
-                    <div className="text-2xl font-bold text-gray-900">12</div>
+                    <div className="text-2xl font-bold text-gray-900">{stats.completed}</div>
                   </div>
                 </div>
               </CardContent>
