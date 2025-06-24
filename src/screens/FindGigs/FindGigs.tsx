@@ -55,10 +55,12 @@ export const FindGigs = (): JSX.Element => {
     const fetchGigs = async () => {
       try {
         setLoading(true);
-        const data = await api.gigs.getAllGigs({
-          status: 'pending'
-        });
-        setGigs(data);
+        // Fetch both 'pending' and 'paused' gigs, then combine
+        const [pendingGigs, pausedGigs] = await Promise.all([
+          api.gigs.getAllGigs({ status: 'pending' }),
+          api.gigs.getAllGigs({ status: 'paused' })
+        ]);
+        setGigs([...pendingGigs, ...pausedGigs]);
         setError(null);
       } catch (err) {
         setError('Failed to fetch gigs. Please try again later.');
@@ -411,6 +413,13 @@ export const FindGigs = (): JSX.Element => {
                         }`}>
                           {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
                         </span>
+                        <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          (gig.status || '').toLowerCase() === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          (gig.status || '').toLowerCase() === 'paused' ? 'bg-gray-200 text-gray-700' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {gig.status ? gig.status.charAt(0).toUpperCase() + gig.status.slice(1) : ''}
+                        </span>
                       </div>
                       
                       <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{gig.title}</h3>
@@ -454,6 +463,13 @@ export const FindGigs = (): JSX.Element => {
                               'bg-gray-100 text-gray-800'
                             }`}>
                               {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
+                            </span>
+                            <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              (gig.status || '').toLowerCase() === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              (gig.status || '').toLowerCase() === 'paused' ? 'bg-gray-200 text-gray-700' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {gig.status ? gig.status.charAt(0).toUpperCase() + gig.status.slice(1) : ''}
                             </span>
                             <span className="text-sm text-gray-500">
                               Posted {gig.created_at ? new Date(gig.created_at).toLocaleDateString() : gig.postedDate || 'Unknown'}
