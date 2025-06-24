@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabaseLocal as supabase } from '../lib/supabaseLocal';
 import { getUserWalletData } from './unifiedWalletService';
 import { SettingsService } from './settingsService';
 

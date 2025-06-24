@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabaseLocal as supabase } from '../lib/supabaseLocal';
 
 interface PaymentProvider {
   name: string;

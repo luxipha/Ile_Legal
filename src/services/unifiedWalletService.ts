@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabaseLocal as supabase } from '../lib/supabaseLocal';
 import { getUserWallet } from './walletService';
 
 export interface UnifiedWalletData {
@@ -35,7 +35,9 @@ export const getUserWalletData = async (userId: string): Promise<UnifiedWalletDa
     if (profile?.circle_wallet_id) {
       try {
         const walletData = await getUserWallet(userId);
-        circleBalance = walletData?.balance || '0.00';
+        // Extract USD balance from balances array
+        const usdBalance = walletData?.balances?.find((b: { currency: string; amount: string }) => b.currency === 'USD');
+        circleBalance = usdBalance?.amount || '0.00';
       } catch (error) {
         console.log('Could not fetch Circle wallet balance:', error);
       }
