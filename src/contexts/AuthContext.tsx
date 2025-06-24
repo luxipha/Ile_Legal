@@ -5,15 +5,28 @@ import * as circleSdk from '../services/circleSdk';
 // User types
 type UserRole = 'buyer' | 'seller' | 'admin';
 
+interface Education {
+  degree: string;
+  institution: string;
+  period: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   isVerified: boolean;
+  status?: string;
   user_metadata: {
+    firstName?: string;
+    lastName?: string;
     phone?: string;
     address?: string;
+    title?: string;
+    about?: string;
+    specializations?: string[];
+    education?: Education[];
     profile_picture?: string;
     role_title?: string;
     clearance_level?: string;
@@ -389,10 +402,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             name: name,
             role_title: role,
             role: role,
-            email_verified: false
+            email_verified: true
           }
         },
       });
+      
+      console.log('Supabase signup response:', { data, error });
       
       if (error) {
         console.error('Error signing up:', error);
@@ -420,10 +435,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           const userId = newUser.id; // Store in variable to satisfy TypeScript
           const walletDescription = `${newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)} wallet for ${newUser.name}`;
-          const wallet = await circleSdk.createWallet(userId, walletDescription);
+          const wallet = await circleSdk.createWallet(newUser.id, walletDescription);
           
-          if (!wallet) {
-            throw new Error('Failed to create Circle wallet');
+          if (!wallet?.walletId) {
+            throw new Error('Failed to create Circle wallet - no wallet ID returned');
           }
           
           console.log('Circle wallet created:', wallet.walletId);
@@ -431,7 +446,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Generate a wallet address
           const addressData = await circleSdk.generateWalletAddress(wallet.walletId);
           
-          if (!addressData) {
+          if (!addressData?.address) {
             throw new Error('Failed to generate wallet address');
           }
           
@@ -498,15 +513,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Register user with Supabase Auth
       const signUpResult = await signUpNewUser(email, name, password, role);
       const userId = signUpResult?.user?.id;
-      if (userId) {
-        // Insert into profiles table
+      
+      if (userId && signUpResult?.session) {
+        // Set the session to authenticate the user before inserting into profiles
+        await supabase.auth.setSession(signUpResult.session);
+        
+        // Insert into profiles table with authenticated context
         const { error: profileError } = await supabase.from('Profiles').insert([
           {
             id: userId,
-            name,
+            first_name: name.split(' ')[0] || '',
+            last_name: name.split(' ').slice(1).join(' ') || '',
             email,
-            role_title: role,
-            email_verified: false
+            user_type: role,
+            verification_status: 'pending'
           }
         ]);
         if (profileError) {
@@ -530,12 +550,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('ileUser', JSON.stringify(newUser));
       localStorage.setItem('ileToken', mockToken);
       
-      const signupData = await signUpNewUser(email, name, password, role);
-      
       // Update ethAddress if wallet was created during signup
-      if (signupData?.user?.user_metadata?.circle_wallet_address) {
-        setEthAddress(signupData.user.user_metadata.circle_wallet_address);
-        localStorage.setItem('ileEthAddress', signupData.user.user_metadata.circle_wallet_address);
+      if (signUpResult?.user?.user_metadata?.circle_wallet_address) {
+        setEthAddress(signUpResult.user.user_metadata.circle_wallet_address);
+        localStorage.setItem('ileEthAddress', signUpResult.user.user_metadata.circle_wallet_address);
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -589,12 +607,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     if (authUser) {
       // Update the profiles table
+      const userName = authUser.user_metadata?.name || '';
       const { error: profileUpdateError } = await supabase.from('Profiles').update({
-        name: authUser.user_metadata?.name,
+        first_name: userName.split(' ')[0] || '',
+        last_name: userName.split(' ').slice(1).join(' ') || '',
         email: authUser.email,
-        role_title: authUser.user_metadata?.role_title,
-        email_verified: authUser.user_metadata?.email_verified,
-        profile_picture: authUser.user_metadata?.profile_picture
+        user_type: authUser.user_metadata?.role_title || authUser.user_metadata?.role,
+        verification_status: authUser.user_metadata?.email_verified ? 'verified' : 'pending',
+        avatar_url: authUser.user_metadata?.profile_picture
       }).eq('id', authUser.id);
       if (profileUpdateError) {
         console.error('Error updating profiles table:', profileUpdateError);
@@ -693,12 +713,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         if (userData) {
-          // User exists, update session
+          // User exists, update session and ensure ETH address is stored
+          await supabase
+            .from('Profiles')
+            .update({ eth_address: address })
+            .eq('id', userData.id);
+          
           const updatedUser: User = {
             id: userData.id,
             name: userData.name || `ETH User ${address.substring(0, 6)}`,
             email: userData.email || '',
-            role: (userData.role_title as UserRole) || (userData.role as UserRole) || 'buyer',
+            role: (userData.user_type as UserRole) || 'buyer',
             isVerified: true, // ETH users are considered verified
             user_metadata: {
               ...userData,
@@ -751,6 +776,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             
             if (newUser?.user) {
+              // Insert profile for new MetaMask user
+              await supabase.from('Profiles').insert([
+                {
+                  id: newUser.user.id,
+                  first_name: `Ethereum User ${address.slice(0, 6)}`,
+                  last_name: '',
+                  email: newUser.user.email || '',
+                  user_type: role,
+                  verification_status: 'verified',
+                  eth_address: address
+                }
+              ]);
+              
               const createdUser: User = {
                 id: newUser.user.id,
                 name: `Ethereum User ${address.slice(0, 6)}`,
@@ -853,7 +891,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let query = supabase.from('Profiles').select('*');
     if (sellers) {
-      query = query.eq('role_title', 'seller');
+      query = query.eq('user_type', 'seller');
     }
 
     const { data, error } = await query;
@@ -867,12 +905,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return data.map((userData: any) => ({
       id: userData.id,
-      name: userData.name,
+      name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
       email: userData.email,
-      role: userData.role_title as UserRole,
-      isVerified: userData.email_verified,
-      user_metadata: userData.user_metadata,
-      status: userData.status
+      role: userData.user_type as UserRole,
+      isVerified: userData.verification_status === 'verified',
+      user_metadata: userData.user_metadata || {},
+      status: userData.status || userData.verification_status || 'pending'
     }));
   };
 

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Account Registration Helper</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #007bff; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; width: 100%; }
+        button:hover { background: #0056b3; }
+        .result { margin: 15px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Admin Account Registration Helper</h1>
+    <p>Use this to create and configure admin accounts for your Ile Legal platform.</p>
+    
+    <div id="result"></div>
+    
+    <form id="adminForm">
+        <div class="form-group">
+            <label for="email">Admin Email:</label>
+            <input type="email" id="email" required placeholder="admin@ile-legal.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" required minlength="6" placeholder="Min 6 characters">
+        </div>
+        
+        <div class="form-group">
+            <label for="name">Full Name:</label>
+            <input type="text" id="name" required placeholder="Admin User">
+        </div>
+        
+        <button type="submit">Create Admin Account</button>
+    </form>
+    
+    <hr style="margin: 30px 0;">
+    
+    <h2>📋 Quick Setup Instructions</h2>
+    <ol>
+        <li><strong>Option 1 - Use this form:</strong> Fill out the form above to create a new admin account</li>
+        <li><strong>Option 2 - Use existing account:</strong> Run the SQL script below to fix your current account</li>
+        <li><strong>Option 3 - Register manually:</strong> 
+            <ul>
+                <li>Go to your app's registration page</li>
+                <li>Register with: <code>admin@ile-legal.com</code> / <code>AdminPass123</code></li>
+                <li>Then run the SQL update script</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>🗄️ SQL Script to Fix Current Account</h3>
+    <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
+-- Fix current admin.test@ile-legal.com account
+UPDATE auth.users 
+SET user_metadata = jsonb_set(
+    jsonb_set(user_metadata, '{role}', '"admin"'),
+    '{role_title}', '"admin"'
+)
+WHERE email = 'admin.test@ile-legal.com';
+
+-- Verify the update worked
+SELECT email, user_metadata->>'role' as role, user_metadata->>'role_title' as role_title
+FROM auth.users 
+WHERE email = 'admin.test@ile-legal.com';
+    </pre>
+
+    <script type="module">
+        // Import Supabase client
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        // Initialize Supabase (you'll need to update these)
+        const supabaseUrl = 'http://localhost:54321'; // Your local Supabase URL
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'; // Your anon key
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        document.getElementById('adminForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const name = document.getElementById('name').value;
+            
+            try {
+                showResult('Creating admin account...', 'info');
+                
+                // Register the user
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: {
+                            name: name,
+                            role: 'admin',
+                            role_title: 'admin',
+                            email_verified: true
+                        }
+                    }
+                });
+                
+                if (authError) {
+                    throw authError;
+                }
+                
+                if (authData.user) {
+                    showResult(`
+                        ✅ Admin account created successfully!<br>
+                        <strong>Email:</strong> ${email}<br>
+                        <strong>Password:</strong> ${password}<br>
+                        <strong>User ID:</strong> ${authData.user.id}<br><br>
+                        You can now login with these credentials and access admin features.
+                    `, 'success');
+                    
+                    // Clear the form
+                    document.getElementById('adminForm').reset();
+                } else {
+                    showResult('⚠️ Account created but please check your email for verification.', 'info');
+                }
+                
+            } catch (error) {
+                console.error('Error creating admin account:', error);
+                showResult(`❌ Error creating admin account: ${error.message}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

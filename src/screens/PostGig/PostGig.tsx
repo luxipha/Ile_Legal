@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { getAllCategoryOptions } from "../../config/categories";
 
 interface AttachedFile {
   id: string;
@@ -34,20 +35,7 @@ export const PostGig = (): JSX.Element => {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const categoryOptions = [
-    { value: "land-title", label: "Land Title Verification" },
-    { value: "contract-review", label: "Contract Review" },
-    { value: "property-survey", label: "Property Survey" },
-    { value: "due-diligence", label: "Due Diligence" },
-    { value: "legal-documentation", label: "Legal Documentation" },
-    { value: "compliance-check", label: "Compliance Check" },
-    { value: "c-of-o", label: "C of O Processing" },
-    { value: "real-estate-law", label: "Real Estate Law" },
-    { value: "family-law", label: "Family Law" },
-    { value: "business-law", label: "Business Law" },
-    { value: "immigration-law", label: "Immigration Law" },
-    { value: "other", label: "Other" }
-  ];
+  const categoryOptions = getAllCategoryOptions();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

@@ -1,13 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { ArrowLeftIcon, MessageSquareIcon, SendIcon } from "lucide-react";
+import { api } from "../../services/api";
+import { messagingService } from "../../services/messagingService";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface Provider {
   name: string;
   avatar: string;
   rating: number;
   projectsPosted: number;
+}
+
+interface Deliverable {
+  id: string;
+  name: string;
+  size: string;
+  uploadDate: string;
+  url?: string;
+}
+
+interface Message {
+  id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  sender: 'user' | 'provider';
 }
 
 interface ViewDeliverablesProps {
@@ -23,7 +42,7 @@ interface ViewDeliverablesProps {
 }
 
 export const ViewDeliverables = ({
-  // gigId is used for API calls in a real implementation
+  gigId,
   gigTitle,
   postedDate,
   deadline,
@@ -31,45 +50,96 @@ export const ViewDeliverables = ({
   status,
   provider,
   onBack,
-  // onMessage is used in the message sending functionality
+  onMessage: _onMessage,
 }: ViewDeliverablesProps) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"details" | "bids" | "deliverables" | "messages">("messages");
   const [messageText, setMessageText] = useState("");
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingDeliverables, setLoadingDeliverables] = useState(false);
 
-  const handleSendMessage = () => {
-    if (messageText.trim()) {
-      console.log("Sending message:", messageText);
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !conversationId || !user?.id) return;
+    
+    setLoading(true);
+    try {
+      await messagingService.sendMessage(conversationId, user.id, messageText);
       setMessageText("");
-      // In a real app, this would send the message to an API
+      // Messages will be updated via real-time subscription
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Mock messages for demonstration
-  const messages = [
-    {
-      id: 1,
-      sender: "provider",
-      text: "Hello! I've completed the Property Lease Agreement draft as requested. Please review the deliverables and let me know if you need any revisions.",
-      time: "10:30 AM",
-      date: "Today"
-    }
-  ];
+  // Load deliverables and setup messaging on component mount
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const initializeData = async () => {
+      // Load deliverables
+      setLoadingDeliverables(true);
+      try {
+        const submissionsData = await api.submissions.getSubmissionsByGig(gigId.toString());
+        const formattedDeliverables: Deliverable[] = submissionsData.flatMap((submission: any) => 
+          submission.deliverables.map((filename: string, index: number) => ({
+            id: `${submission.id}-${index}`,
+            name: filename,
+            size: '-- MB', // Size would need to be stored in submission data
+            uploadDate: new Date(submission.created_at).toLocaleDateString(),
+            url: submission.storage_type === 'ipfs' ? 
+              `https://ipfs.io/ipfs/${filename}` : 
+              `/api/download/${filename}`
+          }))
+        );
+        setDeliverables(formattedDeliverables);
+      } catch (error) {
+        console.log('Could not load deliverables:', error);
+        setDeliverables([]);
+      } finally {
+        setLoadingDeliverables(false);
+      }
 
-  // Mock deliverables for demonstration
-  const deliverables = [
-    {
-      id: 1,
-      name: "Property Lease Agreement - Final Draft.pdf",
-      size: "2.4 MB",
-      uploadDate: "28/04/2025"
-    },
-    {
-      id: 2,
-      name: "Lease Terms Summary.docx",
-      size: "1.1 MB",
-      uploadDate: "28/04/2025"
-    }
-  ];
+      // Setup conversation - Get real conversation for this gig
+      try {
+        // Get the gig details to find the assigned seller
+        const gigData = await api.gigs.getGigById(gigId.toString());
+        if (gigData && gigData.length > 0 && gigData[0].seller_id) {
+          const gig = gigData[0];
+          // Get or create conversation between buyer and seller
+          const conversation = await messagingService.getOrCreateConversation(
+            user.id,
+            gig.seller_id,
+            gigId.toString()
+          );
+          setConversationId(conversation.id);
+          
+          // Load real messages for this conversation
+          const messagesData = await messagingService.getMessages(conversation.id);
+          const formattedMessages = messagesData.map((msg: any) => ({
+            id: msg.id,
+            sender_id: msg.sender_id,
+            content: msg.content,
+            created_at: msg.created_at,
+            sender: (msg.sender_id === user.id ? 'user' : 'provider') as 'user' | 'provider'
+          }));
+          setMessages(formattedMessages);
+        } else {
+          console.log('No seller assigned to this gig yet');
+          setMessages([]);
+        }
+      } catch (error) {
+        console.log('Could not load conversation data:', error);
+        setMessages([]);
+      }
+    };
+    
+    initializeData();
+  }, [user?.id, gigId]);
 
   return (
     <div className="w-1/2 mx-auto">
@@ -175,8 +245,10 @@ export const ViewDeliverables = ({
                           ? "bg-gray-100" 
                           : "bg-[#1B1828]/10"
                       }`}>
-                        <p>{message.text}</p>
-                        <p className="text-xs text-gray-500 mt-1">{message.time} · {message.date}</p>
+                        <p>{message.content}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
                     </div>
                   ))
@@ -200,10 +272,11 @@ export const ViewDeliverables = ({
                 />
                 <Button 
                   onClick={handleSendMessage}
-                  className="bg-[#1B1828] hover:bg-[#2D2A3C]"
+                  disabled={loading || !messageText.trim()}
+                  className="bg-[#1B1828] hover:bg-[#2D2A3C] disabled:opacity-50"
                 >
                   <SendIcon className="w-4 h-4" />
-                  <span className="ml-2">Send</span>
+                  <span className="ml-2">{loading ? 'Sending...' : 'Send'}</span>
                 </Button>
               </div>
             </div>
@@ -246,24 +319,42 @@ export const ViewDeliverables = ({
           <div className="border border-gray-200 rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4">Deliverables</h2>
             
-            <div className="space-y-4">
-              {deliverables.map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+            {loadingDeliverables ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">Loading deliverables...</div>
+              </div>
+            ) : deliverables.length > 0 ? (
+              <div className="space-y-4">
+                {deliverables.map((file) => (
+                  <div key={file.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="font-medium">{file.name}</p>
+                        <p className="text-sm text-gray-500">{file.size} · Uploaded on {file.uploadDate}</p>
+                      </div>
                     </div>
-                    <div className="ml-4">
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-sm text-gray-500">{file.size} · Uploaded on {file.uploadDate}</p>
-                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => file.url && window.open(file.url, '_blank')}
+                    >
+                      Download
+                    </Button>
                   </div>
-                  <Button variant="outline">Download</Button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8 text-gray-500">
+                <div className="text-center">
+                  <p className="text-lg font-medium">No deliverables yet</p>
+                  <p>Deliverables will appear here once submitted by the provider.</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -17,7 +17,9 @@ import {
   XIcon,
   BriefcaseIcon,
   MessageSquareIcon,
-  CreditCardIcon
+  CreditCardIcon,
+  GridIcon,
+  ListIcon
 } from "lucide-react";
 import { MultiSelectDropdown } from "../../components/ui/MultiSelectDropdown";
 
@@ -59,6 +61,7 @@ export const MyGigs = (): JSX.Element => {
   const [selectedFilter, setSelectedFilter] = useState("All Gigs");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [gridViewMode, setGridViewMode] = useState<"grid" | "list">("grid");
   const [isDragOver, setIsDragOver] = useState(false);
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -798,9 +801,28 @@ export const MyGigs = (): JSX.Element => {
                 <Button variant="outline" size="sm">
                   <TrashIcon className="w-4 h-4" />
                 </Button>
-                <Button variant="outline" size="sm">
-                  <FileTextIcon className="w-4 h-4" />
-                </Button>
+                
+                {/* View Toggle Buttons */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600 mr-2">View:</span>
+                  <Button
+                    variant={gridViewMode === "grid" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setGridViewMode("grid")}
+                    className={gridViewMode === "grid" ? "bg-[#1B1828] text-white" : ""}
+                  >
+                    <GridIcon className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={gridViewMode === "list" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setGridViewMode("list")}
+                    className={gridViewMode === "list" ? "bg-[#1B1828] text-white" : ""}
+                  >
+                    <ListIcon className="w-4 h-4" />
+                  </Button>
+                </div>
+                
                 <Link to="/post-gig">
                   <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-3">
                     <PlusIcon className="w-4 h-4 mr-2" />
@@ -843,78 +865,126 @@ export const MyGigs = (): JSX.Element => {
 
             {/* Gigs List */}
             {filteredGigs.length > 0 ? (
-              <div className="space-y-6">
-                {filteredGigs.map((gig) => (
-                  <Card key={gig.id} className="border border-gray-200 hover:border-gray-300 transition-colors rounded-xl">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-xl font-semibold text-gray-900">{gig.title}</h3>
-                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${gig.statusColor}`}>
-                              {gig.status}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-4 mb-3">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                              {gig.category}
-                            </span>
-                            <span className="text-sm text-gray-600">Posted: {gig.postedDate}</span>
-                            <span className="text-sm text-gray-600">Deadline: {gig.deadline}</span>
-                          </div>
-
-                          <p className="text-gray-600 mb-4 line-clamp-2">{gig.description}</p>
-
-                          <div className="flex items-center gap-8">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-gray-900">{gig.orders}</div>
-                              <div className="text-xs text-gray-600">Orders</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-gray-900">{gig.rating}</div>
-                              <div className="text-xs text-gray-600">Rating</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold text-gray-900">{gig.views}</div>
-                              <div className="text-xs text-gray-600">Views</div>
-                            </div>
-                          </div>
-
-                          <div className="mt-4">
-                            <div className="text-2xl font-bold text-green-600">Starting at {gig.budget}</div>
-                          </div>
+              gridViewMode === "grid" ? (
+                /* Grid View */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredGigs.map((gig) => (
+                    <Card key={gig.id} className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="mb-4">
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${gig.statusColor}`}>
+                            {gig.status}
+                          </span>
                         </div>
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={() => handleViewGig(gig)}
-                          className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2"
-                        >
-                          View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleEditGig(gig)}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
-                        >
-                          Edit
-                        </Button>
-                        {!(String(gig.status).toLowerCase() === "active" || String(gig.status).toLowerCase() === "completed" || String(gig.status).toLowerCase() === "suspended") && (
+                        
+                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{gig.title}</h3>
+                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">{gig.description}</p>
+                        
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                          <span>Deadline: {gig.deadline}</span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-lg font-bold text-green-600">{gig.budget}</span>
+                          <span className="text-sm text-gray-600">{gig.orders} orders</span>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleViewGig(gig)}
+                            size="sm"
+                            className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white flex-1"
+                          >
+                            View
+                          </Button>
                           <Button
                             variant="outline"
-                            onClick={() => handlePauseGig(gig)}
+                            onClick={() => handleEditGig(gig)}
+                            size="sm"
+                            className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                /* List View */
+                <div className="space-y-6">
+                  {filteredGigs.map((gig) => (
+                    <Card key={gig.id} className="border border-gray-200 hover:border-gray-300 transition-colors rounded-xl">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-xl font-semibold text-gray-900">{gig.title}</h3>
+                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${gig.statusColor}`}>
+                                {gig.status}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-4 mb-3">
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                                {gig.category}
+                              </span>
+                              <span className="text-sm text-gray-600">Posted: {gig.postedDate}</span>
+                              <span className="text-sm text-gray-600">Deadline: {gig.deadline}</span>
+                            </div>
+
+                            <p className="text-gray-600 mb-4 line-clamp-2">{gig.description}</p>
+
+                            <div className="flex items-center gap-8">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900">{gig.orders}</div>
+                                <div className="text-xs text-gray-600">Orders</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900">{gig.rating}</div>
+                                <div className="text-xs text-gray-600">Rating</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900">{gig.views}</div>
+                                <div className="text-xs text-gray-600">Views</div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4">
+                              <div className="text-2xl font-bold text-green-600">Starting at {gig.budget}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <Button
+                            onClick={() => handleViewGig(gig)}
+                            className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2"
+                          >
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleEditGig(gig)}
                             className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
                           >
-                            {gig.status === "Paused" ? "Resume" : "Pause"}
+                            Edit
                           </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          {!(String(gig.status).toLowerCase() === "active" || String(gig.status).toLowerCase() === "completed" || String(gig.status).toLowerCase() === "suspended") && (
+                            <Button
+                              variant="outline"
+                              onClick={() => handlePauseGig(gig)}
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                            >
+                              {gig.status === "Paused" ? "Resume" : "Pause"}
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )
             ) : (
               /* Empty State */
               <div className="text-center py-16">

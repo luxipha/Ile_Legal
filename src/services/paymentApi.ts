@@ -315,7 +315,7 @@ export const adminPaymentApi = {
 
     let query = supabase
       .from('bank_accounts')
-      .select('*, profiles(name, email)', { count: 'exact' })
+      .select('*, Profiles(name, email)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
 
@@ -360,7 +360,7 @@ export const adminPaymentApi = {
 
     const { data, error, count } = await supabase
       .from('payment_methods')
-      .select('*, profiles(name, email)', { count: 'exact' })
+      .select('*, Profiles(name, email)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
 

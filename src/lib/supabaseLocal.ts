@@ -11,7 +11,7 @@ export const supabaseLocal = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    storageKey: 'ile-legal-auth-local',
+    storageKey: 'ile-legal-auth', // Use same storage key as production
     flowType: 'implicit'
   },
   realtime: {
@@ -22,7 +22,7 @@ export const supabaseLocal = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
       'X-Client-Info': 'ile-legal-app-local',
-      'Content-Type': 'application/json',
+      // Remove Content-Type to match production client
     },
   },
 });

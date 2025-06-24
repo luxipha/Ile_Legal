@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { formatCurrency, formatDate, formatUser } from "../../utils/formatters";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header/Header";
@@ -711,13 +712,13 @@ export const ActiveBids = (): JSX.Element => {
                           <span className="text-sm">Submitted</span>
                         </div>
                         <div className="text-sm text-gray-900 font-medium">
-                          {new Date(bid.created_at).toLocaleDateString()}
+                          {formatDate.full(bid.created_at)}
                         </div>
                       </div>
 
                       {/* Price and Due Date */}
                       <div className="flex items-center justify-between mb-6">
-                        <div className="text-3xl font-bold text-gray-900">₦{bid.amount.toLocaleString()}</div>
+                        <div className="text-3xl font-bold text-gray-900">{formatCurrency.naira(bid.amount)}</div>
                         <div className="text-right">
                           <div className="text-sm text-gray-600 mb-1">Due Date:</div>
                           <div className="bg-[#FEC85F] text-[#1B1828] px-3 py-1 rounded-lg font-medium">

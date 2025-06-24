@@ -55,12 +55,17 @@ export const FindGigs = (): JSX.Element => {
     const fetchGigs = async () => {
       try {
         setLoading(true);
-        // Fetch both 'pending' and 'paused' gigs, then combine
-        const [pendingGigs, pausedGigs] = await Promise.all([
-          api.gigs.getAllGigs({ status: 'pending' }),
-          api.gigs.getAllGigs({ status: 'paused' })
-        ]);
-        setGigs([...pendingGigs, ...pausedGigs]);
+        const data = await api.gigs.getAllGigs();
+        
+        // Filter to show only gigs available for bidding (not ongoing or completed)
+        const availableForBidding = data.filter(gig => {
+          const status = gig.status?.toLowerCase();
+          return status !== 'ongoing' && 
+                 status !== 'in progress' && 
+                 status !== 'completed' && 
+                 status !== 'closed';
+        });
+        setGigs(availableForBidding);
         setError(null);
       } catch (err) {
         setError('Failed to fetch gigs. Please try again later.');

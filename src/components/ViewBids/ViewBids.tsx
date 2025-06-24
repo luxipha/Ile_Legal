@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { formatCurrency, formatDate, formatUser } from '../../utils/formatters';
+import { handleApiError } from '../../utils/apiHelpers';
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { useAuth } from '../../contexts/AuthContext';
@@ -110,75 +112,6 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   // Cast messaging service to extended interface
   const extendedMessagingService = messagingService as ExtendedMessagingService;
   
-  // Static data fallback (from the first file)
-  const staticBids: Bid[] = [
-    {
-      id: "bid-1",
-      userId: "seller-1",
-      seller_id: "seller-1",
-      name: "Adebayo Ogunlesi",
-      seller_name: "Adebayo Ogunlesi",
-      avatar: "AO",
-      seller_avatar: "AO",
-      title: "Senior Legal Consultant",
-      seller_title: "Senior Legal Consultant",
-      rating: 4.9,
-      seller_rating: 4.9,
-      completedJobs: 47,
-      seller_completed_jobs: 47,
-      amount: "₦65,000",
-      deliveryTime: "3 days",
-      submittedDate: "2 days ago",
-      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      proposal: "I have extensive experience in property verification and can deliver a comprehensive report within 3 days. My approach includes thorough document verification, site visits, and liaison with relevant authorities to ensure all legal requirements are met.",
-      description: "I have extensive experience in property verification and can deliver a comprehensive report within 3 days. My approach includes thorough document verification, site visits, and liaison with relevant authorities to ensure all legal requirements are met.",
-      status: 'pending'
-    },
-    {
-      id: "bid-2",
-      userId: "seller-2",
-      seller_id: "seller-2",
-      name: "Ngozi Okonjo",
-      seller_name: "Ngozi Okonjo",
-      avatar: "NO",
-      seller_avatar: "NO",
-      title: "Property Law Specialist",
-      seller_title: "Property Law Specialist",
-      rating: 4.7,
-      seller_rating: 4.7,
-      completedJobs: 32,
-      seller_completed_jobs: 32,
-      amount: "₦70,000",
-      deliveryTime: "2 days",
-      submittedDate: "3 days ago",
-      created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      proposal: "As a property law specialist with over 10 years of experience, I can provide a detailed verification report that covers all legal aspects of the property. I will ensure all documentation is properly reviewed and verified with the relevant authorities.",
-      description: "As a property law specialist with over 10 years of experience, I can provide a detailed verification report that covers all legal aspects of the property. I will ensure all documentation is properly reviewed and verified with the relevant authorities.",
-      status: 'pending'
-    },
-    {
-      id: "bid-3",
-      userId: "seller-3",
-      seller_id: "seller-3",
-      name: "Chukwudi Eze",
-      seller_name: "Chukwudi Eze",
-      avatar: "CE",
-      seller_avatar: "CE",
-      title: "Legal Consultant",
-      seller_title: "Legal Consultant",
-      rating: 4.5,
-      seller_rating: 4.5,
-      completedJobs: 28,
-      seller_completed_jobs: 28,
-      amount: "₦60,000",
-      deliveryTime: "4 days",
-      submittedDate: "1 day ago",
-      created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      proposal: "I offer comprehensive property verification services with a focus on identifying any potential legal issues. My service includes document verification, title search, and confirmation with local authorities. I will provide a detailed report with recommendations.",
-      description: "I offer comprehensive property verification services with a focus on identifying any potential legal issues. My service includes document verification, title search, and confirmation with local authorities. I will provide a detailed report with recommendations.",
-      status: 'pending'
-    }
-  ];
 
   // Helper functions to normalize bid data
   const getBidSellerId = (bid: Bid): string => bid.seller_id || bid.userId || bid.id;
@@ -201,6 +134,18 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   // Load bids on component mount
   useEffect(() => {
     if (useStaticData) {
+      // Static demo data (currently unused but kept for demo purposes)
+      const staticBids: Bid[] = [
+        {
+          id: "demo-1",
+          seller_name: "Demo Seller",
+          amount: 50000,
+          deliveryTime: "3 days",
+          created_at: new Date().toISOString(),
+          description: "Demo bid description",
+          status: 'pending'
+        }
+      ];
       setBids(staticBids);
       setLoading(false);
     } else {
@@ -270,12 +215,56 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
       setLoading(true);
       setError(null);
       const bidsData = await api.bids.getBidsByGigId(gig.id);
-      setBids(bidsData);
+      
+      // Enrich bids with real seller profile data
+      const enrichedBids = await Promise.all(
+        bidsData.map(async (bid: any) => {
+          try {
+            // Get seller profile data from Profiles table (accessible to all users)
+            const { supabaseLocal } = await import('../../lib/supabaseLocal');
+            const { data: profileData } = await supabaseLocal
+              .from('Profiles')
+              .select('*')
+              .eq('id', bid.seller_id)
+              .single();
+            
+            if (profileData) {
+              return {
+                ...bid,
+                seller_name: profileData.name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Anonymous Seller',
+                seller_avatar: profileData.avatar_url || profileData.name?.charAt(0)?.toUpperCase() || 'S',
+                seller_title: profileData.title || 'Legal Professional',
+                seller_rating: profileData.rating || 0,
+                seller_completed_jobs: profileData.completed_jobs || 0
+              };
+            }
+            return {
+              ...bid,
+              seller_name: 'Anonymous Seller',
+              seller_avatar: 'S',
+              seller_title: 'Legal Professional',
+              seller_rating: 0,
+              seller_completed_jobs: 0
+            };
+          } catch (profileError) {
+            console.log('Could not load seller profile for bid:', bid.id);
+            return {
+              ...bid,
+              seller_name: 'Anonymous Seller',
+              seller_avatar: 'S',
+              seller_title: 'Legal Professional',
+              seller_rating: 0,
+              seller_completed_jobs: 0
+            };
+          }
+        })
+      );
+      
+      setBids(enrichedBids);
     } catch (err) {
       setError('Failed to load bids. Please try again.');
-      console.error('Error loading bids:', err);
-      // Fallback to static data if API fails
-      setBids(staticBids);
+      console.log('Error loading bids:', err);
+      setBids([]);
     } finally {
       setLoading(false);
     }

@@ -82,9 +82,9 @@ getConversations: async (userId: string, userType: 'buyer' | 'seller') => {
     let userProfiles: any[] = [];
     
     try {
-      // Try profiles table first (if it exists)
+      // Try Profiles table first (if it exists)
       const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('id, first_name, last_name, avatar_url, email')
         .in('id', userIds);
       
@@ -171,7 +171,7 @@ getConversations: async (userId: string, userType: 'buyer' | 'seller') => {
         if (conversation.gig_id) {
           try {
             const { data: gig, error: gigError } = await supabase
-              .from('gigs')
+              .from('Gigs')
               .select('id, title, description')
               .eq('id', conversation.gig_id)
               .single();
@@ -240,36 +240,68 @@ getConversations: async (userId: string, userType: 'buyer' | 'seller') => {
    * @param gigId Optional gig ID
    */
   getOrCreateConversation: async (buyerId: string, sellerId: string, gigId?: string) => {
-    // First try to find existing conversation
-    const { data: existingConversation } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('buyer_id', buyerId)
-      .eq('seller_id', sellerId)
-      .is('gig_id', gigId || null)
-      .single();
-    
-    if (existingConversation) {
-      return existingConversation;
+    try {
+      // First try to find existing conversation
+      const { data: existingConversation, error: findError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('buyer_id', buyerId)
+        .eq('seller_id', sellerId)
+        .eq('gig_id', gigId || null)
+        .maybeSingle();
+      
+      if (findError) {
+        console.error('Error finding existing conversation:', findError);
+        throw findError;
+      }
+      
+      if (existingConversation) {
+        console.log('Found existing conversation:', existingConversation.id);
+        return existingConversation;
+      }
+      
+      // If no conversation exists, create one
+      console.log('Creating new conversation for:', { buyerId, sellerId, gigId });
+      const { data: newConversation, error: createError } = await supabase
+        .from('conversations')
+        .insert({
+          buyer_id: buyerId,
+          seller_id: sellerId,
+          gig_id: gigId || null
+        })
+        .select()
+        .single();
+      
+      if (createError) {
+        // If it's a duplicate key error, try to find the conversation again
+        if (createError.code === '23505') {
+          console.log('Duplicate key error, attempting to find existing conversation again');
+          const { data: retryConversation, error: retryError } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('buyer_id', buyerId)
+            .eq('seller_id', sellerId)
+            .eq('gig_id', gigId || null)
+            .single();
+          
+          if (retryError) {
+            console.error('Error on retry find:', retryError);
+            throw retryError;
+          }
+          
+          return retryConversation;
+        }
+        
+        console.error('Error creating conversation:', createError);
+        throw createError;
+      }
+      
+      console.log('Created new conversation:', newConversation.id);
+      return newConversation;
+    } catch (error) {
+      console.error('Exception in getOrCreateConversation:', error);
+      throw error;
     }
-    
-    // If no conversation exists, create one
-    const { data: newConversation, error: createError } = await supabase
-      .from('conversations')
-      .insert({
-        buyer_id: buyerId,
-        seller_id: sellerId,
-        gig_id: gigId || null
-      })
-      .select()
-      .single();
-    
-    if (createError) {
-      console.error('Error creating conversation:', createError);
-      throw createError;
-    }
-    
-    return newConversation;
   },
   
   /**
@@ -374,10 +406,9 @@ getConversations: async (userId: string, userType: 'buyer' | 'seller') => {
         p_conversation_id: conversationId,
         p_sender_id: senderId,
         p_content: content,
-        p_attachment_url: attachment_url,
-        p_attachment_type: file?.type || null,
         p_has_attachment: !!attachment_url,
-        p_file_name: fileName
+        p_attachment_type: file?.type || null,
+        p_attachment_url: attachment_url
       });
       
       console.log(`[messagingService] Message send result:`, { 

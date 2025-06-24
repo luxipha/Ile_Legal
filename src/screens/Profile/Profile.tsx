@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { formatDate } from "../../utils/formatters";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header/Header";
@@ -26,6 +27,8 @@ import {
 } from "lucide-react";
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
+
+import LawyerProfileView from './LawyerProfileView';
 
 interface Education {
   degree: string;
@@ -69,95 +72,139 @@ interface Feedback {
 type ViewMode = "profile" | "edit-profile";
 
 export const Profile = (): JSX.Element => {
-  const { user, getUser, updateProfile, uploadProfilePicture, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, updateProfile } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "cases">("overview");
   const [newSpecialization, setNewSpecialization] = useState("");
-  const [reviews, setReviews] = useState<Feedback[]>([]);
-  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData>({
+    firstName: "Loading...",
+    lastName: "",
+    email: "",
+    phone: "",
+    title: "",
+    about: "",
+    specializations: [],
+    education: []
+  });
+  // isLoading state can be used for loading indicators in the future
+  const [, setIsLoading] = useState(true);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [averageRating, setAverageRating] = useState(0);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [editFormData, setEditFormData] = useState<ProfileData | null>(null);
-  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
-  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [cases, setCases] = useState<any[]>([]);
+  const [loadingCases, setLoadingCases] = useState(false);
 
-  // Fetch user profile data on mount
+  // Load real profile data from Supabase
   useEffect(() => {
-    const fetchProfile = async () => {
-      setLoadingProfile(true);
+    const loadProfileData = async () => {
+      if (!user) return;
+      
       try {
-        const u = user || (await getUser());
-        console.log("u", u);
-        if (!u) return;
-        // Parse name into first/last
-        const [firstName, ...rest] = (u.name || '').split(' ');
-        const lastName = rest.join(' ');
-        // Get education and specializations from user_metadata with type checks
-        const education = Array.isArray((u.user_metadata as any)?.education) ? (u.user_metadata as any).education : [];
-        const specializations = Array.isArray((u.user_metadata as any)?.specializations) ? (u.user_metadata as any).specializations : [];
-        setProfilePicUrl((u.user_metadata as any)?.profile_picture || null);
-        const profile: ProfileData = {
-          firstName: firstName || '',
-          lastName: lastName || '',
-          email: u.email,
-          phone: (u.user_metadata as any)?.phone || '',
-          title: (u.user_metadata as any)?.title || '',
-          about: (u.user_metadata as any)?.about || '',
-          specializations: specializations,
-          education: education,
-          user_metadata: u.user_metadata,
-        };
-        setProfileData(profile);
-        setEditFormData(profile);
+        setIsLoading(true);
+        
+        // Get data from user metadata like buyer profile
+        const meta = user.user_metadata || {};
+        let firstName = (meta as any).firstName || '';
+        let lastName = (meta as any).lastName || '';
+        if ((!firstName || !lastName) && user.name) {
+          const parts = user.name.split(' ');
+          firstName = firstName || parts[0] || 'User';
+          lastName = lastName || parts.slice(1).join(' ') || '';
+        }
+
+        setProfileData({
+          firstName,
+          lastName,
+          email: user.email || '',
+          phone: meta.phone || '',
+          title: 'Legal Professional',
+          about: (meta as any).about || '',
+          specializations: Array.isArray((meta as any).specializations) ? (meta as any).specializations : [],
+          education: Array.isArray((meta as any).education) ? (meta as any).education : []
+        });
+      } catch (error) {
+        console.error('Error loading profile data:', error);
       } finally {
-        setLoadingProfile(false);
+        setIsLoading(false);
       }
     };
-    fetchProfile();
-    // eslint-disable-next-line
+
+    loadProfileData();
   }, [user]);
 
-  // Fetch feedback data when component mounts or when reviews tab is active
-  useEffect(() => {
-    if (activeTab === "reviews") {
-      fetchFeedback();
-    }
-    // eslint-disable-next-line
-  }, [activeTab]);
-
+  // Fetch feedback data for reviews
   const fetchFeedback = async () => {
     setLoadingReviews(true);
     try {
+      // Check if there's a valid session first
+      const { supabaseLocal } = await import('../../lib/supabaseLocal');
+      const { data: { session } } = await supabaseLocal.auth.getSession();
+      if (!session) {
+        console.log('No active session, skipping feedback fetch');
+        setReviews([]);
+        setAverageRating(0);
+        return;
+      }
+
       const feedbackData = await api.feedback.getFeedbackForUser();
       console.log("feedbackData", feedbackData);
       setReviews(feedbackData);
+      
       // Calculate average rating
       if (feedbackData.length > 0) {
-        const totalRating = feedbackData.reduce((sum, feedback) => sum + feedback.rating, 0);
+        const totalRating = feedbackData.reduce((sum: number, feedback: any) => sum + feedback.rating, 0);
         setAverageRating(totalRating / feedbackData.length);
-      } else {
-        setAverageRating(0);
       }
     } catch (error) {
-      console.error('Error fetching feedback:', error);
+      console.log('Could not load feedback data:', error);
+      setReviews([]);
+      setAverageRating(0);
     } finally {
       setLoadingReviews(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays === 1) return "1 day ago";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
+  // Fetch cases/gigs data
+  const fetchCases = async () => {
+    setLoadingCases(true);
+    try {
+      // Check if there's a valid session first
+      const { supabaseLocal } = await import('../../lib/supabaseLocal');
+      const { data: { session } } = await supabaseLocal.auth.getSession();
+      if (!session) {
+        console.log('No active session, skipping cases fetch');
+        setCases([]);
+        return;
+      }
+
+      const gigsData = await api.gigs.getMyGigs(user?.id || '');
+      setCases(gigsData.map((gig: any) => ({
+        title: gig.title || 'Legal Service',
+        date: formatDate.short(gig.created_at),
+        status: gig.status === 'completed' ? 'Completed' : 
+               gig.status === 'in_progress' ? 'In Progress' : 
+               gig.status === 'pending' ? 'Open' : 'Open', // Display "Open" for pending status
+        statusColor: gig.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    gig.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                    gig.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+      })));
+    } catch (error) {
+      console.log('Could not load cases data:', error);
+      setCases([]); // Set empty array on error
+    } finally {
+      setLoadingCases(false);
+    }
   };
+
+  // Fetch reviews and cases on component mount
+  useEffect(() => {
+    if (user?.id) {
+      fetchFeedback();
+      fetchCases();
+    }
+  }, [user?.id]);
+
+  const [editFormData, setEditFormData] = useState<ProfileData>(profileData);
 
   const tabs = [
     { id: "overview", label: "Overview" },
@@ -166,127 +213,101 @@ export const Profile = (): JSX.Element => {
     { id: "cases", label: "Cases" }
   ];
 
-  // Experience and cases can remain static or be made dynamic if needed
-  const experience = [
-    {
-      position: "Senior Associate",
-      company: "Adebayo & Partners Law Firm",
-      period: "2020 - Present",
-      description: "Leading property law practice with focus on high-value transactions and complex title issues."
-    },
-    {
-      position: "Associate",
-      company: "Lagos Property Law Chambers",
-      period: "2018 - 2020",
-      description: "Handled residential and commercial property transactions, contract reviews, and title verifications."
-    }
-  ];
+  // Get experience from profile data
+  const experience = Array.isArray((user?.user_metadata as any)?.experience) ? 
+    (user?.user_metadata as any).experience : [];
 
-  const cases = [
-    {
-      title: "Property Purchase",
-      date: "Mar 2024",
-      status: "Completed",
-      statusColor: "bg-green-100 text-green-800"
-    },
-    {
-      title: "Contract Review",
-      date: "Feb 2024",
-      status: "Completed",
-      statusColor: "bg-green-100 text-green-800"
-    },
-    {
-      title: "Title Verification",
-      date: "Apr 2024",
-      status: "In Progress",
-      statusColor: "bg-blue-100 text-blue-800"
-    }
-  ];
+  // Reviews now come from API state
+
+  // Cases now come from API state
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (!editFormData) return;
     const { name, value } = e.target;
-    setEditFormData(prev => prev ? { ...prev, [name]: value } : prev);
+    setEditFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleEducationChange = (index: number, field: keyof Education, value: string) => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       education: prev.education.map((edu, i) => 
         i === index ? { ...edu, [field]: value } : edu
       )
-    } : prev);
+    }));
   };
 
   const addEducation = () => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       education: [...prev.education, { degree: "", institution: "", period: "" }]
-    } : prev);
+    }));
   };
 
   const removeEducation = (index: number) => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       education: prev.education.filter((_, i) => i !== index)
-    } : prev);
+    }));
   };
 
   const addSpecialization = () => {
-    if (!editFormData) return;
     if (newSpecialization.trim()) {
-      setEditFormData(prev => prev ? {
+      setEditFormData(prev => ({
         ...prev,
         specializations: [...prev.specializations, newSpecialization.trim()]
-      } : prev);
+      }));
       setNewSpecialization("");
     }
   };
 
   const removeSpecialization = (index: number) => {
-    if (!editFormData) return;
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => ({
       ...prev,
       specializations: prev.specializations.filter((_, i) => i !== index)
-    } : prev);
+    }));
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFormData) return;
-    // Compose name
-    const name = `${editFormData.firstName} ${editFormData.lastName}`.trim();
-    // Prepare user_metadata
-    const user_metadata: any = {
-      phone: editFormData.phone,
-      title: editFormData.title,
-      about: editFormData.about,
-      specializations: editFormData.specializations,
-      education: editFormData.education,
-    };
-    // Handle profile picture upload if changed
-    if (profilePicFile) {
-      const url = await uploadProfilePicture(profilePicFile);
-      user_metadata.profile_picture = url;
-      setProfilePicUrl(url);
+    
+    try {
+      // Update profile using AuthContext API
+      await updateProfile({
+        user_metadata: {
+          firstName: editFormData.firstName,
+          lastName: editFormData.lastName,
+          phone: editFormData.phone,
+          title: editFormData.title,
+          about: editFormData.about,
+          specializations: editFormData.specializations,
+          education: editFormData.education
+        }
+      });
+      
+      // Update local state and return to profile view
+      setProfileData(editFormData);
+      setViewMode("profile");
+      
+      // TODO: Show success toast
+      console.log("Profile updated successfully");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      // TODO: Show error toast
     }
-    await updateProfile({
-      name,
-      email: editFormData.email,
-      user_metadata,
-    });
-    setProfileData(editFormData);
-    setViewMode("profile");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setProfilePicFile(file);
-      setProfilePicUrl(URL.createObjectURL(file));
+      try {
+        // Update profile picture using AuthContext API
+        await updateProfile({ profile_picture: file });
+        console.log("Profile picture uploaded successfully");
+        // TODO: Show success toast
+      } catch (error) {
+        console.error("Error uploading profile picture:", error);
+        // TODO: Show error toast
+      }
     }
   };
 
@@ -300,7 +321,6 @@ export const Profile = (): JSX.Element => {
   };
 
   const renderTabContent = () => {
-    if (!profileData) return null;
     switch (activeTab) {
       case "overview":
         return (
@@ -311,6 +331,7 @@ export const Profile = (): JSX.Element => {
                 {profileData.about}
               </p>
             </div>
+
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Specializations</h3>
               <div className="space-y-3">
@@ -324,6 +345,7 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
+
       case "experience":
         return (
           <div className="space-y-8">
@@ -344,10 +366,11 @@ export const Profile = (): JSX.Element => {
                 ))}
               </div>
             </div>
+
             <div>
               <h3 className="text-xl font-semibold text-gray-900 mb-6">Professional Experience</h3>
               <div className="space-y-6">
-                {experience.map((exp, index) => (
+                {experience.map((exp: any, index: number) => (
                   <div key={index} className="border-l-4 border-blue-500 pl-6">
                     <h4 className="font-semibold text-gray-900">{exp.position}</h4>
                     <p className="text-gray-600">{exp.company}</p>
@@ -359,6 +382,7 @@ export const Profile = (): JSX.Element => {
             </div>
           </div>
         );
+
       case "reviews":
         return (
           <div>
@@ -367,10 +391,11 @@ export const Profile = (): JSX.Element => {
               <div className="flex items-center gap-2">
                 <div className="flex">{renderStars(Math.round(averageRating))}</div>
                 <span className="text-lg font-semibold text-gray-900">
-                  {averageRating > 0 ? `${averageRating.toFixed(1)} (${reviews.length} reviews)` : "No reviews yet"}
+                  {averageRating > 0 ? `${averageRating.toFixed(1)} out of 5` : "No reviews yet"}
                 </span>
               </div>
             </div>
+
             {loadingReviews ? (
               <div className="flex items-center justify-center py-8">
                 <div className="text-gray-500">Loading reviews...</div>
@@ -396,7 +421,9 @@ export const Profile = (): JSX.Element => {
                             <div className="flex">{renderStars(review.rating)}</div>
                           </div>
                         </div>
-                        <span className="text-sm text-gray-500">{formatDate(review.created_at)}</span>
+                        <span className="text-sm text-gray-500">
+                          {new Date(review.created_at).toLocaleDateString()}
+                        </span>
                       </div>
                       <p className="text-gray-600">{review.free_response}</p>
                     </CardContent>
@@ -406,12 +433,23 @@ export const Profile = (): JSX.Element => {
             )}
           </div>
         );
+
       case "cases":
         return (
           <div>
             <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Cases</h3>
-            <div className="space-y-4">
-              {cases.map((case_, index) => (
+            {loadingCases ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">Loading cases...</div>
+              </div>
+            ) : cases.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-500">No cases yet</div>
+                <p className="text-sm text-gray-400 mt-2">Your completed gigs will appear here</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {cases.map((case_, index) => (
                 <Card key={index} className="bg-white border border-gray-200">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -431,23 +469,21 @@ export const Profile = (): JSX.Element => {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+            )}
           </div>
         );
+
       default:
         return null;
     }
   };
 
-  if (loadingProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500 text-lg">Loading profile...</div>
-      </div>
-    );
+  if (viewMode === "public-view") {
+    return <LawyerProfileView isOwnProfile={true} onBack={() => setViewMode('profile')} />;
   }
 
-  if (viewMode === "edit-profile" && editFormData) {
+  if (viewMode === "edit-profile") {
     return (
       <div className="min-h-screen bg-gray-50 flex">
         {/* Sidebar */}
@@ -462,6 +498,7 @@ export const Profile = (): JSX.Element => {
               </div>
             </Link>
           </div>
+
           <nav className="flex-1 p-4">
             <ul className="space-y-2">
               <li>
@@ -502,21 +539,24 @@ export const Profile = (): JSX.Element => {
               </li>
             </ul>
           </nav>
+
           <div className="p-4 border-t border-gray-700">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">{editFormData.firstName} {editFormData.lastName}</div>
-                <div className="text-xs text-gray-400">{editFormData.email}</div>
+                <div className="text-sm font-medium">{profileData.firstName} {profileData.lastName}</div>
+                <div className="text-xs text-gray-400">{profileData.email}</div>
               </div>
             </div>
           </div>
         </div>
+
         {/* Main Content - Edit Profile */}
         <div className="flex-1 flex flex-col">
-          <Header title="Edit Profile" userName={`${editFormData.firstName} ${editFormData.lastName}`} userType="seller" />
+          <Header title="Edit Profile" userType="seller" />
+
           {/* Edit Profile Content */}
           <main className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
@@ -529,18 +569,15 @@ export const Profile = (): JSX.Element => {
                 <ArrowLeftIcon className="w-4 h-4" />
                 Back to Profile
               </Button>
+
               <form onSubmit={handleSaveProfile} className="space-y-8">
                 {/* Profile Picture */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
                     <div className="flex items-center gap-6">
                       <div className="relative">
-                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                          {profilePicUrl ? (
-                            <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                          ) : (
-                            <UserIcon className="w-12 h-12 text-gray-600" />
-                          )}
+                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
+                          <UserIcon className="w-12 h-12 text-gray-600" />
                         </div>
                         <input
                           type="file"
@@ -563,10 +600,12 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Basic Information */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">Basic Information</h3>
+                    
                     <div className="grid grid-cols-2 gap-6 mb-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -595,6 +634,7 @@ export const Profile = (): JSX.Element => {
                         />
                       </div>
                     </div>
+
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Professional Title
@@ -609,6 +649,7 @@ export const Profile = (): JSX.Element => {
                         required
                       />
                     </div>
+
                     <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -649,6 +690,7 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* About */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -663,6 +705,7 @@ export const Profile = (): JSX.Element => {
                     />
                   </CardContent>
                 </Card>
+
                 {/* Specializations */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -676,7 +719,7 @@ export const Profile = (): JSX.Element => {
                             onChange={(e) => {
                               const newSpecs = [...editFormData.specializations];
                               newSpecs[index] = e.target.value;
-                              setEditFormData(prev => prev ? { ...prev, specializations: newSpecs } : prev);
+                              setEditFormData(prev => ({ ...prev, specializations: newSpecs }));
                             }}
                             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                           />
@@ -698,7 +741,7 @@ export const Profile = (): JSX.Element => {
                           onChange={(e) => setNewSpecialization(e.target.value)}
                           placeholder="Add new specialization"
                           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialization())}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialization())}
                         />
                         <Button
                           type="button"
@@ -713,6 +756,7 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Education */}
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="p-8">
@@ -779,6 +823,7 @@ export const Profile = (): JSX.Element => {
                     </div>
                   </CardContent>
                 </Card>
+
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-4 pt-6">
                   <Button
@@ -805,20 +850,15 @@ export const Profile = (): JSX.Element => {
   }
 
   // Default profile view
-  if (!profileData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500 text-lg">No profile data found.</div>
-      </div>
-    );
-  }
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <SellerSidebar activePage="profile" />
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header title="Profile" userName={`${profileData.firstName} ${profileData.lastName}`} userType="seller" />
+        <Header title="Profile" userType="seller" />
+
         {/* Profile Content */}
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
@@ -828,37 +868,40 @@ export const Profile = (): JSX.Element => {
                 <CardContent className="p-8">
                   <div className="flex items-start gap-6">
                     <div className="relative">
-                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                        {profilePicUrl ? (
-                          <img src={profilePicUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                        ) : (
-                          <UserIcon className="w-12 h-12 text-gray-600" />
-                        )}
+                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
+                        <UserIcon className="w-12 h-12 text-gray-600" />
                       </div>
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                         <CheckCircleIcon className="w-4 h-4 text-white" />
                       </div>
                     </div>
+
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
                         <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                          {profileData.user_metadata?.status === "verified" ? "🔵 Verified Professional" : "🔴 Unverified Professional"}
+                          {(user?.user_metadata as any)?.verification_status === 'verified' ? '🔵 Verified Professional' : '🔵 Pending Verification'}
                         </span>
                       </div>
+                      
                       <p className="text-xl text-gray-600 mb-4">{profileData.title}</p>
+                      
                       <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-1">
                           {renderStars(Math.round(averageRating))}
                           <span className="ml-2 font-semibold text-gray-900">
-                            {averageRating > 0 ? `${averageRating.toFixed(1)} (${reviews.length} reviews)` : 'No reviews yet'}
+                            {loadingReviews ? 'Loading...' : 
+                             reviews.length > 0 ? 
+                               `${averageRating.toFixed(1)} (${reviews.length} review${reviews.length === 1 ? '' : 's'})` : 
+                               'No reviews yet'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
                           <BriefcaseIcon className="w-4 h-4" />
-                          <span>8+ years experience</span>
+                          <span>{experience.length > 0 ? `${experience.length} position${experience.length === 1 ? '' : 's'}` : 'Professional'}</span>
                         </div>
                       </div>
+
                       <div className="flex items-center gap-4">
                         <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                           Available Now
@@ -866,16 +909,30 @@ export const Profile = (): JSX.Element => {
                         <span className="text-gray-600">Response within 2 hours</span>
                       </div>
                     </div>
-                    <Button
-                      onClick={() => setViewMode("edit-profile")}
-                      className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                    >
-                      <EditIcon className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </Button>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => setViewMode("public-view")}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <UserIcon className="w-4 h-4 mr-2" />
+                        View Public Profile
+                      </Button>
+                      <Button
+                        onClick={() => setViewMode("edit-profile")}
+                        className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                      >
+                        <EditIcon className="w-4 h-4 mr-2" />
+                        Edit Profile
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+
+
+
+
               {/* Tabs Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-0">
@@ -896,15 +953,18 @@ export const Profile = (): JSX.Element => {
                       ))}
                     </nav>
                   </div>
+
                   <div className="p-8">
                     {renderTabContent()}
                   </div>
                 </CardContent>
               </Card>
+
               {/* Contact Information Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-8">
                   <h3 className="text-xl font-semibold text-gray-900 mb-6">Contact Information</h3>
+                  
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <MailIcon className="w-5 h-5 text-gray-400" />
@@ -916,7 +976,7 @@ export const Profile = (): JSX.Element => {
                     </div>
                     <div className="flex items-center gap-3">
                       <MapPinIcon className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-700">455 Lekki Phase 1, Lagos</span>
+                      <span className="text-gray-700">Location not specified</span>
                     </div>
                   </div>
                 </CardContent>

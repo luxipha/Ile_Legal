@@ -7,9 +7,14 @@ const ALGORAND_NETWORK = (typeof import.meta !== 'undefined' ? import.meta.env?.
 
 export interface IPFSUploadResult {
   cid: string;
-  path: string;
+  path?: string;
   size: number;
   url: string;
+  name?: string;
+  // Filecoin extension fields (optional)
+  pieceId?: string;
+  storageCost?: number;
+  contractTxId?: string;
 }
 
 export interface IPFSFileMetadata {

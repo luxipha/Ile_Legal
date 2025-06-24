@@ -7,6 +7,7 @@ import {
   MessageSquareIcon,
   DollarSignIcon,
 } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface SellerSidebarProps {
   activePage?: "dashboard" | "find-gigs" | "active-bids" | "messages" | "earnings" | "profile";
@@ -16,9 +17,14 @@ interface SellerSidebarProps {
 
 export const SellerSidebar: React.FC<SellerSidebarProps> = ({
   activePage = "dashboard",
-  userName = "Demo Seller",
-  userEmail = "seller@example.com",
+  userName,
+  userEmail,
 }) => {
+  const { user } = useAuth();
+  
+  // Use real user data from AuthContext if available, fallback to props or defaults
+  const displayName = userName || user?.name || (user?.user_metadata as any)?.full_name || "User";
+  const displayEmail = userEmail || user?.email || "user@example.com";
   return (
     <div className="w-64 bg-[#1B1828] text-white flex flex-col">
       <div className="p-6 border-b border-gray-700">
@@ -121,8 +127,8 @@ export const SellerSidebar: React.FC<SellerSidebarProps> = ({
             <UserIcon className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-sm font-medium">{userName}</div>
-            <div className="text-xs text-gray-400">{userEmail}</div>
+            <div className="text-sm font-medium">{displayName}</div>
+            <div className="text-xs text-gray-400">{displayEmail}</div>
           </div>
         </div>
       </div>

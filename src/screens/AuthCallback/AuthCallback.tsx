@@ -76,7 +76,7 @@ export const AuthCallback = () => {
             // Check if user has a Circle wallet, create one if not
             try {
               const { data: profile } = await supabase
-                .from('profiles')
+                .from('Profiles')
                 .select('circle_wallet_id')
                 .eq('id', userData.user.id)
                 .single();

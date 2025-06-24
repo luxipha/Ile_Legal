@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { formatCurrency, formatDate, formatUser } from "../../utils/formatters";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { ViewDetails } from "../../components/ViewDetails";
+import { ViewDetails, Gig as ViewDetailsGig } from "../../components/ViewDetails";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { SecureLegalUpload, SecureUploadResult } from "../../components/SecureLegalUpload";
@@ -21,8 +22,22 @@ import {
 
 type ViewMode = "dashboard" | "place-bid" | "view-details" | "submit-work" | "edit-bid";
 
-// Import Gig type from ViewDetails
-import type { Gig } from "../../components/ViewDetails";
+interface SellerGig {
+  id: string;
+  title: string;
+  company: string;
+  price: string;
+  deadline: string;
+  postedDate: string;
+  budget: number;
+  deliveryTime: string;
+  description: string;
+  requirements: string[];
+  companyRating: number;
+  projectsPosted: number;
+  is_flagged: boolean;
+  status?: string;
+}
 
 interface OngoingGig {
   id: string;
@@ -38,8 +53,17 @@ export const SellerDashboard = (): JSX.Element => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
-  const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
+  const [selectedGig, setSelectedGig] = useState<SellerGig | null>(null);
   const [selectedOngoingGig, setSelectedOngoingGig] = useState<OngoingGig | null>(null);
+  
+  // Real data state
+  const [availableGigs, setAvailableGigs] = useState<SellerGig[]>([]);
+  const [ongoingGigs, setOngoingGigs] = useState<OngoingGig[]>([]);
+  const [completedGigs, setCompletedGigs] = useState<any[]>([]);
+  const [activeBids, setActiveBids] = useState<any[]>([]);
+  const [loadingGigs, setLoadingGigs] = useState(false);
+  const [loadingOngoing, setLoadingOngoing] = useState(false);
+  const [loadingActiveBids, setLoadingActiveBids] = useState(false);
   const [bidFormData, setBidFormData] = useState({
     bidAmount: "",
     deliveryTime: "",
@@ -54,49 +78,117 @@ export const SellerDashboard = (): JSX.Element => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // State for fetched data
-  const [availableGigs, setAvailableGigs] = useState<Gig[]>([]);
-  const [pendingBids, setPendingBids] = useState<any[]>([]);
-  const [activeBids, setActiveBids] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on component mount
+  // Load available gigs from API
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!user?.id) return;
-      
-      setLoading(true);
-      setError(null);
-      
+    const loadAvailableGigs = async () => {
+      setLoadingGigs(true);
       try {
-        // Fetch available gigs with "pending" status
-        const gigsData = await api.gigs.getAllGigs();
-        const pendingGigs = gigsData.filter((gig: any) => gig.status === 'pending');
-        setAvailableGigs(pendingGigs);
-
-        // Fetch seller's bids
-        const bidsData = await api.bids.getActiveBids(user.id);
+        const gigs = await api.gigs.getAllGigs();
         
-        // Separate bids by status
-        const pending = bidsData.filter((bid: any) => bid.status === 'pending');
-        const active = bidsData.filter((bid: any) => bid.status === 'active');
+        // Convert API gigs to SellerGig format
+        const formattedGigs: SellerGig[] = gigs.map((gig: any) => ({
+          id: gig.id.toString(),
+          title: gig.title || "Legal Service",
+          company: gig.buyer_name || "Client",
+          price: formatCurrency.naira(gig.budget, "Budget not specified"),
+          deadline: formatDate.full(gig.deadline),
+          postedDate: formatDate.full(gig.created_at),
+          budget: gig.budget || 0,
+          deliveryTime: "To be negotiated",
+          description: gig.description || "No description provided",
+          requirements: gig.categories || [],
+          companyRating: 0, // Will be calculated from buyer feedback
+          projectsPosted: 0, // Will be calculated from buyer's total gigs
+          is_flagged: gig.is_flagged || false,
+          status: gig.status || "active"
+        }));
         
-        setPendingBids(pending);
-        setActiveBids(active);
-        
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data');
+        // Only show active gigs for sellers to bid on
+        const activeGigs = formattedGigs.filter(gig => gig.status?.toLowerCase() === 'active' || gig.status?.toLowerCase() === 'pending');
+        setAvailableGigs(activeGigs);
+      } catch (error) {
+        console.error('Error loading available gigs:', error);
+        setAvailableGigs([]);
       } finally {
-        setLoading(false);
+        setLoadingGigs(false);
       }
     };
 
-    fetchDashboardData();
+    loadAvailableGigs();
+  }, []);
+
+  // Load ongoing gigs (seller's accepted/in-progress gigs)
+  useEffect(() => {
+    const loadOngoingGigs = async () => {
+      if (!user?.id) return;
+      
+      setLoadingOngoing(true);
+      try {
+        // For sellers, we need to get gigs where they have accepted bids
+        // This is a simplified approach - in reality you'd need to join bids and gigs tables
+        const myGigs = await api.gigs.getMyGigs(user.id);
+        
+        // Convert to OngoingGig format for accepted/in-progress gigs
+        const ongoing: OngoingGig[] = myGigs
+          .filter((gig: any) => gig.status?.toLowerCase() === 'in progress' || gig.status?.toLowerCase() === 'accepted')
+          .map((gig: any) => ({
+            id: gig.id.toString(),
+            title: gig.title || "Legal Service",
+            company: gig.buyer_name || "Client",
+            price: formatCurrency.naira(gig.budget, "Budget not specified"),
+            dueDate: formatDate.full(gig.deadline),
+            progress: gig.progress || 0, // Use real progress if available
+            description: gig.description || "No description provided"
+          }));
+        
+        setOngoingGigs(ongoing);
+        
+        // Also load completed gigs
+        const completed = myGigs
+          .filter((gig: any) => gig.status?.toLowerCase() === 'completed')
+          .map((gig: any) => ({
+            id: gig.id.toString(),
+            title: gig.title || "Legal Service",
+            company: gig.buyer_name || "Client",
+            price: formatCurrency.naira(gig.budget, "Budget not specified"),
+            completedDate: formatDate.full(gig.updated_at || gig.created_at),
+            description: gig.description || "No description provided"
+          }));
+        
+        setCompletedGigs(completed);
+      } catch (error) {
+        console.error('Error loading ongoing gigs:', error);
+        setOngoingGigs([]);
+        setCompletedGigs([]);
+      } finally {
+        setLoadingOngoing(false);
+      }
+    };
+
+    loadOngoingGigs();
   }, [user?.id]);
 
-  const handleViewDetails = (gig: Gig) => {
+  // Load active bids (seller's pending bids)
+  useEffect(() => {
+    const loadActiveBids = async () => {
+      if (!user?.id) return;
+      
+      setLoadingActiveBids(true);
+      try {
+        const bids = await api.bids.getActiveBids(user.id);
+        setActiveBids(bids);
+      } catch (error) {
+        console.error('Error loading active bids:', error);
+        setActiveBids([]);
+      } finally {
+        setLoadingActiveBids(false);
+      }
+    };
+
+    loadActiveBids();
+  }, [user?.id]);
+
+  const handleViewDetails = (gig: SellerGig) => {
     setSelectedGig(gig);
     setViewMode("view-details");
   };
@@ -114,28 +206,48 @@ export const SellerDashboard = (): JSX.Element => {
     setViewMode("place-bid");
   };
 
-
-  const handleEditBid = () => {
-    // Navigate to ActiveBids with state to indicate we want to edit a specific bid
-    navigate('/active-bids', { 
-      state: { 
-        viewMode: 'edit-bid',
-        bidId: 1, // Using a placeholder ID for the active bid
-        bidData: {
-          id: 1,
-          title: "Property Survey - Lekki Phase 1",
-          client: "Prestige Homes",
-          bidAmount: "₦75,000",
-          deliveryTime: "7 days",
-          dueDate: "10/06/2025",
-          status: "active",
-          proposal: "I'll provide a comprehensive property survey including boundary markers, topographical analysis, and legal documentation review.",
-          originalBudget: "₦80,000",
-          previousBid: "₦75,000"
-        }
-      }
-    });
+  // Convert SellerGig to ViewDetailsGig
+  const convertToViewDetailsGig = (gig: SellerGig): ViewDetailsGig => {
+    return {
+      id: gig.id,
+      title: gig.title,
+      company: gig.company,
+      price: gig.price,
+      deadline: gig.deadline,
+      postedDate: gig.postedDate,
+      budget: gig.budget,
+      deliveryTime: gig.deliveryTime,
+      description: gig.description,
+      requirements: gig.requirements,
+      companyRating: gig.companyRating,
+      projectsPosted: gig.projectsPosted,
+      is_flagged: gig.is_flagged,
+      status: gig.status
+    };
   };
+
+  // Handle ViewDetails onPlaceBid callback
+  const handleViewDetailsPlaceBid = (gig: ViewDetailsGig) => {
+    const sellerGig: SellerGig = {
+      id: gig.id,
+      title: gig.title,
+      company: gig.company || "Client",
+      price: gig.price || "Price not specified",
+      deadline: gig.deadline,
+      postedDate: gig.postedDate || new Date().toLocaleDateString(),
+      budget: gig.budget || 0,
+      deliveryTime: gig.deliveryTime || "To be negotiated",
+      description: gig.description,
+      requirements: gig.requirements || [],
+      companyRating: gig.companyRating || 4.5,
+      projectsPosted: gig.projectsPosted || 1,
+      is_flagged: gig.is_flagged,
+      status: gig.status
+    };
+    handlePlaceBid(sellerGig);
+  };
+
+
 
   const handleSubmitWork = (gig: OngoingGig) => {
     setSelectedOngoingGig(gig);
@@ -281,8 +393,8 @@ export const SellerDashboard = (): JSX.Element => {
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
+                <div className="text-sm font-medium">{formatUser.displayName(user, 'Seller')}</div>
+                <div className="text-xs text-gray-400">{user?.email || 'No email'}</div>
               </div>
             </div>
           </div>
@@ -457,8 +569,8 @@ export const SellerDashboard = (): JSX.Element => {
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
+                <div className="text-sm font-medium">{formatUser.displayName(user, 'Seller')}</div>
+                <div className="text-xs text-gray-400">{user?.email || 'No email'}</div>
               </div>
             </div>
           </div>
@@ -470,12 +582,21 @@ export const SellerDashboard = (): JSX.Element => {
 
           {/* View Details Content */}
           <main className="flex-1 p-6">
-            <ViewDetails
-              gig={selectedGig}
-              onBack={() => setViewMode("dashboard")}
-              onPlaceBid={handlePlaceBid}
-              backButtonText="Back to Dashboard"
-            />
+            {selectedGig ? (
+              <ViewDetails
+                gig={convertToViewDetailsGig(selectedGig)}
+                onBack={() => setViewMode("dashboard")}
+                onPlaceBid={handleViewDetailsPlaceBid}
+                backButtonText="Back to Dashboard"
+              />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No gig selected</p>
+                <Button onClick={() => setViewMode("dashboard")} className="mt-4">
+                  Back to Dashboard
+                </Button>
+              </div>
+            )}
           </main>
         </div>
       </div>
@@ -548,8 +669,8 @@ export const SellerDashboard = (): JSX.Element => {
                 <UserIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="text-sm font-medium">Demo Seller</div>
-                <div className="text-xs text-gray-400">seller@example.com</div>
+                <div className="text-sm font-medium">{formatUser.displayName(user, 'Seller')}</div>
+                <div className="text-xs text-gray-400">{user?.email || 'No email'}</div>
               </div>
             </div>
           </div>
@@ -698,7 +819,7 @@ export const SellerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Active Bids</div>
-                    <div className="text-2xl font-bold text-gray-900">{pendingBids.length}</div>
+                    <div className="text-2xl font-bold text-gray-900">{activeBids.length}</div>
                   </div>
                 </div>
               </CardContent>
@@ -712,7 +833,7 @@ export const SellerDashboard = (): JSX.Element => {
                   </div>
                   <div>
                     <div className="text-sm text-gray-600">Ongoing Gigs</div>
-                    <div className="text-2xl font-bold text-gray-900">{activeBids.length}</div>
+                    <div className="text-2xl font-bold text-gray-900">{ongoingGigs.length}</div>
                   </div>
                 </div>
               </CardContent>
@@ -725,8 +846,8 @@ export const SellerDashboard = (): JSX.Element => {
                     <CheckCircleIcon className="w-6 h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Available Gigs</div>
-                    <div className="text-2xl font-bold text-gray-900">{availableGigs.length}</div>
+                    <div className="text-sm text-gray-600">Completed</div>
+                    <div className="text-2xl font-bold text-gray-900">{completedGigs.length}</div>
                   </div>
                 </div>
               </CardContent>
@@ -740,19 +861,14 @@ export const SellerDashboard = (): JSX.Element => {
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Available Gigs</h3>
               <p className="text-gray-600 mb-6">Recently posted gigs that matches your expertise</p>
               
-              {loading ? (
+              {loadingGigs ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B1828] mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Loading gigs...</p>
-                </div>
-              ) : error ? (
-                <div className="text-center py-8">
-                  <p className="text-red-600 mb-4">{error}</p>
-                  <Button onClick={() => window.location.reload()}>Try Again</Button>
+                  <p className="text-gray-600">Loading available gigs...</p>
                 </div>
               ) : availableGigs.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-600">No pending gigs available at the moment.</p>
+                  <p className="text-gray-600">No available gigs at the moment</p>
+                  <p className="text-sm text-gray-400 mt-2">Check back later for new opportunities</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -760,24 +876,17 @@ export const SellerDashboard = (): JSX.Element => {
                     <Card key={gig.id} className="bg-white border border-gray-200">
                       <CardContent className="p-6">
                         <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
-                        <p className="text-sm text-gray-600 mb-2">
-                          Posted by {gig.buyer?.name || gig.buyer?.email || 'Unknown Client'}
-                        </p>
-                        <p className="text-sm text-gray-600 mb-4">Deadline: {new Date(gig.deadline).toLocaleDateString()}</p>
-                        <div className="flex flex-col gap-4">
-                          <span className="text-lg font-bold text-gray-900">
-                            {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
-                          </span>
+                        <p className="text-sm text-gray-600 mb-2">Posted by {gig.company}</p>
+                        <p className="text-sm text-gray-600 mb-4">Deadline: {gig.deadline}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-bold text-gray-900">{gig.price}</span>
                           <div className="flex gap-2">
                             <Button 
                               onClick={() => handlePlaceBid(gig)}
                               className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                              disabled={gig.status === 'suspended' || user?.user_metadata?.status === 'pending' || user?.user_metadata?.status === 'rejected'}
+                              disabled={gig.status === 'suspended'}
                             >
-                              {gig.status === 'suspended' ? 'Gig Suspended' : 
-                               user?.user_metadata?.status === 'pending' ? 'Verification Pending' :
-                               user?.user_metadata?.status === 'rejected' ? 'Account Rejected' :
-                               'Place Bid'}
+                              {gig.status === 'suspended' ? 'Gig Suspended' : 'Place Bid'}
                             </Button>
                             <Button 
                               variant="outline"
@@ -801,48 +910,45 @@ export const SellerDashboard = (): JSX.Element => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Your Active Bids</h3>
                 <p className="text-gray-600 mb-6">Bids you've placed that are awaiting client decisions</p>
                 
-                {loading ? (
+                {loadingActiveBids ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B1828] mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading bids...</p>
+                    <p className="text-gray-600">Loading active bids...</p>
                   </div>
-                ) : pendingBids.length === 0 ? (
+                ) : activeBids.length === 0 ? (
                   <div className="text-center py-8">
-                    <p className="text-gray-600">No pending bids at the moment.</p>
+                    <p className="text-gray-600">No active bids</p>
+                    <p className="text-sm text-gray-400 mt-2">Place bids on available gigs to see them here</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {pendingBids.map((bid) => (
+                    {activeBids.map((bid) => (
                       <Card key={bid.id} className="bg-white border border-gray-200">
                         <CardContent className="p-6">
-                          <h4 className="font-semibold text-gray-900 mb-2">{bid.gig?.title || 'Unknown Gig'}</h4>
-                          <p className="text-sm text-gray-600 mb-2">
-                            Client: {bid.gig?.buyer?.name || bid.gig?.buyer?.email || bid.gig?.company || 'Unknown Client'}
-                          </p>
-                          <p className="text-sm text-gray-600 mb-4">Bid placed on: {new Date(bid.created_at).toLocaleDateString()}</p>
+                          <h4 className="font-semibold text-gray-900 mb-2">Bid #{bid.id}</h4>
+                          <p className="text-sm text-gray-600 mb-2">Gig ID: {bid.gig_id}</p>
+                          <p className="text-sm text-gray-600 mb-4">Status: {bid.status}</p>
                           <div className="flex items-center justify-between mb-4">
                             <div>
                               <span className="text-lg font-bold text-gray-900">₦{bid.amount?.toLocaleString()}</span>
-                              {bid.gig?.budget && (
-                                <span className="text-sm text-gray-500 ml-2">Original: ₦{bid.gig.budget.toLocaleString()}</span>
-                              )}
                             </div>
                           </div>
+                          <p className="text-sm text-gray-600 mb-4">{bid.description}</p>
                           <div className="flex gap-2">
                             <Button 
                               variant="outline" 
                               className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828]"
-                              onClick={() => handleEditBid()}
+                              onClick={() => navigate('/active-bids', { 
+                                state: { 
+                                  viewMode: 'edit-bid',
+                                  bidData: bid
+                                }
+                              })}
                             >
                               Edit Bid
                             </Button>
                             <Button 
                               variant="outline"
-                              onClick={() => {
-                                if (bid.gig) {
-                                  handleViewDetails(bid.gig);
-                                }
-                              }}
+                              onClick={() => navigate('/active-bids')}
                             >
                               View Details
                             </Button>
@@ -859,68 +965,52 @@ export const SellerDashboard = (): JSX.Element => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Ongoing Gigs</h3>
                 <p className="text-gray-600 mb-6">Gigs you are currently working on</p>
                 
-                {loading ? (
+                {loadingOngoing ? (
                   <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B1828] mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading ongoing gigs...</p>
+                    <p className="text-gray-600">Loading ongoing gigs...</p>
                   </div>
-                ) : activeBids.length === 0 ? (
+                ) : ongoingGigs.length === 0 ? (
                   <div className="text-center py-8">
-                    <p className="text-gray-600">No ongoing gigs at the moment.</p>
+                    <p className="text-gray-600">No ongoing gigs</p>
+                    <p className="text-sm text-gray-400 mt-2">Place bids on available gigs to start working</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {activeBids.map((bid) => (
-                      <Card key={bid.id} className="bg-white border border-gray-200">
-                        <CardContent className="p-6">
-                          <h4 className="font-semibold text-gray-900 mb-2">{bid.gig?.title || 'Unknown Gig'}</h4>
-                          <p className="text-sm text-gray-600 mb-2">
-                            Client: {bid.gig?.buyer?.name || bid.gig?.buyer?.email || bid.gig?.company || 'Unknown Client'}
-                          </p>
-                          <p className="text-sm text-gray-600 mb-2">Due: {new Date(bid.gig?.deadline).toLocaleDateString()}</p>
-                          <p className="text-lg font-bold text-gray-900 mb-4">₦{bid.amount?.toLocaleString()}</p>
-                          
-                          {/* Progress Bar */}
-                          <div className="mb-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm text-gray-600">Progress: 0%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div className="bg-green-500 h-2 rounded-full" style={{ width: '0%' }}></div>
-                            </div>
+                  ongoingGigs.map((gig) => (
+                    <Card key={gig.id} className="bg-white border border-gray-200">
+                      <CardContent className="p-6">
+                        <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
+                        <p className="text-sm text-gray-600 mb-2">Client: {gig.company}</p>
+                        <p className="text-sm text-gray-600 mb-2">Due: {gig.dueDate}</p>
+                        <p className="text-lg font-bold text-gray-900 mb-4">{gig.price}</p>
+                        
+                        {/* Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-gray-600">Progress: {gig.progress}%</span>
                           </div>
-                          
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              onClick={() => navigate("/seller-messages")}
-                              className="border-blue-500 text-blue-500 hover:bg-blue-50"
-                            >
-                              Message Client
-                            </Button>
-                            <Button 
-                              onClick={() => {
-                                // Convert bid to OngoingGig format for handleSubmitWork
-                                const ongoingGig: OngoingGig = {
-                                  id: bid.gig?.id || bid.id,
-                                  title: bid.gig?.title || 'Unknown Gig',
-                                  company: bid.gig?.buyer?.name || bid.gig?.buyer?.email || bid.gig?.company || 'Unknown Client',
-                                  price: `₦${bid.amount?.toLocaleString()}`,
-                                  dueDate: bid.gig?.deadline ? new Date(bid.gig.deadline).toLocaleDateString() : 'Unknown',
-                                  progress: 0,
-                                  description: bid.gig?.description || ''
-                                };
-                                handleSubmitWork(ongoingGig);
-                              }}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              Submit Work
-                            </Button>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="bg-green-500 h-2 rounded-full" style={{ width: `${gig.progress}%` }}></div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => navigate("/seller-messages")}
+                            className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                          >
+                            Message Client
+                          </Button>
+                          <Button 
+                            onClick={() => handleSubmitWork(gig)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Submit Work
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
                 )}
               </div>
             </div>

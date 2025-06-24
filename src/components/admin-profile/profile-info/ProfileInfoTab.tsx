@@ -31,7 +31,7 @@ export const ProfileInfoTab = () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('email, first_name, last_name, phone, location, created_at')
         .eq('id', user!.id)
         .single();

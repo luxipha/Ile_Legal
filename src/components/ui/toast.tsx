@@ -18,7 +18,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = (message: string, type: 'success' | 'error' | 'info') => {
-    const id = Date.now().toString();
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     setToasts((prev) => [...prev, { id, message, type }]);
     
     // Auto-remove toast after 5 seconds

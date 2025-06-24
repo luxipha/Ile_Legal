@@ -11,7 +11,7 @@ export const createUserWallet = async (user: User) => {
   try {
     // Check if user already has a wallet
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
+      .from('Profiles')
       .select('circle_wallet_id, circle_wallet_address')
       .eq('id', user.id)
       .single();
@@ -36,7 +36,7 @@ export const createUserWallet = async (user: User) => {
     
     // Update user profile with wallet information
     await supabase
-      .from('profiles')
+      .from('Profiles')
       .update({
         circle_wallet_id: wallet.walletId,
         circle_wallet_address: addressData.address,
@@ -54,7 +54,7 @@ export const createUserWallet = async (user: User) => {
     
     // Update user profile with error status
     await supabase
-      .from('profiles')
+      .from('Profiles')
       .update({
         circle_wallet_status: 'failed'
       })
@@ -73,7 +73,7 @@ export const getUserWallet = async (userId: string) => {
   try {
     // Get wallet ID from user profile
     const { data: profile, error } = await supabase
-      .from('profiles')
+      .from('Profiles')
       .select('circle_wallet_id, circle_wallet_address')
       .eq('id', userId)
       .single();
@@ -137,7 +137,7 @@ export const getWalletTransactions = async (userId: string, pageSize = 20, pageN
   try {
     // Get wallet ID from user profile
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('Profiles')
       .select('circle_wallet_id')
       .eq('id', userId)
       .single();
@@ -177,7 +177,7 @@ export const createEscrowTransaction = async (
   try {
     // Get buyer's wallet ID
     const { data: buyerProfile } = await supabase
-      .from('profiles')
+      .from('Profiles')
       .select('circle_wallet_id')
       .eq('id', buyerId)
       .single();

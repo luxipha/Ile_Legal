@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   UserIcon,
   BriefcaseIcon,
@@ -11,15 +12,12 @@ import {
 
 interface BuyerSidebarProps {
   activePage?: "dashboard" | "my-gigs" | "messages" | "payments" | "profile" | "post-gig";
-  userName?: string;
-  userEmail?: string;
 }
 
 export const BuyerSidebar: React.FC<BuyerSidebarProps> = ({
   activePage = "dashboard",
-  userName = "Demo Client",
-  userEmail = "client@example.com",
 }) => {
+  const { user } = useAuth();
   return (
     <div className="w-64 bg-[#1B1828] text-white flex flex-col">
       <div className="p-6 border-b border-gray-700">
@@ -122,8 +120,8 @@ export const BuyerSidebar: React.FC<BuyerSidebarProps> = ({
             <UserIcon className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-sm font-medium">{userName}</div>
-            <div className="text-xs text-gray-400">{userEmail}</div>
+            <div className="text-sm font-medium">{user?.name || user?.email?.split('@')[0] || 'User'}</div>
+            <div className="text-xs text-gray-400">{user?.email || 'No email'}</div>
           </div>
         </div>
       </div>

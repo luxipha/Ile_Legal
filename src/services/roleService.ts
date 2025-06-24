@@ -130,7 +130,7 @@ export class RoleService {
 
       // Get total count for admin users only
       const { count, error: countError } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('*', { count: 'exact', head: true })
         .in('user_type', ['admin', 'super_admin', 'moderator', 'support']);
 
@@ -138,7 +138,7 @@ export class RoleService {
 
       // Get admin team members
       const { data: profiles, error } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('id, email, first_name, last_name, user_type, created_at, avatar_url')
         .in('user_type', ['admin', 'super_admin', 'moderator', 'support'])
         .order('created_at', { ascending: false })
@@ -200,7 +200,7 @@ export class RoleService {
 
       // Create profile
       const { error: profileError } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .insert({
           id: data.user.id,
           email: userData.email,
@@ -232,7 +232,7 @@ export class RoleService {
   static async changeUserRole(userId: string, newUserType: UserType): Promise<void> {
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .update({ user_type: newUserType })
         .eq('id', userId);
 
@@ -249,7 +249,7 @@ export class RoleService {
   static async getUserRole(userId: string): Promise<SimpleRole | null> {
     try {
       const { data: profile, error } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('user_type')
         .eq('id', userId)
         .single();
@@ -307,7 +307,7 @@ export class RoleService {
   } | null> {
     try {
       const { data: profile, error } = await supabase
-        .from('profiles')
+        .from('Profiles')
         .select('id, email, first_name, last_name, phone, location, user_type, created_at')
         .eq('id', userId)
         .single();

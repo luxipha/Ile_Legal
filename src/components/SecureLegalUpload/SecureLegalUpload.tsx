@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { ipfsService, IPFSUploadResult } from '../../services/ipfsService';
+import { enhancedIPFSService } from '../../services/filecoinStorageService';
+import { InstantDocumentViewer } from '../InstantDocumentViewer/InstantDocumentViewer';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { 
@@ -39,6 +41,8 @@ export interface SecureUploadResult {
     uploadedAt: string;
     securityLevel: 'court-grade';
     algorandTxId?: string;
+    filecoinPieceId?: string;
+    filecoinStorageCost?: number;
     verification: {
       tamperProof: boolean;
       courtAdmissible: boolean;
@@ -96,19 +100,26 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
     };
 
     try {
-      // Step 1: Upload to IPFS for permanent storage
+      // Step 1: Upload with enhanced Filecoin support
       result.status = 'uploading';
-      const ipfsResult = await ipfsService.uploadFile(file, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        uploadedAt: timestamp
+      
+      // Use enhanced IPFS service with optional Filecoin storage
+      const uploadResult = await enhancedIPFSService.uploadWithFilecoin(file, {
+        useFilecoin: true, // Enable Filecoin for enhanced storage
+        storageDuration: 365 // 1 year storage
       });
 
-      result.ipfsCid = ipfsResult.cid;
-      result.ipfsUrl = ipfsResult.url;
+      result.ipfsCid = uploadResult.cid;
+      result.ipfsUrl = uploadResult.url;
       result.metadata.verification.permanentStorage = true;
       result.metadata.verification.encrypted = true;
+      
+      // Add Filecoin-specific metadata if available
+      if (uploadResult.pieceId) {
+        result.metadata.filecoinPieceId = uploadResult.pieceId;
+        result.metadata.filecoinStorageCost = uploadResult.storageCost;
+        console.log(`🚀 Filecoin piece ID: ${uploadResult.pieceId}`);
+      }
 
       // Step 2: Generate blockchain hash and submit to Algorand
       result.status = 'securing';
@@ -285,7 +296,7 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
       <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-2">
           <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
-          <h3 className="font-semibold text-blue-900">Court-Grade Security Enabled</h3>
+          <h3 className="font-semibold text-blue-900">Court-Grade Security + Filecoin Storage</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div className="flex items-center gap-2">
@@ -298,11 +309,11 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <ClockIcon className="w-4 h-4 text-green-600" />
-            <span className="text-gray-700">Permanent storage</span>
+            <span className="text-gray-700">Filecoin permanent storage</span>
           </div>
           <div className="flex items-center gap-2">
             <LockIcon className="w-4 h-4 text-green-600" />
-            <span className="text-gray-700">Client confidentiality</span>
+            <span className="text-gray-700">FVM payment tracking</span>
           </div>
         </div>
       </div>
@@ -346,9 +357,9 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
               </p>
               <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-600">
                 <span>• Blockchain verification</span>
-                <span>• Permanent IPFS storage</span>
+                <span>• Filecoin permanent storage</span>
                 <span>• Tamper-proof timestamps</span>
-                <span>• Court-admissible proof</span>
+                <span>• FVM payment tracking</span>
               </div>
               <p className="text-xs text-gray-400 mt-4">
                 Supported: PDF, DOC, DOCX, TXT, JPG, PNG, XLS, XLSX (max {maxFiles} files)
@@ -390,7 +401,7 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
                         </div>
 
                         {file.status === 'completed' && (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div className="flex items-center gap-1">
                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -400,18 +411,31 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                                 <span>IPFS: {file.ipfsCid.substring(0, 12)}...</span>
                               </div>
+                              {file.metadata.filecoinPieceId && (
+                                <div className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                  <span>Filecoin Piece: {file.metadata.filecoinPieceId.substring(0, 12)}...</span>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-4 text-xs text-gray-500">
                               <span>Timestamp: {new Date(file.timestamp).toLocaleString()}</span>
-                              <a
-                                href={file.ipfsUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                              >
-                                View Secure Copy
-                                <ExternalLinkIcon className="w-3 h-3" />
-                              </a>
+                              {file.metadata.filecoinStorageCost && (
+                                <span>Storage Cost: {file.metadata.filecoinStorageCost.toFixed(8)} FIL</span>
+                              )}
+                            </div>
+                            
+                            {/* Instant Document Viewer Integration */}
+                            <div className="mt-3 border-t pt-3">
+                              <InstantDocumentViewer
+                                cid={file.ipfsCid}
+                                filename={file.file.name}
+                                fileType={file.file.type}
+                                fileSize={file.file.size}
+                                showPreview={false}
+                                autoLoad={false}
+                                className="text-sm"
+                              />
                             </div>
                           </div>
                         )}
