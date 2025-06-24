@@ -10,7 +10,9 @@ import {
   StarIcon,
   BuildingIcon,
   SendIcon,
-  PaperclipIcon
+  PaperclipIcon,
+  UserIcon,
+  AlertTriangleIcon
 } from "lucide-react";
 
 // Unified Gig interface that supports both data structures
@@ -38,6 +40,15 @@ export interface Gig {
   buyer_id?: string;      // From first component
   buyerId?: string;       // From second component
   company?: string;       // From second component
+  
+  // Buyer profile data from API join
+  buyer?: {
+    id: string;
+    email?: string;
+    name?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
   
   // Additional fields from second component
   location?: string;
@@ -505,8 +516,18 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
             <span>Budget {getBudget()}</span>
           </div>
         </div>
-        <span className="bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium">
-          {getStatus() === 'pending' ? 'Open for Bids' : 'Closed'}
+        <span className={
+          getStatus() === 'pending'
+            ? 'bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium'
+            : getStatus() === 'paused'
+              ? 'bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium'
+              : 'bg-gray-200 text-gray-500 px-4 py-2 rounded-lg font-medium'
+        }>
+          {getStatus() === 'pending'
+            ? 'Open for Bids'
+            : getStatus() === 'paused'
+              ? 'Paused'
+              : 'Closed'}
         </span>
       </div>
 
@@ -576,6 +597,62 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
                 <div className="mb-6">
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">Location</h4>
                   <p className="text-gray-600">{gig.location}</p>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {gig.attachments && gig.attachments.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Attachments</h4>
+                  <div className="space-y-3">
+                    {gig.attachments.map((attachmentUrl, index) => {
+                      // Extract filename from URL
+                      const filename = attachmentUrl.split('/').pop()?.split('?')[0] || `attachment-${index + 1}`;
+                      // Shorten URL for display: show filename + ... + first 6 chars of hash/query
+                      const urlHash = attachmentUrl.split('?')[1]?.slice(0, 6) || attachmentUrl.slice(-6);
+                      const shortDisplay = `${filename}...${urlHash}`;
+                      return (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{shortDisplay}</div>
+                              <div className="text-sm text-gray-500">Document</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(attachmentUrl, '_blank')}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                            >
+                              View
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = attachmentUrl;
+                                link.download = filename;
+                                link.click();
+                              }}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-100"
+                            >
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -798,12 +875,26 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
 
           {/* Only show Place Bid button if showPlaceBid is true and gig is pending */}
           {showPlaceBid && getStatus() === 'pending' && getStatus() !== 'suspended' && (
-            <Button
-              onClick={() => onPlaceBid(gig)}
-              className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 mb-4"
-            >
-              Place Bid
-            </Button>
+            <>
+              {user?.user_metadata?.status === "verified" ? (
+                <Button
+                  onClick={() => onPlaceBid(gig)}
+                  className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 mb-4"
+                >
+                  Place Bid
+                </Button>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangleIcon className="w-5 h-5 text-yellow-600" />
+                    <span className="font-medium text-yellow-800">Account Verification Required</span>
+                  </div>
+                  <p className="text-sm text-yellow-700">
+                    Your account needs to be verified before you can place bids. Please contact support to complete verification.
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

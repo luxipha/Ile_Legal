@@ -6,7 +6,7 @@ import { Header } from "../../components/Header";
 import { ViewBids } from "../../components/ViewBids/ViewBids";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
 import { api } from "../../services/api";
-import { supabaseLocal as supabase } from "../../lib/supabaseLocal";
+import { supabase } from "../../lib/supabase";
 import { 
   UserIcon,
   PlusIcon,
@@ -21,6 +21,7 @@ import {
   GridIcon,
   ListIcon
 } from "lucide-react";
+import { MultiSelectDropdown } from "../../components/ui/MultiSelectDropdown";
 
 type ViewMode = "list" | "view-gig" | "edit-gig";
 
@@ -28,6 +29,7 @@ interface Gig {
   id: number;
   title: string;
   category: string;
+  categories: string[];
   description: string;
   budget: string;
   deadline: string;
@@ -41,6 +43,7 @@ interface Gig {
   requirements: string[];
   attachments: string[];
   is_flagged: boolean;
+  buyer_id: string;
 }
 
 interface AttachedFile {
@@ -48,6 +51,7 @@ interface AttachedFile {
   name: string;
   size: number;
   type: string;
+  file?: File;
 }
 
 export const MyGigs = (): JSX.Element => {
@@ -61,9 +65,10 @@ export const MyGigs = (): JSX.Element => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
+  const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]);
   const [editFormData, setEditFormData] = useState({
     title: "",
-    category: "",
+    categories: [] as string[],
     description: "",
     budget: "",
     deadline: "",
@@ -73,6 +78,21 @@ export const MyGigs = (): JSX.Element => {
   const filters = ["All Gigs", "Active", "Paused", "Draft"];
   const categories = ["All Categories", "Contract Law", "Business Law", "Family Law", "Property Law", "Immigration Law"];
 
+  const categoryOptions = [
+    { value: "land-title", label: "Land Title Verification" },
+    { value: "contract-review", label: "Contract Review" },
+    { value: "property-survey", label: "Property Survey" },
+    { value: "due-diligence", label: "Due Diligence" },
+    { value: "legal-documentation", label: "Legal Documentation" },
+    { value: "compliance-check", label: "Compliance Check" },
+    { value: "c-of-o", label: "C of O Processing" },
+    { value: "real-estate-law", label: "Real Estate Law" },
+    { value: "family-law", label: "Family Law" },
+    { value: "business-law", label: "Business Law" },
+    { value: "immigration-law", label: "Immigration Law" },
+    { value: "other", label: "Other" }
+  ];
+
   useEffect(() => {
     fetchGigs();
   }, []);
@@ -80,6 +100,7 @@ export const MyGigs = (): JSX.Element => {
   const fetchGigs = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("user", user);
       if (!user) return;
 
       const filters = {
@@ -88,12 +109,14 @@ export const MyGigs = (): JSX.Element => {
       };
 
       const fetchedGigs = await api.gigs.getMyGigs(user.id, filters);
+      console.log("fetchedGigs:", fetchedGigs);
       
       // Transform the fetched gigs to match our Gig interface
       const transformedGigs: Gig[] = fetchedGigs.map((gig: any) => ({
         id: gig.id,
         title: gig.title,
-        category: gig.categories[0], // Assuming first category is primary
+        category: gig.categories?.[0] || '',
+        categories: gig.categories || [],
         description: gig.description,
         budget: `₦${gig.budget}`,
         deadline: new Date(gig.deadline).toLocaleDateString(),
@@ -106,7 +129,8 @@ export const MyGigs = (): JSX.Element => {
         bidsReceived: 0,
         requirements: gig.requirements || [],
         attachments: gig.attachments || [],
-        is_flagged: false
+        is_flagged: false,
+        buyer_id: user.id
       }));
 
       setGigs(transformedGigs);
@@ -137,9 +161,10 @@ export const MyGigs = (): JSX.Element => {
 
   const handleEditGig = (gig: Gig) => {
     setSelectedGig(gig);
+    setAttachmentsToDelete([]);
     setEditFormData({
       title: gig.title,
-      category: gig.category,
+      categories: Array.isArray((gig as any).categories) ? (gig as any).categories : [gig.category],
       description: gig.description,
       budget: gig.budget.replace('₦', ''),
       deadline: new Date(gig.deadline).toLocaleDateString('en-CA'),
@@ -152,14 +177,46 @@ export const MyGigs = (): JSX.Element => {
       id: Math.random().toString(36).substr(2, 9),
       name,
       size: 0, // We don't have the original size
-      type: name.split('.').pop() || '' // Try to guess the type from extension
+      type: name.split('.').pop() || '', // Try to guess the type from extension
+      file: undefined
     })));
 
     setViewMode("edit-gig");
   };
 
-  const handlePauseGig = (gigId: number) => {
-    console.log("Pausing gig:", gigId);
+  const handlePauseGig = async (gig: Gig): Promise<void> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Determine the new status: resume to 'pending', pause to 'paused'
+      const newStatus = gig.status === "Paused" ? "pending" : "paused";
+
+      // Prepare the update payload, keeping all required fields
+      const gigData = {
+        title: gig.title,
+        description: gig.description,
+        categories: Array.isArray((gig as any).categories) ? (gig as any).categories : [gig.category],
+        budget: gig.budget.replace('₦', ''),
+        deadline: new Date(gig.deadline).toISOString(),
+        status: newStatus,
+        buyer_id: user.id,
+        requirements: gig.requirements
+      };
+
+      const error = await api.gigs.updateGig(gig.id.toString(), gigData);
+
+      if (error) {
+        throw new Error('Failed to update gig status');
+      }
+
+      // Refresh the gigs list to show updated data
+      await fetchGigs();
+    } catch (error) {
+      console.error('Error updating gig status:', error);
+      // Optionally show an error message to the user
+    }
+    return;
   };
 
   // Delete functionality is implemented inline where needed
@@ -195,7 +252,8 @@ export const MyGigs = (): JSX.Element => {
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
       size: file.size,
-      type: file.type
+      type: file.type,
+      file: file
     }));
     setAttachedFiles(prev => [...prev, ...newFiles]);
   };
@@ -238,19 +296,36 @@ export const MyGigs = (): JSX.Element => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Delete marked attachments first
+      if (attachmentsToDelete.length > 0) {
+        for (const filename of attachmentsToDelete) {
+          try {
+            await api.gigs.deleteAttachment(selectedGig.id, selectedGig.buyer_id, filename);
+          } catch (err) {
+            console.error(`Failed to delete attachment ${filename}:`, err);
+            // Continue with other deletions even if one fails
+          }
+        }
+      }
+
       // Filter out empty requirements
       const validRequirements = editFormData.requirements.filter(req => req.trim() !== '');
+
+      // Get files from attachedFiles state (newly uploaded files)
+      const files: File[] = attachedFiles
+        .filter(file => file.file) // Only include files that have a File object
+        .map(file => file.file!)
+        .filter(Boolean); // Remove any undefined values
 
       const gigData = {
         title: editFormData.title,
         description: editFormData.description,
-        categories: [editFormData.category],
+        categories: editFormData.categories,
         budget: editFormData.budget.replace('₦', ''),
         deadline: new Date(editFormData.deadline).toISOString(),
         status: selectedGig.status.toLowerCase(),
-        attachments: attachedFiles.map(f => f.name),
+        attachments: files, // Pass File objects from attachedFiles
         buyer_id: user.id,
-        // client: {} as JSON,
         requirements: validRequirements
       };
 
@@ -278,7 +353,8 @@ export const MyGigs = (): JSX.Element => {
   // Update the filteredGigs to use the state
   const filteredGigs = gigs.filter(gig => {
     const matchesFilter = selectedFilter === "All Gigs" || gig.status === selectedFilter;
-    const matchesCategory = selectedCategory === "All Categories" || gig.category === selectedCategory;
+    const matchesCategory = selectedCategory === "All Categories" || 
+      gig.categories.includes(selectedCategory) || gig.category === selectedCategory;
     return matchesFilter && matchesCategory;
   });
 
@@ -287,6 +363,10 @@ export const MyGigs = (): JSX.Element => {
     active: gigs.filter(g => g.status === "Active").length,
     paused: gigs.filter(g => g.status === "Paused").length,
     draft: gigs.filter(g => g.status === "Draft").length
+  };
+
+  const handleCategoriesChange = (selectedCategories: string[]) => {
+    setEditFormData(prev => ({ ...prev, categories: selectedCategories }));
   };
 
   if (viewMode === "view-gig" && selectedGig) {
@@ -317,7 +397,8 @@ export const MyGigs = (): JSX.Element => {
                 companyRating: 4.8,
                 projectsPosted: 12,
                 is_flagged: selectedGig.is_flagged,
-                status: selectedGig.status.toLowerCase()
+                status: selectedGig.status.toLowerCase(),
+                attachments: selectedGig.attachments
               }}
               onBack={() => setViewMode("list")}
               backButtonText="Back to My Gigs"
@@ -435,22 +516,14 @@ export const MyGigs = (): JSX.Element => {
                       </div>
                       <div>
                         <label className="block text-lg font-semibold text-gray-900 mb-3">
-                          Category
+                          Categories
                         </label>
-                        <select
-                          name="category"
-                          value={editFormData.category}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-lg"
-                          required
-                        >
-                          <option value="">Select Category</option>
-                          <option value="Contract Law">Contract Law</option>
-                          <option value="Business Law">Business Law</option>
-                          <option value="Family Law">Family Law</option>
-                          <option value="Property Law">Property Law</option>
-                          <option value="Immigration Law">Immigration Law</option>
-                        </select>
+                        <MultiSelectDropdown
+                          options={categoryOptions}
+                          selectedValues={editFormData.categories}
+                          onChange={handleCategoriesChange}
+                          placeholder="Select categories..."
+                        />
                       </div>
                     </div>
 
@@ -499,49 +572,108 @@ export const MyGigs = (): JSX.Element => {
                       </div>
                     </div>
 
-                    {/* Requirements */}
-                    <div>
-                      <label className="block text-lg font-semibold text-gray-900 mb-3">
-                        Requirements
-                      </label>
-                      <div className="space-y-3">
-                        {editFormData.requirements.map((req, index) => (
-                          <div key={index} className="flex items-center gap-3">
-                            <input
-                              type="text"
-                              value={req}
-                              onChange={(e) => handleRequirementChange(index, e.target.value)}
-                              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
-                              placeholder="Enter requirement"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeRequirement(index)}
-                              className="text-red-600 border-red-200 hover:bg-red-50"
-                            >
-                              <XIcon className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={addRequirement}
-                          className="text-green-600 border-green-200 hover:bg-green-50"
-                        >
-                          <PlusIcon className="w-4 h-4 mr-2" />
-                          Add Requirement
-                        </Button>
-                      </div>
-                    </div>
-
                     {/* Attachments */}
                     <div>
                       <label className="block text-lg font-semibold text-gray-900 mb-3">
                         Attachments
                       </label>
+                      
+                      {/* Existing Attachments */}
+                      {selectedGig.attachments && selectedGig.attachments.length > 0 && (
+                        <div className="mb-6">
+                          <h4 className="text-md font-medium text-gray-700 mb-3">Existing Attachments</h4>
+                          <div className="space-y-2">
+                            {selectedGig.attachments.map((attachmentUrl, index) => {
+                              // Extract filename from URL
+                              console.log("selectedGig:", selectedGig);
+                              const filename = attachmentUrl.split('/').pop()?.split('?')[0] || `attachment-${index + 1}`;
+                              // Shorten URL for display: show filename + ... + first 6 chars of hash/query
+                              const urlHash = attachmentUrl.split('?')[1]?.slice(0, 6) || attachmentUrl.slice(-6);
+                              const shortDisplay = `${filename}...${urlHash}`;
+                              // Extract file path for deletion (between /object/sign/documents/ and ?)
+                              let filePath = '';
+                              try {
+                                const match = attachmentUrl.match(/\/object\/sign\/documents\/([^?]+)/);
+                                if (match && match[1]) filePath = decodeURIComponent(match[1]);
+                              } catch {}
+                              // Extract filename for API
+                              const filenameForApi = filename;
+                              const handleDeleteAttachment = async () => {
+                                // Mark attachment for deletion
+                                setAttachmentsToDelete(prev => [...prev, filenameForApi]);
+                              };
+                              const isMarkedForDeletion = attachmentsToDelete.includes(filenameForApi);
+                              return (
+                                <div key={index} className={`flex items-center justify-between p-3 rounded-lg border ${
+                                  isMarkedForDeletion 
+                                    ? 'bg-red-50 border-red-200' 
+                                    : 'bg-blue-50 border-blue-200'
+                                }`}>
+                                  <div className="flex items-center gap-3">
+                                    <FileTextIcon className="w-5 h-5 text-blue-500" />
+                                    <div>
+                                      <div className="font-medium text-gray-900">{shortDisplay}</div>
+                                      <div className="text-sm text-gray-500">
+                                        {isMarkedForDeletion ? 'Marked for deletion' : 'Existing file'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {!isMarkedForDeletion ? (
+                                      <>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => window.open(attachmentUrl, '_blank')}
+                                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                                        >
+                                          View
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            const link = document.createElement('a');
+                                            link.href = attachmentUrl;
+                                            link.download = filename;
+                                            link.click();
+                                          }}
+                                          className="text-green-600 hover:text-green-700 hover:bg-green-100"
+                                        >
+                                          Download
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={handleDeleteAttachment}
+                                          className="text-red-600 hover:text-red-700 hover:bg-red-100"
+                                        >
+                                          Delete
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setAttachmentsToDelete(prev => prev.filter(f => f !== filenameForApi))}
+                                          className="text-green-600 hover:text-green-700 hover:bg-green-100"
+                                        >
+                                          Undo
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                       
                       <div
                         onDrop={handleDrop}
@@ -571,32 +703,34 @@ export const MyGigs = (): JSX.Element => {
                           (PDF, DOC, DOCX, JPG, PNG up to 10 MB)
                         </p>
                       </div>
-
-                      {attachedFiles.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                          {attachedFiles.map((file) => (
-                            <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <FileTextIcon className="w-5 h-5 text-gray-500" />
-                                <div>
-                                  <div className="font-medium text-gray-900">{file.name}</div>
-                                  <div className="text-sm text-gray-500">{formatFileSize(file.size)}</div>
-                                </div>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeFile(file.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <XIcon className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
+
+                    {/* New Attachments */}
+                    {attachedFiles.filter(f => f.file).length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <h4 className="text-md font-medium text-gray-700 mb-3">New Attachments</h4>
+                        {attachedFiles.filter(f => f.file).map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <FileTextIcon className="w-5 h-5 text-gray-500" />
+                              <div>
+                                <div className="font-medium text-gray-900">{file.name}</div>
+                                <div className="text-sm text-gray-500">{formatFileSize(file.size)}</div>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile(file.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <XIcon className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-4 pt-6">
@@ -836,13 +970,15 @@ export const MyGigs = (): JSX.Element => {
                           >
                             Edit
                           </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handlePauseGig(gig.id)}
-                            className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
-                          >
-                            {gig.status === "Paused" ? "Resume" : "Pause"}
-                          </Button>
+                          {!(String(gig.status).toLowerCase() === "active" || String(gig.status).toLowerCase() === "completed" || String(gig.status).toLowerCase() === "suspended") && (
+                            <Button
+                              variant="outline"
+                              onClick={() => handlePauseGig(gig)}
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                            >
+                              {gig.status === "Paused" ? "Resume" : "Pause"}
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

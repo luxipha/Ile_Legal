@@ -193,7 +193,13 @@ export const SellerDashboard = (): JSX.Element => {
     setViewMode("view-details");
   };
 
-  const handlePlaceBid = (gig?: SellerGig) => {
+  const handlePlaceBid = (gig?: Gig) => {
+    // Check if seller is verified
+    if (user?.user_metadata?.status === 'pending' || user?.user_metadata?.status === 'rejected') {
+      alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
+      return;
+    }
+    
     if (gig) {
       setSelectedGig(gig);
     }
@@ -250,6 +256,13 @@ export const SellerDashboard = (): JSX.Element => {
 
   const handleBidSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if seller is verified
+    if (user?.user_metadata?.status === 'pending' || user?.user_metadata?.status === 'rejected') {
+      alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
+      return;
+    }
+    
     console.log("Bid submitted:", bidFormData);
     setViewMode("dashboard");
   };

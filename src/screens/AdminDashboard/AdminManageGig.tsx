@@ -21,7 +21,16 @@ interface Gig {
   priority?: "High Value" | "Urgent" | "New";
   postedDate: string;
   dueDate: string;
+  deadline: string;
+  created_at: string;
   is_flagged: boolean;
+  buyer?: {
+    id: string;
+    name?: string;
+    email?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
 }
 
 interface AdminManageGigProps {
@@ -33,6 +42,16 @@ interface AdminManageGigProps {
   selectedGigTab: "all" | "active" | "pending" | "completed" | "flagged";
   setSelectedGigTab: (tab: "all" | "active" | "pending" | "completed" | "flagged") => void;
 }
+
+// Helper function to format dates
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'Unknown';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric'
+  });
+};
 
 export const AdminManageGig = ({
   gigs,
@@ -114,7 +133,7 @@ export const AdminManageGig = ({
                   <div className="grid grid-cols-2 gap-6 mb-4">
                     <div className="flex items-center gap-2">
                       <UsersIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-600">Client: {gig.client}</span>
+                      <span className="text-gray-600">Client: {gig.buyer?.name || gig.buyer?.email || gig.client || 'Unknown Client'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <UserIcon className="w-4 h-4 text-gray-400" />
@@ -171,8 +190,8 @@ export const AdminManageGig = ({
                     {gig.status}
                   </span>
                   <div className="text-sm text-gray-500">
-                    <div>Posted: {gig.postedDate}</div>
-                    <div>Due: {gig.dueDate}</div>
+                    <div>Created: {formatDate(gig.created_at)}</div>
+                    <div>Deadline: {formatDate(gig.deadline)}</div>
                   </div>
                 </div>
               </div>

@@ -63,6 +63,7 @@ interface Gig {
   projectsPosted: number;
   is_flagged: boolean;
   status?: string;
+  attachments?: string[]; // Add attachments field
 }
 
 // Extended messaging service interface to handle optional methods
@@ -743,10 +744,67 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                 ))}
               </ol>
               
-              <p className="text-gray-600">
+              <p className="text-gray-600 mb-6">
                 The property is a 1,000 sqm commercial plot with existing development. 
                 All necessary documents will be provided upon assignment.
               </p>
+
+              {/* Attachments Section */}
+              {gig.attachments && gig.attachments.length > 0 && (
+                <div className="mt-8">
+                  <h4 className="text-lg font-semibold text-[#1B1828] mb-4">Attachments</h4>
+                  <div className="space-y-3">
+                    {gig.attachments.map((attachmentUrl, index) => {
+                      // Extract filename from URL
+                      const filename = attachmentUrl.split('/').pop()?.split('?')[0] || `attachment-${index + 1}`;
+                      // Shorten URL for display: show filename + ... + first 6 chars of hash/query
+                      const urlHash = attachmentUrl.split('?')[1]?.slice(0, 6) || attachmentUrl.slice(-6);
+                      const shortDisplay = `${filename}...${urlHash}`;
+                      
+                      return (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{shortDisplay}</div>
+                              <div className="text-sm text-gray-500">Document</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(attachmentUrl, '_blank')}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                            >
+                              View
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = attachmentUrl;
+                                link.download = filename;
+                                link.click();
+                              }}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-100"
+                            >
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

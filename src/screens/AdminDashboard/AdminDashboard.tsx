@@ -31,6 +31,12 @@ interface User {
     name: string;
     status: "Verified" | "Pending" | "Rejected";
   }[];
+  user_metadata?: {
+    name?: string;
+    type?: string;
+    status?: string;
+    submittedDate?: string;
+  };
 }
 
 interface Gig {
@@ -50,8 +56,6 @@ interface Dispute {
   id: number;
   title: string;
   description: string;
-  buyer: string;
-  seller: string;
   amount: string;
   priority: "High Priority" | "Medium Priority" | "Low Priority";
   status: "Pending" | "In Review" | "Resolved";
@@ -59,7 +63,22 @@ interface Dispute {
   lastActivity: string;
   type: "Payment Dispute" | "Quality Dispute" | "Delivery Dispute";
   gig_id: string;
+  buyer_id: string;
   seller_id: string;
+  buyer?: {
+    id: string;
+    name?: string;
+    email?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
+  seller?: {
+    id: string;
+    name?: string;
+    email?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
 }
 
 export const AdminDashboard = (): JSX.Element => {
@@ -306,7 +325,7 @@ export const AdminDashboard = (): JSX.Element => {
   
   if (viewMode === "view-user-details" && selectedUser) {
     return (
-      <AdminLayout viewMode={viewMode} onNavigate={setViewMode} title={`User: ${selectedUser.name}`}>
+      <AdminLayout viewMode={viewMode} onNavigate={setViewMode} title={`User: ${typeof selectedUser.name === 'string' ? selectedUser.name : selectedUser.user_metadata?.name || selectedUser.email || 'Unknown User'}`}>
         <AdminViewUser 
           user={selectedUser} 
           onBack={() => setViewMode("verify-user")} 
@@ -421,7 +440,12 @@ export const AdminDashboard = (): JSX.Element => {
                             <UsersIcon className="w-4 h-4 text-gray-500" />
                           </div>
                           <div>
-                            <div className="font-medium">{user.name}</div>
+                            <div className="font-medium">
+                              {typeof user.name === 'string' ? user.name : 
+                               user.user_metadata?.name || 
+                               user.email || 
+                               'Unknown User'}
+                            </div>
                             <div className="text-xs text-gray-500">{user.type || user.user_metadata?.type || "Legal Professional"}</div>
                           </div>
                           <div className="ml-auto text-xs text-gray-500">{user.submittedDate || user.user_metadata?.submittedDate || ""}</div>
@@ -486,7 +510,7 @@ export const AdminDashboard = (): JSX.Element => {
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 mb-2">
-                          Between: {dispute.buyer} & {dispute.seller}
+                          Between: {dispute.buyer?.name || dispute.buyer?.email || 'Unknown Buyer'} & {dispute.seller?.name || dispute.seller?.email || 'Unknown Seller'}
                         </p>
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-gray-900">{dispute.amount}</span>

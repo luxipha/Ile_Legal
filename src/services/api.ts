@@ -1,4 +1,5 @@
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+// import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 import { ipfsService, IPFSUploadResult } from './ipfsService';
 import { reputationService } from './reputationService';
 
@@ -135,7 +136,13 @@ export const api = {
 
       const { data, error } = await supabase
         .from('Bids')
-        .select('*')
+        .select(`
+          *,
+          gig:Gigs!gig_id(
+            *,
+            buyer:Profiles!buyer_id(*)
+          )
+        `)
         .eq('seller_id', sellerId)
         .in('status', ['pending', 'accepted'])
         .order('created_at', { ascending: false });
@@ -264,9 +271,24 @@ export const api = {
       const { data, error } = await supabase
         .from('Gigs')
         .select('*')
-        .eq('id', gigId);
+        .eq('id', gigId)
+        .single();
       if (error) {
         console.error('Error fetching gig:', error);
+        return null;
+      }
+      // If there are attachments, fetch signed URLs
+      if (data && data.attachments && Array.isArray(data.attachments) && data.attachments.length > 0 && data.buyer_id) {
+        const attachmentUrls = await Promise.all(
+          data.attachments.map(async (filename: string) => {
+            const filePath = `${data.id}/${data.buyer_id}/${filename}`;
+            const { data: urlData } = await supabase.storage
+              .from('documents')
+              .createSignedUrl(filePath, 86400);
+            return urlData?.signedUrl || '';
+          })
+        );
+        return { ...data, attachments: attachmentUrls };
       }
       return data;
     },
@@ -280,8 +302,11 @@ export const api = {
       console.log("filters:", filters);
       let query = supabase
         .from("Gigs")
-        .select("*");
-      // console.log("query", query);
+        .select(`
+          *,
+          buyer:Profiles!buyer_id(*)
+        `);
+
       // Apply category filter if provided
       if (filters?.categories && filters.categories.length > 0) {
         query = query.contains('categories', filters.categories);
@@ -311,8 +336,26 @@ export const api = {
       if (error) {
         throw error;
       }
-      
-      return data || [];
+      // For each gig, if it has attachments and buyer_id, fetch signed URLs
+      const gigsWithUrls = await Promise.all((data || []).map(async (gig) => {
+        if (gig.attachments && Array.isArray(gig.attachments) && gig.attachments.length > 0 && gig.buyer_id) {
+          const attachmentUrls = await Promise.all(
+            gig.attachments.map(async (filename: string) => {
+              const filePath = `${gig.id}/${gig.buyer_id}/${filename}`;
+              const { data: urlData } = await supabase.storage
+                .from('documents')
+                .createSignedUrl(filePath, 86400);
+              return urlData?.signedUrl || '';
+            })
+          );
+          return {
+            ...gig,
+            attachments: attachmentUrls
+          };
+        }
+        return gig;
+      }));
+      return gigsWithUrls;
     },
 
     createGig: async (gigData: {
@@ -324,6 +367,9 @@ export const api = {
       attachments?: FileList | File[];
       buyer_id: string | undefined;
     }) => {
+      // Generate a random integer ID from 0 to 999999999
+      const randomId = Math.floor(Math.random() * 1000000000);
+      
       let attachmentUrls: string[] = [];
       
       // Upload files if they exist
@@ -333,7 +379,7 @@ export const api = {
         console.log('files:', files);
         
         const uploadPromises = files.map(async (file) => {
-          const filePath = `${gigData.buyer_id}/${file.name}`;
+          const filePath = `${randomId}/${gigData.buyer_id}/${file.name}`;
           console.log('filePath:', filePath);
           const { error: uploadError } = await supabase.storage
             .from('documents')
@@ -353,6 +399,7 @@ export const api = {
       const { data, error } = await supabase
         .from('Gigs')
         .insert({
+          id: randomId,
           title: gigData.title,
           description: gigData.description,
           categories: gigData.categories,
@@ -406,8 +453,32 @@ export const api = {
       if (error) {
         throw error;
       }
+
+      // Transform the data to include public URLs for attachments
+      const gigsWithUrls = await Promise.all((data || []).map(async (gig) => {
+        if (gig.attachments && Array.isArray(gig.attachments) && gig.attachments.length > 0) {
+          // Get public URLs for each attachment
+          const attachmentUrls = await Promise.all(
+            gig.attachments.map(async (filename: string) => {
+              const filePath = `${gig.id}/${userId}/${filename}`;
+              const { data: urlData } = await supabase.storage
+                .from('documents')
+                .createSignedUrl(filePath, 86400);
+              console.log("urlData:", urlData);
+              return urlData?.signedUrl || '';
+            })
+          );
+          
+          return {
+            ...gig,
+            attachments: attachmentUrls
+          };
+        }
+        
+        return gig;
+      }));
       
-      return data || [];
+      return gigsWithUrls;
     },
 
     deleteGig: async (gigId: string) => {
@@ -425,18 +496,91 @@ export const api = {
       budget: string;
       deadline: string;
       status: string;
-      attachments?: any;
+      attachments?: FileList | File[];
       buyer_id: string | undefined;
       // client: JSON;
     }) => {
+      console.log("gigData:", gigData);
+      
+      let attachmentUrls: string[] = [];
+      
+      // Upload files if they exist
+      if (gigData.attachments && gigData.buyer_id) {
+        // Convert FileList to array of Files
+        const files = Array.from(gigData.attachments);
+        console.log('files:', files);
+        
+        const uploadPromises = files.map(async (file) => {
+          const filePath = `${gigId}/${gigData.buyer_id}/${file.name}`;
+          console.log('filePath:', filePath);
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(filePath, file, { contentType: file.type });
+            
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw uploadError;
+          }
+          
+          return file.name;
+        });
+        
+        attachmentUrls = await Promise.all(uploadPromises);
+      }
+
+      // Fetch current attachments from DB
+      let currentAttachments: string[] = [];
+      const { data: gig, error: fetchError } = await supabase
+        .from('Gigs')
+        .select('attachments')
+        .eq('id', gigId)
+        .single();
+      if (!fetchError && gig && Array.isArray(gig.attachments)) {
+        currentAttachments = gig.attachments;
+      }
+
+      // Prepare the data to update, appending new filenames
+      const updateData = {
+        ...gigData,
+        attachments: attachmentUrls.length > 0 ? [...currentAttachments, ...attachmentUrls] : currentAttachments
+      };
+
       const { error } = await supabase
         .from('Gigs')
-        .update(gigData)
+        .update(updateData)
         .eq('id', gigId);
       console.log(error);
-      console.log(gigId);
-      console.log(gigData);
+      // console.log(gigId);
+      // console.log(gigData);
       return error;
+    },
+
+    /**
+     * Delete an attachment from the 'documents' bucket and remove it from the gig's attachments column
+     * @param gigId The gig's ID
+     * @param buyerId The buyer's ID
+     * @param filename The filename to remove
+     */
+    deleteAttachment: async (gigId: string | number, buyerId: string, filename: string) => {
+      // Remove from storage
+      const filePath = `${gigId}/${buyerId}/${filename}`;
+      const { error: storageError } = await supabase.storage.from('documents').remove([filePath]);
+      if (storageError) throw storageError;
+      // Remove from attachments array in Gigs table
+      // Fetch current attachments
+      const { data: gig, error: fetchError } = await supabase
+        .from('Gigs')
+        .select('attachments')
+        .eq('id', gigId)
+        .single();
+      if (fetchError) throw fetchError;
+      const updatedAttachments = (gig.attachments || []).filter((a: string) => a !== filename);
+      const { error: updateError } = await supabase
+        .from('Gigs')
+        .update({ attachments: updatedAttachments })
+        .eq('id', gigId);
+      if (updateError) throw updateError;
+      return true;
     },
   },
 
@@ -861,9 +1005,8 @@ export const api = {
 
     getAllDisputes: async () => {
       // Check if user is admin using session
-      console.log("getAllDisputes");
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log("session", session);
+
       if (sessionError) {
         throw new Error('Authentication error');
       }
@@ -872,12 +1015,19 @@ export const api = {
         throw new Error('Unauthorized: Admin access required');
       }
 
-      // If user is admin, fetch all disputes
+      // If user is admin, fetch all disputes with buyer and seller information
       const { data: disputes, error: disputesError } = await supabase
         .from('Disputes')
-        .select('*')
+        .select(`
+          *,
+          buyer:Profiles!buyer_id(*),
+          seller:Profiles!seller_id(*)
+        `)
         .order('created_at', { ascending: false });
       console.log("disputes", disputes);
+      if (disputes && disputes.length > 0) {
+        console.log(disputes[0]);
+      }
       if (disputesError) {
         throw disputesError;
       }
@@ -1098,7 +1248,10 @@ export const api = {
 
       const { data, error } = await supabase
         .from('Feedback')
-        .select('*')
+        .select(`
+          *,
+          creator_profile:Profiles!creator(*)
+        `)
         .eq('recipient', user.id)
         .order('created_at', { ascending: false });
 

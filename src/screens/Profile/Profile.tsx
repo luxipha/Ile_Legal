@@ -45,9 +45,31 @@ interface ProfileData {
   about: string;
   specializations: string[];
   education: Education[];
+  status?: string;
+  user_metadata?: {
+    status?: string;
+    [key: string]: any;
+  };
 }
 
-type ViewMode = "profile" | "edit-profile" | "public-view";
+interface Feedback {
+  id: number;
+  rating: number;
+  free_response: string;
+  creator: string;
+  recipient: string;
+  gig_id: number;
+  created_at: string;
+  creator_profile?: {
+    id: string;
+    name?: string;
+    email?: string;
+    created_at?: string;
+    verification_status?: string;
+  };
+}
+
+type ViewMode = "profile" | "edit-profile";
 
 export const Profile = (): JSX.Element => {
   const { user, updateProfile } = useAuth();
@@ -125,6 +147,7 @@ export const Profile = (): JSX.Element => {
       }
 
       const feedbackData = await api.feedback.getFeedbackForUser();
+      console.log("feedbackData", feedbackData);
       setReviews(feedbackData);
       
       // Calculate average rating
@@ -392,7 +415,9 @@ export const Profile = (): JSX.Element => {
                             <UserIcon className="w-6 h-6 text-gray-600" />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-900">Client</h4>
+                            <h4 className="font-semibold text-gray-900">
+                              {review.creator_profile?.name || review.creator_profile?.email || 'Anonymous Client'}
+                            </h4>
                             <div className="flex">{renderStars(review.rating)}</div>
                           </div>
                         </div>
