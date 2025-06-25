@@ -1,4 +1,4 @@
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 import * as circleSdk from './circleSdk';
 import { User } from '../types';
 

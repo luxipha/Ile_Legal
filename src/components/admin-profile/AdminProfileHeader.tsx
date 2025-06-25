@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useAuth } from "../../contexts/AuthContext";
 import { RoleService, UserType } from "../../services/roleService";
 import { usePermissions } from "../../hooks/usePermissions";
-import { supabaseLocal as supabase } from "../../lib/supabaseLocal";
+import { supabase } from '../../lib/supabase';
 
 export const AdminProfileHeader = () => {
   const { user, isLoading } = useAuth();

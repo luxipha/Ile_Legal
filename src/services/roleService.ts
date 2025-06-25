@@ -3,7 +3,7 @@
  * Uses simple user_type field instead of complex role tables
  */
 
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 
 export type UserType = 'buyer' | 'seller' | 'admin' | 'super_admin' | 'moderator' | 'support';
 

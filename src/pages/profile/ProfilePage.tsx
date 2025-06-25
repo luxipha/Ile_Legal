@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDropzone } from 'react-dropzone';
-import { supabaseLocal as supabase } from '../../lib/supabaseLocal';
+import { supabase } from '../../lib/supabase';
 import { api } from '../../services/api';
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),

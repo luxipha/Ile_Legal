@@ -1,5 +1,4 @@
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
-// import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { ipfsService, IPFSUploadResult } from './ipfsService';
 import { reputationService } from './reputationService';
 
@@ -1021,7 +1020,7 @@ export const api = {
       // Check if user is admin using session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      if (sessionError) {
+      if (sessionError || !session) {
         throw new Error('Authentication error');
       }
 
@@ -1074,7 +1073,7 @@ export const api = {
       // Check if user is admin using session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError) {
+      if (sessionError || !session) {
         throw new Error('Authentication error');
       }
 

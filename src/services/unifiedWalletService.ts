@@ -1,4 +1,4 @@
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 import { getUserWallet } from './walletService';
 
 export interface UnifiedWalletData {

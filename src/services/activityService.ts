@@ -1,4 +1,4 @@
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 
 export interface AdminActivity {
   id: string;

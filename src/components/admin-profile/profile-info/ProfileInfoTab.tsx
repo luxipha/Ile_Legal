@@ -3,7 +3,7 @@ import { PhoneIcon, MapPinIcon, MailIcon, ShieldIcon, KeyIcon, ClockIcon } from 
 import { Card, CardContent } from "../../../components/ui/card";
 import { useAuth } from "../../../contexts/AuthContext";
 import { usePermissions } from "../../../hooks/usePermissions";
-import { supabaseLocal as supabase } from "../../../lib/supabaseLocal";
+import { supabase } from '../../../lib/supabase';
 
 interface AdminProfile {
   email: string;

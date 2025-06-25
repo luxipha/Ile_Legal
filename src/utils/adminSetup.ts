@@ -1,4 +1,4 @@
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 
 /**
  * Admin setup utility for development

@@ -6,7 +6,7 @@
  */
 
 import { ipfsService, IPFSUploadResult } from './ipfsService';
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+import { supabase } from '../lib/supabase';
 
 // Environment variable validation
 const WEB3_STORAGE_DID = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_WEB3_STORAGE_DID : process.env.VITE_WEB3_STORAGE_DID) || '';

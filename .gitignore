@@ -9,3 +9,12 @@ coverage/
 .vscode/
 .idea/
 *.local
+
+# Test files - temporary scripts for testing
+test-*.js
+test-*.mjs
+*-test.js
+*-test.mjs
+query-*.mjs
+check-*.mjs
+list-*.mjs

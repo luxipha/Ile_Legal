@@ -90,9 +90,8 @@ const DEMO_USERS = [
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Import the Supabase client from our lib/supabaseLocal.ts file
-import { supabaseLocal as supabase } from '../lib/supabaseLocal';
-// import { supabase } from '../lib/supabase';
+// Import the Supabase client from our lib/supabase.ts file (remote database)
+import { supabase } from '../lib/supabase';
 
 // Function to create a test user for development purposes
 const createTestUser = async (role: UserRole = 'buyer'): Promise<void> => {
@@ -433,7 +432,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error('No user ID available for wallet creation');
           }
           
-          const userId = newUser.id; // Store in variable to satisfy TypeScript
           const walletDescription = `${newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)} wallet for ${newUser.name}`;
           const wallet = await circleSdk.createWallet(newUser.id, walletDescription);
           

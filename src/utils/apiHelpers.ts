@@ -28,8 +28,8 @@ export const handleApiError = (
 export const validateSession = async (maxRetries = 3, delayMs = 100): Promise<boolean> => {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const { supabaseLocal } = await import('../lib/supabaseLocal');
-      const { data: { session }, error } = await supabaseLocal.auth.getSession();
+      const { supabase } = await import('../lib/supabase');
+      const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
         console.log(`Session validation error (attempt ${attempt + 1}):`, error);

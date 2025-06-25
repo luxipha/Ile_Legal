@@ -2,7 +2,7 @@ import { useState } from "react";
 import { KeyIcon, EyeIcon, EyeOffIcon, CheckIcon } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent } from "../../../components/ui/card";
-import { supabaseLocal as supabase } from "../../../lib/supabaseLocal";
+import { supabase } from '../../../lib/supabase';
 import { ActivityService } from "../../../services/activityService";
 
 export const PasswordChangeCard = () => {

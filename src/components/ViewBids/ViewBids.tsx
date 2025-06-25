@@ -221,8 +221,8 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         bidsData.map(async (bid: any) => {
           try {
             // Get seller profile data from Profiles table (accessible to all users)
-            const { supabaseLocal } = await import('../../lib/supabaseLocal');
-            const { data: profileData } = await supabaseLocal
+            const { supabase } = await import('../../lib/supabase');
+            const { data: profileData } = await supabase
               .from('Profiles')
               .select('*')
               .eq('id', bid.seller_id)

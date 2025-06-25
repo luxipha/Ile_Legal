@@ -69,7 +69,7 @@ interface Feedback {
   };
 }
 
-type ViewMode = "profile" | "edit-profile";
+type ViewMode = "profile" | "edit-profile" | "public-view";
 
 export const Profile = (): JSX.Element => {
   const { user, updateProfile } = useAuth();
@@ -88,7 +88,7 @@ export const Profile = (): JSX.Element => {
   });
   // isLoading state can be used for loading indicators in the future
   const [, setIsLoading] = useState(true);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<Feedback[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [cases, setCases] = useState<any[]>([]);
@@ -137,8 +137,8 @@ export const Profile = (): JSX.Element => {
     setLoadingReviews(true);
     try {
       // Check if there's a valid session first
-      const { supabaseLocal } = await import('../../lib/supabaseLocal');
-      const { data: { session } } = await supabaseLocal.auth.getSession();
+      const { supabase } = await import('../../lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.log('No active session, skipping feedback fetch');
         setReviews([]);
@@ -169,8 +169,8 @@ export const Profile = (): JSX.Element => {
     setLoadingCases(true);
     try {
       // Check if there's a valid session first
-      const { supabaseLocal } = await import('../../lib/supabaseLocal');
-      const { data: { session } } = await supabaseLocal.auth.getSession();
+      const { supabase } = await import('../../lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.log('No active session, skipping cases fetch');
         setCases([]);

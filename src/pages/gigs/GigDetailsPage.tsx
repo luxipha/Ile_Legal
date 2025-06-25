@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, Calendar, DollarSign, MessageSquare, FileText, Clock, Shield, CheckCircle } from 'lucide-react';
-import { supabaseLocal as supabase } from '../../lib/supabaseLocal';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 
