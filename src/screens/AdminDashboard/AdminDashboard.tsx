@@ -25,11 +25,11 @@ interface User {
   name: string;
   email: string;
   type: "Property Law" | "Contract Law" | "Business Law";
-  status: "Pending" | "Verified" | "Rejected";
+  status: "pending" | "verified" | "rejected";
   submittedDate: string;
   documents: {
     name: string;
-    status: "Verified" | "Pending" | "Rejected";
+    status: "verified" | "pending" | "rejected";
   }[];
   user_metadata?: {
     name?: string;
@@ -177,7 +177,7 @@ export const AdminDashboard = (): JSX.Element => {
     }
   };
 
-  const handleRequestInfo = (userId: number, request: string) => {
+  const handleRequestInfo = (userId: string, request: string) => {
     console.log(`Requesting info from user ${userId}: ${request}`);
   };
 
@@ -189,7 +189,7 @@ export const AdminDashboard = (): JSX.Element => {
     }
   };
 
-  const handleViewUserDetails = (userId: number) => {
+  const handleViewUserDetails = (userId: string) => {
     const user = users.find(u => u.id === userId);
     if (user) {
       setSelectedUser(user);
@@ -218,7 +218,7 @@ export const AdminDashboard = (): JSX.Element => {
   const handleReviewGig = async (gigId: number) => {
     try {
       await api.admin.approveGig(gigId.toString());
-      setGigs(gigs => gigs.map(g => g.id === gigId ? { ...g, status: 'active' } : g));
+      setGigs(gigs => gigs.map(g => g.id === gigId ? { ...g, status: 'Active' } : g));
       console.log(`✅ Gig ${gigId} approved successfully`);
     } catch (error) {
       console.error('Error approving gig:', error);
@@ -472,7 +472,7 @@ export const AdminDashboard = (): JSX.Element => {
                             size="sm" 
                             variant="link"
                             className="text-xs text-blue-500 h-7"
-                            onClick={() => handleViewUserDetails(user.id)}
+                            onClick={() => handleViewUserDetails(user.id.toString())}
                           >
                             View Details
                           </Button>

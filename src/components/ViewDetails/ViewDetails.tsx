@@ -66,6 +66,9 @@ export interface Gig {
   
   // New field from the code block
   is_flagged: boolean;
+  
+  // Avatar field for buyer profile picture
+  avatar?: string;
 }
 
 // Unified Bid interface
@@ -935,7 +938,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
           {/* Only show Place Bid button if showPlaceBid is true and gig is pending */}
           {showPlaceBid && getStatus() === 'pending' && getStatus() !== 'suspended' && (
             <>
-              {user?.user_metadata?.verification_status === "verified" ? (
+              {gig.buyer?.verification_status === "verified" ? (
                 <Button
                   onClick={() => onPlaceBid(gig)}
                   className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 mb-4"

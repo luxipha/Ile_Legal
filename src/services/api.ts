@@ -499,7 +499,6 @@ export const api = {
       buyer_id: string | undefined;
       // client: JSON;
     }) => {
-      console.log("gigData:", gigData);
       
       let attachmentUrls: string[] = [];
       

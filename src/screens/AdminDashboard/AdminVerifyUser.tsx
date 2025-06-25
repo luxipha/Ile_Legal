@@ -142,7 +142,7 @@ export const AdminVerifyUser = ({
                     >
                       View Details
                     </button>
-                    {user.status !== "verified" && (
+                    {user.status !== "verified" && user.status !== "rejected" && (
                       <>
                         <Button 
                           onClick={() => onVerifyUser(user.id, "verify")}

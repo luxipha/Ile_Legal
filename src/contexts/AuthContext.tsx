@@ -920,7 +920,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const { error } = await supabase
       .from('Profiles')
-      .update({ status })
+      .update({ verification_status: status })
       .eq('id', userId);
     if (error) {
       console.error('Error updating user status:', error);

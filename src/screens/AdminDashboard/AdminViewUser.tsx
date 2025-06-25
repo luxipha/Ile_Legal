@@ -7,7 +7,7 @@ import { ArrowLeft, Mail, Eye, CheckCircle, XCircle } from "lucide-react";
 
 type Document = {
   name: string;
-  status: "Verified" | "Pending" | "Rejected";
+  status: "verified" | "pending" | "rejected";
 };
 
 type User = {
@@ -16,8 +16,8 @@ type User = {
   email: string;
   phone?: string;
   location?: string;
-  type: string;
-  status: "Pending" | "Verified" | "Rejected";
+  type: "Property Law" | "Contract Law" | "Business Law";
+  status: "pending" | "verified" | "rejected";
   submittedDate: string;
   joinedDate?: string;
   documents: Document[];
@@ -192,41 +192,34 @@ export const AdminViewUser = ({
             <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
               <h3 className="text-lg font-semibold mb-4">Actions</h3>
               <div className="flex flex-col gap-3">
-                {user.status.toLowerCase() !== "verified" && (
-                  <>
-                    <Button 
-                      onClick={() => onVerify(user.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white w-full"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Verify User
-                    </Button>
-                    
-                    <Button 
-                      onClick={() => setShowRejectModal(true)}
-                      variant="outline"
-                      className="border-red-500 text-red-600 hover:bg-red-50 w-full"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Reject User
-                    </Button>
-                    
-                    <Button 
-                      onClick={() => setShowRequestInfoModal(true)}
-                      variant="outline"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50 w-full"
-                    >
-                      <Mail className="w-4 h-4 mr-2" />
-                      Request More Info
-                    </Button>
-                  </>
+                {user.status.toLowerCase() !== "verified" && user.status.toLowerCase() !== "rejected" && (
+                  <Button 
+                    onClick={() => onVerify(user.id)}
+                    className="bg-green-600 hover:bg-green-700 text-white w-full"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Verify User
+                  </Button>
+                )}
+                
+                {user.status.toLowerCase() !== "rejected" && (
+                  <Button 
+                    onClick={() => setShowRejectModal(true)}
+                    variant="outline"
+                    className="border-red-500 text-red-600 hover:bg-red-50 w-full"
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Reject User
+                  </Button>
                 )}
                 
                 <Button 
+                  onClick={() => setShowRequestInfoModal(true)}
                   variant="outline"
                   className="border-gray-300 text-gray-700 hover:bg-gray-50 w-full"
                 >
-                  View Activity Log
+                  <Mail className="w-4 h-4 mr-2" />
+                  Request More Info
                 </Button>
               </div>
             </div>

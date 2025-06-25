@@ -52,6 +52,7 @@ export const FindGigs = (): JSX.Element => {
   ];
 
   useEffect(() => {
+    console.log("user:", user);
     const fetchGigs = async () => {
       try {
         setLoading(true);
@@ -93,7 +94,8 @@ export const FindGigs = (): JSX.Element => {
   };
 
   const handlePlaceBid = (gig: Gig) => {
-    if (user?.user_metadata?.status !== "verified") {
+    console.log(user?.user_metadata)
+    if (user?.user_metadata?.verification_status !== "verified") {
       alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
       return;
     }
@@ -105,7 +107,7 @@ export const FindGigs = (): JSX.Element => {
     e.preventDefault();
     if (!selectedGig) return;
 
-    if (user?.user_metadata?.status !== "verified") {
+    if (user?.user_metadata?.verification_status !== "verified") {
       alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
       return;
     }

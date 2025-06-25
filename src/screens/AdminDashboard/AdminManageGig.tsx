@@ -17,7 +17,7 @@ interface Gig {
   client: string;
   provider: string;
   amount: string;
-  status: "Active" | "Pending" | "Completed" | "Flagged" | "In Progress" | "Pending Assignment" | "suspended";
+  status: "active" | "pending" | "completed" | "flagged" | "in progress" | "pending assignment" | "suspended";
   priority?: "High Value" | "Urgent" | "New";
   postedDate: string;
   dueDate: string;
@@ -181,10 +181,10 @@ export const AdminManageGig = ({
                 <div className="text-right ml-6">
                   <div className="text-2xl font-bold text-gray-900 mb-2">{gig.amount}</div>
                   <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 ${
-                    gig.status === "In Progress" ? "bg-blue-100 text-blue-800" :
-                    gig.status === "Pending Assignment" ? "bg-yellow-100 text-yellow-800" :
-                    gig.status === "Active" ? "bg-green-100 text-green-800" :
-                    gig.status === "Completed" ? "bg-gray-100 text-gray-800" :
+                    gig.status === "in progress" ? "bg-blue-100 text-blue-800" :
+                    gig.status === "pending assignment" ? "bg-yellow-100 text-yellow-800" :
+                    gig.status === "active" ? "bg-green-100 text-green-800" :
+                    gig.status === "completed" ? "bg-gray-100 text-gray-800" :
                     "bg-red-100 text-red-800"
                   }`}>
                     {gig.status}
