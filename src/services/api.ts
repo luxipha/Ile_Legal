@@ -1,5 +1,5 @@
-// import { supabaseLocal as supabase } from '../lib/supabaseLocal';
-import { supabase } from '../lib/supabase';
+import { supabaseLocal as supabase } from '../lib/supabaseLocal';
+// import { supabase } from '../lib/supabase';
 import { ipfsService, IPFSUploadResult } from './ipfsService';
 import { reputationService } from './reputationService';
 
