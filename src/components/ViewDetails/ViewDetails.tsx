@@ -48,6 +48,10 @@ export interface Gig {
     name?: string;
     created_at?: string;
     verification_status?: string;
+    avatar_url?: string;
+    profile_picture?: string;
+    first_name?: string;
+    last_name?: string;
   };
   
   // Additional fields from second component
@@ -120,6 +124,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
   showPlaceBid = true,
   bidCount
 }) => {
+  console.log("gig:", gig);
   const { user } = useAuth();
   const { addToast } = useToast();
   
@@ -169,6 +174,52 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
 
   const getBidCount = (): number => {
     return bidCount ?? bids.length;
+  };
+
+  // Helper function to format deadline date
+  const getFormattedDeadline = (): string => {
+    if (!gig.deadline) return "Not specified";
+    try {
+      const date = new Date(gig.deadline);
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.log("error:", error);
+      return gig.deadline; // Fallback to original if parsing fails
+    }
+  };
+
+  // Helper function to get buyer's profile picture
+  const getBuyerProfilePicture = (): string | null => {
+    if (gig.avatar) return gig.avatar;
+    return null;
+  };
+
+  // Helper function to get buyer's display name
+  const getBuyerDisplayName = (): string => {
+    if (gig.buyer?.first_name && gig.buyer?.last_name) {
+      return `${gig.buyer.first_name} ${gig.buyer.last_name}`;
+    }
+    if (gig.buyer?.first_name) return gig.buyer.first_name;
+    if (gig.buyer?.last_name) return gig.buyer.last_name;
+    if (gig.buyer?.name) return gig.buyer.name;
+    if (gig.company) return gig.company;
+    return 'Client';
+  };
+
+  // Helper function to get buyer's initials
+  const getBuyerInitials = (): string => {
+    const displayName = getBuyerDisplayName();
+    if (displayName === 'Client') return 'C';
+    
+    const words = displayName.split(' ');
+    if (words.length >= 2) {
+      return `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase();
+    }
+    return displayName.charAt(0).toUpperCase();
   };
 
   // Fetch bids using API and enrich with seller profile data
@@ -512,7 +563,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{gig.title}</h1>
           <div className="flex items-center gap-6 text-gray-600">
             <span>Posted {getPostedDate()}</span>
-            <span>Deadline {gig.deadline}</span>
+            <span>Deadline {getFormattedDeadline()}</span>
             <span>Budget {getBudget()}</span>
           </div>
         </div>
@@ -743,10 +794,10 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
                     <>
                       <div className="flex items-center gap-4 p-4 border-b border-gray-200 bg-[#1B1828]/5 mb-4">
                         <div className="w-12 h-12 bg-[#FEC85F]/20 rounded-full flex items-center justify-center text-sm font-medium text-[#1B1828]">
-                          {gig.company?.charAt(0) || 'B'}
+                          {getBuyerInitials()}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-[#1B1828]">{gig.company || 'Buyer'}</h4>
+                          <h4 className="font-semibold text-[#1B1828]">{getBuyerDisplayName()}</h4>
                           <p className="text-gray-600">Gig Owner</p>
                         </div>
                       </div>
@@ -838,11 +889,21 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
             <CardContent className="p-6">
               <div className="text-center">
                 <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <BuildingIcon className="w-8 h-8 text-gray-600" />
+                  {getBuyerProfilePicture() ? (
+                    <img
+                      src={getBuyerProfilePicture()!}
+                      alt={getBuyerDisplayName()}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  ) : (
+                    <span className="text-2xl font-bold text-gray-600">
+                      {getBuyerInitials()}
+                    </span>
+                  )}
                 </div>
                 
-                {/* Company info (from second component) or gig details (from first component) */}
-                {gig.company ? (
+                {/* Company info */}
+                {gig.company && (
                   <>
                     <h3 className="font-semibold text-gray-900 mb-2">{gig.company}</h3>
                     {gig.companyRating && (
@@ -852,23 +913,21 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
                       </div>
                     )}
                     {gig.projectsPosted && (
-                      <p className="text-sm text-gray-600">{gig.projectsPosted} projects posted</p>
+                      <p className="text-sm text-gray-600 mb-4">{gig.projectsPosted} projects posted</p>
                     )}
                   </>
-                ) : (
-                  <>
-                    <h3 className="font-semibold text-gray-900 mb-2">Gig Details</h3>
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <p>Status: <span className="font-medium">{getStatus()}</span></p>
-                      <p>Posted: <span className="font-medium">{getPostedDate()}</span></p>
-                      <p>Deadline: <span className="font-medium">{gig.deadline}</span></p>
-                      <p>Budget: <span className="font-medium">{getBudget()}</span></p>
-                      {gig.deliveryTime && (
-                        <p>Delivery: <span className="font-medium">{gig.deliveryTime}</span></p>
-                      )}
-                    </div>
-                  </>
                 )}
+
+                {/* Gig details */}
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>Status: <span className="font-medium">{getStatus()}</span></p>
+                  <p>Posted: <span className="font-medium">{getPostedDate()}</span></p>
+                  <p>Deadline: <span className="font-medium">{getFormattedDeadline()}</span></p>
+                  <p>Budget: <span className="font-medium">{getBudget()}</span></p>
+                  {gig.deliveryTime && (
+                    <p>Delivery: <span className="font-medium">{gig.deliveryTime}</span></p>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -876,7 +935,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
           {/* Only show Place Bid button if showPlaceBid is true and gig is pending */}
           {showPlaceBid && getStatus() === 'pending' && getStatus() !== 'suspended' && (
             <>
-              {user?.user_metadata?.status === "verified" ? (
+              {user?.user_metadata?.verification_status === "verified" ? (
                 <Button
                   onClick={() => onPlaceBid(gig)}
                   className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 mb-4"

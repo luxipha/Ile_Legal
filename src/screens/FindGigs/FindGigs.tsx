@@ -87,6 +87,7 @@ export const FindGigs = (): JSX.Element => {
   });
 
   const handleViewDetails = (gig: Gig) => {
+    gig.avatar = gig.buyer?.avatar_url;
     setSelectedGig(gig);
     setViewMode("view-details");
   };

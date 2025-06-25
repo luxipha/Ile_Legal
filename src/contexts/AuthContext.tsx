@@ -35,6 +35,7 @@ export interface User {
     circle_wallet_id?: string;
     circle_wallet_address?: string;
     status?: string;
+    verification_status?: string;
   };
 }
 

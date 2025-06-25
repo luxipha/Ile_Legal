@@ -84,23 +84,48 @@ export const SellerDashboard = (): JSX.Element => {
       setLoadingGigs(true);
       try {
         const gigs = await api.gigs.getAllGigs();
-        
         // Convert API gigs to SellerGig format
-        const formattedGigs: SellerGig[] = gigs.map((gig: any) => ({
-          id: gig.id.toString(),
-          title: gig.title || "Legal Service",
-          company: gig.buyer_name || "Client",
-          price: formatCurrency.naira(gig.budget, "Budget not specified"),
-          deadline: formatDate.full(gig.deadline),
-          postedDate: formatDate.full(gig.created_at),
-          budget: gig.budget || 0,
-          deliveryTime: "To be negotiated",
-          description: gig.description || "No description provided",
-          requirements: gig.categories || [],
-          companyRating: 0, // Will be calculated from buyer feedback
-          projectsPosted: 0, // Will be calculated from buyer's total gigs
-          is_flagged: gig.is_flagged || false,
-          status: gig.status || "active"
+        const formattedGigs: SellerGig[] = await Promise.all(gigs.map(async (gig: any) => {
+          // Get average rating for the buyer
+          let companyRating = 0;
+          try {
+            if (gig.buyer?.id) {
+              companyRating = await api.feedback.getAverageRating(gig.buyer.id);
+            }
+          } catch (error) {
+            console.error('Error fetching average rating:', error);
+          }
+
+          // Get projects posted count for the buyer
+          let projectsPosted = 0;
+          try {
+            if (gig.buyer?.id) {
+              const buyerGigs = await api.gigs.getMyGigs(gig.buyer.id);
+              projectsPosted = buyerGigs.length;
+            }
+          } catch (error) {
+            console.error('Error fetching buyer gigs:', error);
+          }
+
+          return {
+            id: gig.id.toString(),
+            title: gig.title || "Legal Service",
+            company: gig.buyer?.first_name && gig.buyer?.last_name 
+              ? `${gig.buyer.first_name} ${gig.buyer.last_name}` 
+              : gig.buyer?.first_name || gig.buyer?.last_name,
+            price: formatCurrency.naira(gig.budget, "Budget not specified"),
+            deadline: formatDate.full(gig.deadline),
+            postedDate: formatDate.full(gig.created_at),
+            budget: gig.budget || 0,
+            deliveryTime: "To be negotiated",
+            description: gig.description || "No description provided",
+            requirements: gig.categories || [],
+            companyRating: companyRating,
+            projectsPosted: projectsPosted,
+            is_flagged: gig.is_flagged || false,
+            status: gig.status || "active",
+            avatar: gig.buyer?.avatar_url
+          };
         }));
         
         // Only show active gigs for sellers to bid on
@@ -134,7 +159,9 @@ export const SellerDashboard = (): JSX.Element => {
           .map((gig: any) => ({
             id: gig.id.toString(),
             title: gig.title || "Legal Service",
-            company: gig.buyer_name || "Client",
+            company: gig.buyer?.first_name && gig.buyer?.last_name 
+              ? `${gig.buyer.first_name} ${gig.buyer.last_name}` 
+              : gig.buyer?.first_name || gig.buyer?.last_name,
             price: formatCurrency.naira(gig.budget, "Budget not specified"),
             dueDate: formatDate.full(gig.deadline),
             progress: gig.progress || 0, // Use real progress if available
@@ -149,7 +176,9 @@ export const SellerDashboard = (): JSX.Element => {
           .map((gig: any) => ({
             id: gig.id.toString(),
             title: gig.title || "Legal Service",
-            company: gig.buyer_name || "Client",
+            company: gig.buyer?.first_name && gig.buyer?.last_name 
+              ? `${gig.buyer.first_name} ${gig.buyer.last_name}` 
+              : gig.buyer?.first_name || gig.buyer?.last_name ,
             price: formatCurrency.naira(gig.budget, "Budget not specified"),
             completedDate: formatDate.full(gig.updated_at || gig.created_at),
             description: gig.description || "No description provided"
@@ -193,7 +222,7 @@ export const SellerDashboard = (): JSX.Element => {
     setViewMode("view-details");
   };
 
-  const handlePlaceBid = (gig?: Gig) => {
+  const handlePlaceBid = (gig?: SellerGig) => {
     // Check if seller is verified
     if (user?.user_metadata?.status === 'pending' || user?.user_metadata?.status === 'rejected') {
       alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
@@ -208,6 +237,7 @@ export const SellerDashboard = (): JSX.Element => {
 
   // Convert SellerGig to ViewDetailsGig
   const convertToViewDetailsGig = (gig: SellerGig): ViewDetailsGig => {
+    // console.log("convertToViewDetailsGig gig:", gig);
     return {
       id: gig.id,
       title: gig.title,
@@ -263,7 +293,7 @@ export const SellerDashboard = (): JSX.Element => {
       return;
     }
     
-    console.log("Bid submitted:", bidFormData);
+    // console.log("Bid submitted:", bidFormData);
     setViewMode("dashboard");
   };
 
@@ -584,7 +614,7 @@ export const SellerDashboard = (): JSX.Element => {
           <main className="flex-1 p-6">
             {selectedGig ? (
               <ViewDetails
-                gig={convertToViewDetailsGig(selectedGig)}
+                gig={(selectedGig)}
                 onBack={() => setViewMode("dashboard")}
                 onPlaceBid={handleViewDetailsPlaceBid}
                 backButtonText="Back to Dashboard"

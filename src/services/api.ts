@@ -463,7 +463,7 @@ export const api = {
               const { data: urlData } = await supabase.storage
                 .from('documents')
                 .createSignedUrl(filePath, 86400);
-              console.log("urlData:", urlData);
+              // console.log("urlData:", urlData);
               return urlData?.signedUrl || '';
             })
           );
@@ -1248,11 +1248,11 @@ export const api = {
       return data || [];
     },
 
-    getAverageRating: async (gigId: string) => {
+    getAverageRating: async (id: string) => {
       const { data, error } = await supabase
         .from('Feedback')
         .select('rating')
-        .eq('gig_id', gigId);
+        .eq('recipient', id);
 
       if (error) {
         throw error;
