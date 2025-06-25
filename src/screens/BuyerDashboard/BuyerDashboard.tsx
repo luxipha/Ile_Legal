@@ -128,7 +128,7 @@ export const BuyerDashboard = (): JSX.Element => {
         const inProgress: InProgressGig[] = [];
         const completed: CompletedGig[] = [];
         gigs.forEach((gig: any) => {
-          if (gig.status?.toLowerCase() === "active" || gig.status?.toLowerCase() === "pending") {
+          if ( gig.status?.toLowerCase() === "pending") {
             active.push({
               ...gig,
               status: gig.status?.toLowerCase() === "pending" ? "Open" : gig.status, // Display "Open" for pending
@@ -146,7 +146,7 @@ export const BuyerDashboard = (): JSX.Element => {
               projectsPosted: gig.projectsPosted || 0,
               is_flagged: gig.is_flagged || false
             });
-          } else if (gig.status?.toLowerCase() === "in progress") {
+          } else if (gig.status?.toLowerCase() === "in progress" || gig.status?.toLowerCase() === "active" ) {
             inProgress.push({
               id: gig.id,
               title: gig.title,

@@ -88,12 +88,23 @@ interface ViewBidsProps {
   useStaticData?: boolean;
 }
 
+// Helper function to format dates in mm/dd/yyyy format
+const formatDateMMDDYYYY = (dateString: string) => {
+  if (!dateString) return 'Unknown';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric'
+  });
+};
+
 export const ViewBids: React.FC<ViewBidsProps> = ({ 
   gig, 
   onBack, 
   backButtonText,
   useStaticData = false
 }) => {
+  console.log("GIG:", gig);
   const [activeTab, setActiveTab] = useState<string>("bids");
   const [activeBidder, setActiveBidder] = useState<string | null>(null);
   const [bidderMessages, setBidderMessages] = useState<Record<string, Message[]>>({});
@@ -590,8 +601,8 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{gig.title}</h1>
           <div className="flex items-center gap-6 text-gray-600">
-            <span>Posted {gig.postedDate}</span>
-            <span>Deadline {gig.deadline}</span>
+            <span>Posted {formatDateMMDDYYYY(gig.created_at)}</span>
+            <span>Deadline {formatDateMMDDYYYY(gig.deadline)}</span>
             <span>Budget {gig.budget}</span>
           </div>
         </div>

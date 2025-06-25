@@ -22,6 +22,7 @@ import {
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import ClientProfileView from './ClientProfileView';
+import { formatUser } from '../../utils/formatters';
 
 interface Education {
   degree: string;
@@ -525,8 +526,20 @@ export const BuyerProfile = (): JSX.Element => {
                   <CardContent className="p-8">
                     <div className="flex items-center gap-6">
                       <div className="relative">
-                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                          <UserIcon className="w-12 h-12 text-gray-600" />
+                        <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                          {user?.user_metadata?.profile_picture ? (
+                            <img 
+                              src={user.user_metadata.profile_picture} 
+                              alt={`${profileData.firstName} ${profileData.lastName}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback to UserIcon if image fails to load
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <UserIcon className={`w-12 h-12 text-gray-600 ${user?.user_metadata?.profile_picture ? 'hidden' : ''}`} />
                         </div>
                         <input
                           type="file"
@@ -833,8 +846,20 @@ export const BuyerProfile = (): JSX.Element => {
                 <CardContent className="p-8">
                   <div className="flex items-start gap-6">
                     <div className="relative">
-                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                        <UserIcon className="w-12 h-12 text-gray-600" />
+                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                        {user?.user_metadata?.profile_picture ? (
+                          <img 
+                            src={user.user_metadata.profile_picture} 
+                            alt={`${profileData.firstName} ${profileData.lastName}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to UserIcon if image fails to load
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <UserIcon className={`w-12 h-12 text-gray-600 ${user?.user_metadata?.profile_picture ? 'hidden' : ''}`} />
                       </div>
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                         <CheckCircleIcon className="w-4 h-4 text-white" />
