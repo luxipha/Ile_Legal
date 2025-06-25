@@ -56,8 +56,8 @@ export const api = {
         throw new Error('User must be logged in to create a bid');
       }
 
-      // Generate a random integer ID from 0 to 10000000
-      const randomId = Math.floor(Math.random() * 10000001);
+      // Use UUID for bid ID to prevent collisions
+      const randomId = crypto.randomUUID();
 
       const { data, error } = await supabase
         .from('Bids')
@@ -367,8 +367,8 @@ export const api = {
       attachments?: FileList | File[];
       buyer_id: string | undefined;
     }) => {
-      // Generate a random integer ID from 0 to 999999999
-      const randomId = Math.floor(Math.random() * 1000000000);
+      // Use UUID for gig ID to prevent collisions
+      const randomId = crypto.randomUUID();
       
       let attachmentUrls: string[] = [];
       
@@ -901,10 +901,17 @@ export const api = {
     suspendGig: async (gigId: string, _reason?: string) => {
       // Check if user is admin using session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
+      if (sessionError || !session?.user) {
         throw new Error('Authentication error');
       }
-      if (!session?.user || session.user.user_metadata.role_title !== 'admin') {
+      // Check admin status from Profiles table (secure)
+      const { data: profile, error: profileError } = await supabase
+        .from('Profiles')
+        .select('user_type')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError || profile?.user_type !== 'admin') {
         throw new Error('Unauthorized: Admin access required');
       }
       // Fetch the gig to check its current status
@@ -943,10 +950,17 @@ export const api = {
     approveGig: async (gigId: string, adminNotes?: string) => {
       console.log('Admin notes:', adminNotes); // Use the parameter to avoid warning
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
+      if (sessionError || !session?.user) {
         throw new Error('Authentication error');
       }
-      if (!session?.user || session.user.user_metadata.role_title !== 'admin') {
+      // Check admin status from Profiles table (secure)
+      const { data: profile, error: profileError } = await supabase
+        .from('Profiles')
+        .select('user_type')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError || profile?.user_type !== 'admin') {
         throw new Error('Unauthorized: Admin access required');
       }
 
@@ -1011,7 +1025,14 @@ export const api = {
         throw new Error('Authentication error');
       }
 
-      if (!session?.user || session.user.user_metadata.role_title !== 'admin') {
+      // Check admin status from Profiles table (secure)
+      const { data: profile, error: profileError } = await supabase
+        .from('Profiles')
+        .select('user_type')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError || profile?.user_type !== 'admin') {
         throw new Error('Unauthorized: Admin access required');
       }
 
@@ -1057,7 +1078,14 @@ export const api = {
         throw new Error('Authentication error');
       }
 
-      if (!session?.user || session.user.user_metadata.role_title !== 'admin') {
+      // Check admin status from Profiles table (secure)
+      const { data: profile, error: profileError } = await supabase
+        .from('Profiles')
+        .select('user_type')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError || profile?.user_type !== 'admin') {
         throw new Error('Unauthorized: Admin access required');
       }
 
