@@ -117,6 +117,7 @@ export const AdminManageGig = ({
       {/* Gig Cards */}
       <div className="space-y-6">
         {filteredGigs.map((gig) => (
+          
           <Card key={gig.id} className={`bg-white border ${gig.is_flagged ? 'border-red-500' : 'border-gray-200'}` }>
             <CardContent className="p-8">
               <div className="flex items-start justify-between">

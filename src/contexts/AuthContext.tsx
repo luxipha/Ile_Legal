@@ -885,9 +885,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     let query = supabase.from('Profiles').select('*');
-    if (sellers) {
-      query = query.eq('user_type', 'seller');
-    }
+    // if (sellers) {
+    //   query = query.eq('user_type', 'seller');
+    // }
 
     const { data, error } = await query;
 

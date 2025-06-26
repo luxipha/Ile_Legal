@@ -5,6 +5,7 @@ import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
 import { Card, CardContent } from "../../components/ui/card";
 import { ArrowLeft, Flag, Star, CheckCircle, AlertTriangle, MessageSquare, XCircle, User } from "lucide-react";
+import { api } from "../../services/api";
 
 type Bid = {
   id: number;
@@ -55,16 +56,37 @@ export const AdminViewDetails = ({
   onReview,
   onSuspend
 }: AdminViewDetailsProps): JSX.Element => {
+  console.log("gig:", gig);
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [showUnsuspendModal, setShowUnsuspendModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [flagReason, setFlagReason] = useState("");
   const [suspendReason, setSuspendReason] = useState("");
+  const [unsuspendNotes, setUnsuspendNotes] = useState("");
   const [feedback, setFeedback] = useState("");
   const [activeTab, setActiveTab] = useState<"details" | "bids">("details");
   const [flagAction, setFlagAction] = useState<'flag' | 'unflag'>('flag');
   
+  // Helper function to format date in mm/dd/yyyy format
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // Return original if invalid date
+      
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const year = date.getFullYear();
+      
+      return `${month}/${day}/${year}`;
+    } catch (error) {
+      return dateString; // Return original if parsing fails
+    }
+  };
+
   // Sample bids data - in a real app, this would come from the gig object or API
   const bids: Bid[] = gig?.bids || [
     {
@@ -145,6 +167,25 @@ export const AdminViewDetails = ({
     setShowSuspendModal(false);
   };
 
+  const handleSubmitUnsuspend = async () => {
+    if (!gig) return;
+    
+    try {
+      await api.admin.unsuspendGig(gig.id.toString(), unsuspendNotes);
+      
+      // Reset and close modal
+      setUnsuspendNotes("");
+      setShowUnsuspendModal(false);
+      
+      // Optionally refresh the gig data or navigate back
+      // You might want to add a callback to refresh the gig data
+      window.location.reload(); // Simple refresh for now
+    } catch (error) {
+      console.error("Failed to unsuspend gig:", error);
+      // You might want to show an error toast here
+    }
+  };
+
   const handleSubmitFeedback = () => {
     if (!gig || !feedback.trim()) return;
     
@@ -209,7 +250,7 @@ export const AdminViewDetails = ({
           </div>
           <div>
             <span className="text-sm">Deadline: </span>
-            <span className="font-medium">{gig.deadline || gig.dueDate}</span>
+            <span className="font-medium">{formatDate(gig.deadline || gig.dueDate)}</span>
           </div>
           <div>
             <span className="text-sm">Budget: </span>
@@ -439,14 +480,25 @@ export const AdminViewDetails = ({
                 Send Feedback
               </Button>
               
-              <Button 
-                onClick={() => setShowSuspendModal(true)}
-                variant="outline"
-                className="border-red-500 text-red-600 hover:bg-red-50 w-full"
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Suspend Gig
-              </Button>
+              {gig.status === 'suspended' ? (
+                <Button 
+                  onClick={() => setShowUnsuspendModal(true)}
+                  variant="outline"
+                  className="border-green-500 text-green-600 hover:bg-green-50 w-full"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Unsuspend Gig
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => setShowSuspendModal(true)}
+                  variant="outline"
+                  className="border-red-500 text-red-600 hover:bg-red-50 w-full"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Suspend Gig
+                </Button>
+              )}
             </div>
             
             {/* Admin Info */}
@@ -531,6 +583,34 @@ export const AdminViewDetails = ({
           <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setShowSuspendModal(false)}>Cancel</Button>
             <Button onClick={handleSubmitSuspend} className="bg-red-600 hover:bg-red-700 text-white">Suspend</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Unsuspend Modal */}
+      <Dialog open={showUnsuspendModal} onOpenChange={setShowUnsuspendModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsuspend Gig</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to unsuspend this gig? This will restore it to pending status and make it visible to users again.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            <Label htmlFor="unsuspend-notes">Admin Notes (Optional)</Label>
+            <Textarea 
+              id="unsuspend-notes"
+              value={unsuspendNotes}
+              onChange={(e) => setUnsuspendNotes(e.target.value)}
+              placeholder="Enter notes about why this gig is being unsuspended..."
+              className="mt-2"
+            />
+          </div>
+          
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setShowUnsuspendModal(false)}>Cancel</Button>
+            <Button onClick={handleSubmitUnsuspend} className="bg-green-600 hover:bg-green-700 text-white">Unsuspend</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

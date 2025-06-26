@@ -37,6 +37,8 @@ interface User {
     status?: string;
     submittedDate?: string;
   };
+  role?: string;
+  user_type?: string;
 }
 
 interface Gig {
@@ -229,6 +231,8 @@ export const AdminDashboard = (): JSX.Element => {
     try {
       await api.admin.suspendGig(gigId.toString());
       setGigs(gigs => gigs.map(g => g.id === gigId ? { ...g, status: 'suspended' } : g));
+      // Navigate back to dashboard after successful suspension
+      setViewMode("dashboard");
     } catch (error) {
       console.error('Error suspending gig:', error);
     }
@@ -431,8 +435,11 @@ export const AdminDashboard = (): JSX.Element => {
               ) : (
                 <div className="space-y-4">
                   {users
-                    .filter(user => (user.status?.toLowerCase() === "pending" || user.user_metadata?.status?.toLowerCase() === "pending"))
-                    .slice(0, 2)
+                    .filter(user => 
+                      (user.status?.toLowerCase() === "pending" || user.user_metadata?.status?.toLowerCase() === "pending") &&
+                      (user.role === 'seller' || user.user_metadata?.role === 'seller' || user.user_type === 'seller')
+                    )
+                    .slice()
                     .map((user) => (
                       <div key={user.id} className="border-b border-gray-100 pb-4">
                         <div className="flex items-center gap-3 mb-2">
@@ -479,7 +486,10 @@ export const AdminDashboard = (): JSX.Element => {
                         </div>
                       </div>
                     ))}
-                  {users.filter(user => (user.status?.toLowerCase() === "pending" || user.user_metadata?.status?.toLowerCase() === "pending")).length === 0 && (
+                  {users.filter(user => 
+                    (user.status?.toLowerCase() === "pending" || user.user_metadata?.status?.toLowerCase() === "pending") &&
+                    (user.role === 'seller' || user.user_metadata?.role === 'seller' || user.user_type === 'seller')
+                  ).length === 0 && (
                     <div className="text-gray-500">No pending verifications.</div>
                   )}
                 </div>

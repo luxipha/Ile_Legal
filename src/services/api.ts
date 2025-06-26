@@ -978,6 +978,61 @@ export const api = {
       return { success: true };
     },
 
+    /**
+     * Admin-only: Unsuspend a gig (set status from 'suspended' back to 'pending')
+     */
+    unsuspendGig: async (gigId: string, adminNotes?: string) => {
+      // Check if user is admin using session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        throw new Error('Authentication error');
+      }
+      // Check admin status from Profiles table (secure)
+      const { data: profile, error: profileError } = await supabase
+        .from('Profiles')
+        .select('user_type')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError || profile?.user_type !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+      // Fetch the gig to check its current status
+      const { data: gig, error: fetchError } = await supabase
+        .from('Gigs')
+        .select('status')
+        .eq('id', gigId)
+        .single();
+      if (fetchError) {
+        throw fetchError;
+      }
+      if (!gig || gig.status !== 'suspended') {
+        throw new Error('Only gigs with status "suspended" can be unsuspended');
+      }
+      // Update the gig status back to 'pending'
+      const { error } = await supabase
+        .from('Gigs')
+        .update({ 
+          status: 'pending',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', gigId);
+      if (error) {
+        throw error;
+      }
+      // Optionally log the unsuspension action
+      // await supabase
+      //   .from('admin_actions')
+      //   .insert({
+      //     admin_id: session.user.id,
+      //     action_type: 'gig_unsuspended',
+      //     target_id: gigId,
+      //     details: { adminNotes }
+      //   });
+      console.log(`✅ Gig ${gigId} unsuspended by admin`);
+      return { success: true };
+    },
+
     // Approve pending gig (missing function!)
     approveGig: async (gigId: string, adminNotes?: string) => {
       console.log('Admin notes:', adminNotes); // Use the parameter to avoid warning
