@@ -461,12 +461,6 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   };
 
   const handleAcceptBid = async (bidId: string) => {
-    // Check if gig is suspended
-    if (gig.status === 'suspended') {
-      addToast("Cannot accept bids on suspended gigs", "error");
-      return;
-    }
-
     if (useStaticData) {
       console.log("Accepting bid:", bidId);
       addToast("Bid accepted (demo mode)", "success");
@@ -474,7 +468,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
     }
 
     try {
-      await api.bids.updateBid(bidId, { status: 'active' });
+      await api.bids.updateBid(bidId, { status: 'accepted' });
       await loadBids();
       addToast("Bid accepted successfully", "success");
     } catch (err) {

@@ -56,6 +56,23 @@ export const api = {
         throw new Error('User must be logged in to create a bid');
       }
 
+      // Check if seller already has a pending or accepted bid for this gig
+      const { data: existingBid, error: checkError } = await supabase
+        .from('Bids')
+        .select('id, status')
+        .eq('gig_id', gigId)
+        .eq('seller_id', user.id)
+        .in('status', ['pending', 'accepted'])
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        throw checkError;
+      }
+
+      if (existingBid) {
+        throw new Error(`You already have a ${existingBid.status} bid for this gig. You cannot place another bid.`);
+      }
+
       // Use random 12-digit ID for bid ID to prevent collisions
       const randomId = generateRandom12DigitId();
 
@@ -160,7 +177,7 @@ export const api = {
     updateBid: async (bidId: string, updates: {
       amount?: number;
       description?: string;
-      status?: 'pending' | 'active' | 'rejected';
+      status?: 'pending' | 'accepted' | 'rejected';
       previous_amount?: number;
       delivery_time?: string;
     }) => {
@@ -200,7 +217,7 @@ export const api = {
         }
         
         // Check if the gig is suspended before allowing status updates
-        if (updates.status && updates.status === 'active') {
+        if (updates.status && updates.status === 'accepted') {
           const { data: gig, error: gigError } = await supabase
             .from('Gigs')
             .select('status')

@@ -37,6 +37,7 @@ interface SellerGig {
   projectsPosted: number;
   is_flagged: boolean;
   status?: string;
+  buyer_id?: string;
 }
 
 interface OngoingGig {
@@ -124,7 +125,8 @@ export const SellerDashboard = (): JSX.Element => {
             projectsPosted: projectsPosted,
             is_flagged: gig.is_flagged || false,
             status: gig.status || "active",
-            avatar: gig.buyer?.avatar_url
+            avatar: gig.buyer?.avatar_url,
+            buyer_id: gig.buyer?.id
           };
         }));
         
@@ -274,7 +276,8 @@ export const SellerDashboard = (): JSX.Element => {
       companyRating: gig.companyRating || 4.5,
       projectsPosted: gig.projectsPosted || 1,
       is_flagged: gig.is_flagged,
-      status: gig.status
+      status: gig.status,
+      buyer_id: gig.buyer_id
     };
     handlePlaceBid(sellerGig);
   };
@@ -286,17 +289,35 @@ export const SellerDashboard = (): JSX.Element => {
     setViewMode("submit-work");
   };
 
-  const handleBidSubmit = (e: React.FormEvent) => {
+  const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedGig) return;
     
     // Check if seller is verified
-    if (user?.user_metadata?.status === 'pending' || user?.user_metadata?.status === 'rejected') {
+    if (user?.user_metadata?.verification_status !== "verified") {
       alert("Your account needs to be verified before you can place bids. Please contact support to complete verification.");
       return;
     }
-    
-    // console.log("Bid submitted:", bidFormData);
-    setViewMode("dashboard");
+    console.log("selectedGig:", selectedGig);
+    try {
+      await api.bids.createBid(
+        selectedGig.id,
+        Number(bidFormData.bidAmount),
+        bidFormData.proposal,
+        selectedGig.buyer_id || ""
+      );
+
+      // Reset form and return to dashboard
+      setBidFormData({
+        bidAmount: "",
+        deliveryTime: "",
+        proposal: ""
+      });
+      setViewMode("dashboard");
+    } catch (err) {
+      console.error('Error submitting bid:', err);
+      alert(err instanceof Error ? err.message : 'Failed to submit bid. Please try again.');
+    }
   };
 
   const handleWorkSubmit = async (e: React.FormEvent) => {
@@ -959,7 +980,7 @@ export const SellerDashboard = (): JSX.Element => {
                       bid.gigDeadline = bid.gig?.deadline,
                       bid.gigBudget = bid.gig?.budget,
                       bid.deliveryTime = bid.delivery_time,
-                      console.log('bid:', bid),
+                      
                       <Card key={bid.id} className="bg-white border border-gray-200">
                         <CardContent className="p-6">
                           <h4 className="font-semibold text-gray-900 mb-2">Bid #{bid.id}</h4>

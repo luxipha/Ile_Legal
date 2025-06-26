@@ -499,15 +499,17 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
     console.log("bid:", bid);
     const name = bid.seller?.full_name || bid.name || 'Anonymous';
     const title = bid.title || 'Professional';
-    const rating = bid.seller?.rating;
-    const completedJobs = bid.seller?.completed_jobs ;
+    const rating = bid.seller?.rating || 0;
+    const completedJobs = bid.seller?.completed_jobs || 0;
     const amount = bid.amount ? `₦${bid.amount.toLocaleString()}` : 'Not specified';
     const submittedDate = bid.created_at ? new Date(bid.created_at).toLocaleDateString() : bid.submittedDate || 'Unknown';
     const proposal = bid.description || bid.proposal || 'No proposal provided';
     const avatar = bid.seller?.avatar || bid.avatar || name.charAt(0);
+    const isRejected = bid.status === 'rejected';
+    const isAccepted = bid.status === 'accepted';
 
     return (
-      <Card key={bid.id} className="border border-gray-200">
+      <Card key={bid.id} className={`border ${isRejected ? 'border-red-200 bg-red-50' : isAccepted ? 'border-green-200 bg-green-50' : 'border-gray-200'}`}>
         <CardContent className="p-6">
           <div className="flex items-start gap-4 mb-4">
             <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700 overflow-hidden">
@@ -544,6 +546,20 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
                   </div>
                 </div>
               </div>
+              
+              {/* Status Badge */}
+              {(isRejected || isAccepted) && (
+                <div className="mb-3">
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    isRejected 
+                      ? 'bg-red-100 text-red-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {isRejected ? 'Rejected' : 'Accepted'}
+                  </span>
+                </div>
+              )}
+              
               <div className="flex items-center gap-4 mb-3">
                 <div className="flex items-center gap-1">
                   {renderStars(Math.floor(rating))}
@@ -558,7 +574,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
           
           <div className="mb-4">
             <h5 className="font-medium text-gray-900 mb-2">Proposal</h5>
-            <p className="text-gray-600">{proposal}</p>
+            <p className={`${isRejected ? 'text-gray-500' : 'text-gray-600'}`}>{proposal}</p>
           </div>
         </CardContent>
       </Card>
