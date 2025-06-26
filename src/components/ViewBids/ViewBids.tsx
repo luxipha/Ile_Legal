@@ -11,7 +11,8 @@ import {
   ArrowLeftIcon,
   StarIcon,
   BuildingIcon,
-  PaperclipIcon
+  PaperclipIcon,
+  UserIcon
 } from "lucide-react";
 
 interface Message {
@@ -64,6 +65,7 @@ interface Gig {
   is_flagged: boolean;
   status?: string;
   attachments?: string[]; // Add attachments field
+  created_at?: string; // Add created_at field
 }
 
 // Extended messaging service interface to handle optional methods
@@ -116,6 +118,11 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(!useStaticData);
   const [error, setError] = useState<string | null>(null);
+  const [buyerName, setBuyerName] = useState<string>('');
+  const [buyerRating, setBuyerRating] = useState<number>(0);
+  const [buyerGigsCount, setBuyerGigsCount] = useState<number>(0);
+  const [buyerAvatar, setBuyerAvatar] = useState<string>('');
+  const [loadingBuyerData, setLoadingBuyerData] = useState(false);
   
   const { user } = useAuth();
   const { addToast } = useToast();
@@ -163,6 +170,51 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
       loadBids();
     }
   }, [gig.id, useStaticData]);
+
+  // Load buyer data
+  useEffect(() => {
+    const loadBuyerData = async () => {
+      if (!user?.id || useStaticData) return;
+      
+      setLoadingBuyerData(true);
+      try {
+        // Get buyer name from user profile
+        const { supabase } = await import('../../lib/supabase');
+        const { data: profileData } = await supabase
+          .from('Profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileData) {
+          const name = profileData.name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() || 'Anonymous Buyer';
+          setBuyerName(name);
+          setBuyerAvatar(profileData.avatar_url || profileData.name?.charAt(0)?.toUpperCase() || 'S');
+        } else {
+          setBuyerName('Anonymous Buyer');
+          setBuyerAvatar('S');
+        }
+
+        // Get buyer's average rating
+        const rating = await api.feedback.getAverageRating(user.id);
+        setBuyerRating(rating);
+
+        // Get buyer's gigs count
+        const gigs = await api.gigs.getMyGigs(user.id);
+        setBuyerGigsCount(gigs.length);
+      } catch (error) {
+        console.error('Error loading buyer data:', error);
+        setBuyerName('Anonymous Buyer');
+        setBuyerRating(0);
+        setBuyerGigsCount(0);
+        setBuyerAvatar('A');
+      } finally {
+        setLoadingBuyerData(false);
+      }
+    };
+
+    loadBuyerData();
+  }, [user?.id, useStaticData]);
 
   // Set up subscription to new messages (from first file)
   useEffect(() => {
@@ -601,7 +653,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{gig.title}</h1>
           <div className="flex items-center gap-6 text-gray-600">
-            <span>Posted {formatDateMMDDYYYY(gig.created_at)}</span>
+            <span>Posted {formatDateMMDDYYYY(gig.created_at || gig.postedDate)}</span>
             <span>Deadline {formatDateMMDDYYYY(gig.deadline)}</span>
             <span>Budget {gig.budget}</span>
           </div>
@@ -664,11 +716,27 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                 <div className="text-center py-8 text-gray-500">No bids received yet</div>
               ) : (
                 bids.map((bid) => (
+                  console.log("bid:", bid),
                   <Card key={bid.id} className="border border-gray-200">
                     <CardContent className="p-6">
                       <div className="flex items-start gap-4 mb-4">
-                        <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-                          {getBidSellerAvatar(bid)}
+                        <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700 overflow-hidden">
+                          {getBidSellerAvatar(bid).startsWith('http') ? (
+                            <img 
+                              src={getBidSellerAvatar(bid)} 
+                              alt={`${getBidSellerName(bid)}'s avatar`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback to initials if image fails to load
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <span className={getBidSellerAvatar(bid).startsWith('http') ? 'hidden' : ''}>
+                            {getBidSellerAvatar(bid)}
+                          </span>
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
@@ -827,8 +895,23 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                   const bidder = bids.find(bid => getBidSellerId(bid) === activeBidder);
                   return bidder ? (
                     <>
-                      <div className="w-12 h-12 bg-[#FEC85F]/20 rounded-full flex items-center justify-center text-sm font-medium text-[#1B1828]">
-                        {getBidSellerAvatar(bidder)}
+                      <div className="w-12 h-12 bg-[#FEC85F]/20 rounded-full flex items-center justify-center text-sm font-medium text-[#1B1828] overflow-hidden">
+                        {getBidSellerAvatar(bidder).startsWith('http') ? (
+                          <img 
+                            src={getBidSellerAvatar(bidder)} 
+                            alt={`${getBidSellerName(bidder)}'s avatar`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to initials if image fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <span className={getBidSellerAvatar(bidder).startsWith('http') ? 'hidden' : ''}>
+                          {getBidSellerAvatar(bidder)}
+                        </span>
                       </div>
                       <div>
                         <h4 className="font-semibold text-[#1B1828]">{getBidSellerName(bidder)}</h4>
@@ -921,15 +1004,48 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         <div className="col-span-1">
           <Card className="border border-gray-200 mb-6">
             <CardContent className="p-6 text-center">
-              <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <BuildingIcon className="w-8 h-8 text-gray-600" />
+              <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4 overflow-hidden">
+                {loadingBuyerData ? (
+                  <UserIcon className="w-8 h-8 text-gray-600" />
+                ) : buyerName && buyerName !== 'Anonymous Buyer' ? (
+                  <>
+                    {buyerAvatar.startsWith('http') ? (
+                      <img 
+                        src={buyerAvatar} 
+                        alt="Buyer's profile picture"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          target.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <span className={buyerAvatar.startsWith('http') ? 'hidden' : ''}>
+                      {buyerAvatar.charAt(0).toUpperCase()}
+                    </span>
+                  </>
+                ) : (
+                  <UserIcon className="w-8 h-8 text-gray-600" />
+                )}
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">{gig.company}</h3>
+              <h3 className="font-semibold text-gray-900 mb-2">
+                {loadingBuyerData ? 'Loading...' : buyerName}
+              </h3>
               <div className="flex items-center justify-center gap-1 mb-2">
-                {renderStars(Math.floor(gig.companyRating))}
-                <span className="text-sm text-gray-600 ml-1">{gig.companyRating}</span>
+                {loadingBuyerData ? (
+                  <div className="animate-pulse bg-gray-200 h-4 w-20 rounded"></div>
+                ) : (
+                  <>
+                    {renderStars(Math.floor(buyerRating))}
+                    <span className="text-sm text-gray-600 ml-1">{buyerRating.toFixed(1)}</span>
+                  </>
+                )}
               </div>
-              <p className="text-sm text-gray-600">{gig.projectsPosted} projects posted</p>
+              <p className="text-sm text-gray-600">
+                {loadingBuyerData ? 'Loading...' : `${buyerGigsCount} gigs posted`}
+              </p>
             </CardContent>
           </Card>
 
