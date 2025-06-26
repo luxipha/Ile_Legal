@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Textarea } from "../../components/ui/textarea";
@@ -8,7 +8,7 @@ import { ArrowLeft, Flag, Star, CheckCircle, AlertTriangle, MessageSquare, XCirc
 import { api } from "../../services/api";
 
 type Bid = {
-  id: number;
+  id: string | number;
   name: string;
   avatar: string;
   title: string;
@@ -68,6 +68,11 @@ export const AdminViewDetails = ({
   const [feedback, setFeedback] = useState("");
   const [activeTab, setActiveTab] = useState<"details" | "bids">("details");
   const [flagAction, setFlagAction] = useState<'flag' | 'unflag'>('flag');
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loadingBids, setLoadingBids] = useState(false);
+  const [clientData, setClientData] = useState<any>(null);
+  const [loadingClient, setLoadingClient] = useState(false);
+  const [adminReviewData, setAdminReviewData] = useState<any>(null);
   
   // Helper function to format date in mm/dd/yyyy format
   const formatDate = (dateString: string | undefined): string => {
@@ -87,35 +92,168 @@ export const AdminViewDetails = ({
     }
   };
 
-  // Sample bids data - in a real app, this would come from the gig object or API
-  const bids: Bid[] = gig?.bids || [
-    {
-      id: 1,
-      name: "Chioma Okonkwo",
-      title: "Property Lawyer",
-      rating: 4.9,
-      completedJobs: 24,
-      amount: "₦65,000",
-      deliveryTime: "5 days",
-      submittedDate: "21/04/2025",
-      proposal: "I have over 10 years of experience in title verification in Lagos State, particularly in Victoria Island. I have established connections with the land registry and can complete this task efficiently and accurately.",
-      avatar: "CO",
-      status: "pending"
-    },
-    {
-      id: 2,
-      name: "Adebayo Ogundimu",
-      title: "Senior Legal Counsel",
-      rating: 4.8,
-      completedJobs: 18,
-      amount: "₦72,000",
-      deliveryTime: "4 days",
-      submittedDate: "22/04/2025",
-      proposal: "With my background in commercial property law and extensive experience with the Lagos State Land Registry, I can provide a comprehensive verification report that covers all legal aspects of the property.",
-      avatar: "AO",
-      status: "pending"
+  // Helper function to check if a string is a valid image URL
+  const isImageUrl = (url: string | undefined | null): boolean => {
+    return Boolean(url && (
+      url.startsWith('http://') || 
+      url.startsWith('https://') || 
+      url.startsWith('data:image/')
+    ));
+  };
+
+  // Fetch bids when component mounts or when gig changes
+  useEffect(() => {
+    if (gig?.id) {
+      fetchBids();
+      fetchClientData();
+      fetchAdminReviewData();
     }
-  ];
+  }, [gig?.id]);
+
+  const fetchBids = async () => {
+    if (!gig?.id) return;
+    
+    try {
+      setLoadingBids(true);
+      const bidsData = await api.bids.getBidsByGigId(gig.id.toString());
+      
+      // Transform the API bid data to match the UI expectations
+      const transformedBids: Bid[] = await Promise.all(
+        bidsData.map(async (bid: any) => {
+          // Get seller profile data
+          const sellerProfile = bid.seller || {};
+          const sellerName = sellerProfile.name || 
+                           `${sellerProfile.first_name || ''} ${sellerProfile.last_name || ''}`.trim() || 
+                           'Anonymous Seller';
+          
+          // Get seller rating and completed jobs
+          let sellerRating = 0;
+          let completedJobs = 0;
+          
+          try {
+            if (bid.seller_id) {
+              const rating = await api.feedback.getAverageRating(bid.seller_id);
+              sellerRating = rating || 0;
+              
+              // Get completed jobs count (you might need to implement this API)
+              // For now, using a default value
+              completedJobs = sellerProfile.completed_jobs || 0;
+            }
+          } catch (error) {
+            console.error('Error fetching seller rating:', error);
+          }
+          
+          // Determine avatar - check if it's a valid URL or use initials
+          const avatarUrl = sellerProfile.avatar_url;
+          const isAvatarUrl = isImageUrl(avatarUrl);
+          
+          return {
+            id: bid.id,
+            name: sellerName,
+            avatar: isAvatarUrl ? avatarUrl : sellerName.charAt(0).toUpperCase(),
+            title: sellerProfile.title || 'Legal Professional',
+            rating: sellerRating,
+            completedJobs: completedJobs,
+            amount: `₦${bid.amount?.toLocaleString() || '0'}`,
+            deliveryTime: bid.delivery_time || 'Not specified',
+            submittedDate: formatDate(bid.created_at),
+            proposal: bid.description || 'No proposal provided',
+            status: bid.status || 'pending'
+          };
+        })
+      );
+      
+      setBids(transformedBids);
+    } catch (error) {
+      console.error('Error fetching bids:', error);
+      setBids([]);
+    } finally {
+      setLoadingBids(false);
+    }
+  };
+
+  const fetchClientData = async () => {
+    if (!gig?.id) return;
+    
+    try {
+      setLoadingClient(true);
+      // Get the gig data which should include buyer information
+      const gigData = await api.gigs.getGigById(gig.id.toString());
+      
+      if (gigData && gigData.buyer_id) {
+        // Fetch buyer profile data
+        const { supabase } = await import('../../lib/supabase');
+        const { data: buyerProfile } = await supabase
+          .from('Profiles')
+          .select('*')
+          .eq('id', gigData.buyer_id)
+          .single();
+        
+        if (buyerProfile) {
+          // Get buyer rating
+          let buyerRating = 0;
+          let projectsPosted = 0;
+          
+          try {
+            buyerRating = await api.feedback.getAverageRating(gigData.buyer_id);
+            
+            // Get projects posted count
+            const buyerGigs = await api.gigs.getMyGigs(gigData.buyer_id);
+            projectsPosted = buyerGigs.length;
+          } catch (error) {
+            console.error('Error fetching buyer data:', error);
+          }
+          
+          setClientData({
+            name: buyerProfile.name || 
+                  `${buyerProfile.first_name || ''} ${buyerProfile.last_name || ''}`.trim() || 
+                  'Anonymous Client',
+            avatar: buyerProfile.avatar_url || buyerProfile.name?.charAt(0)?.toUpperCase() || 'C',
+            rating: buyerRating,
+            projectsPosted: projectsPosted
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching client data:', error);
+      // Set default client data if fetch fails
+      setClientData({
+        name: 'Client Information Unavailable',
+        avatar: 'C',
+        rating: 0,
+        projectsPosted: 0
+      });
+    } finally {
+      setLoadingClient(false);
+    }
+  };
+
+  const fetchAdminReviewData = async () => {
+    if (!gig?.id) return;
+    
+    try {
+      // Get the gig data which should include admin review information
+      const gigData = await api.gigs.getGigById(gig.id.toString());
+      
+      if (gigData) {
+        setAdminReviewData({
+          lastReviewed: gigData.updated_at || gigData.created_at,
+          reviewedBy: gigData.verified_by || null,
+          reviewNotes: gigData.verification_notes || null,
+          status: gigData.status
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching admin review data:', error);
+      // Set default admin review data if fetch fails
+      setAdminReviewData({
+        lastReviewed: null,
+        reviewedBy: null,
+        reviewNotes: null,
+        status: gig?.status
+      });
+    }
+  };
 
   const handleFlagButtonClick = () => {
     if (gig?.is_flagged) {
@@ -275,6 +413,17 @@ export const AdminViewDetails = ({
             >
               Bids ({bids.length})
             </button>
+            {activeTab === "bids" && (
+              <Button
+                onClick={fetchBids}
+                disabled={loadingBids}
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+              >
+                {loadingBids ? "Refreshing..." : "Refresh Bids"}
+              </Button>
+            )}
           </div>
         </div>
         
@@ -288,20 +437,10 @@ export const AdminViewDetails = ({
                   {gig.description ? (
                     <p>{gig.description}</p>
                   ) : (
-                    <>
-                      <p className="mb-4">We are seeking a qualified legal professional to conduct a comprehensive title verification for a property located in Victoria Island, Lagos.</p>
-                      
-                      <p className="mb-2">The verification should include:</p>
-                      <ol className="list-decimal pl-5 mb-4 space-y-1">
-                        <li>Confirmation of ownership history</li>
-                        <li>Verification of all relevant documentation</li>
-                        <li>Checks for any encumbrances or liens</li>
-                        <li>Validation with the local land registry</li>
-                        <li>Preparation of a detailed report on findings</li>
-                      </ol>
-                      
-                      <p>The property is a 1,000 sqm commercial plot with existing development. All necessary documents will be provided upon assignment.</p>
-                    </>
+                    <div className="text-gray-500 italic">
+                      <p>No description provided for this gig.</p>
+                      <p className="text-sm mt-2">The client has not added a detailed description for this project.</p>
+                    </div>
                   )}
                 </div>
                 {/* Attachments */}
@@ -362,13 +501,37 @@ export const AdminViewDetails = ({
             
             {activeTab === "bids" && (
               <div className="space-y-6">
-                {bids.length > 0 ? (
+                {loadingBids ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Bids...</h3>
+                    <p className="text-gray-600">Please wait while we fetch the bids for this gig.</p>
+                  </div>
+                ) : bids.length > 0 ? (
                   bids.map((bid) => (
                     <Card key={bid.id} className="border border-gray-200">
                       <CardContent className="p-6">
                         <div className="flex items-start gap-4 mb-4">
-                          <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-                            {bid.avatar}
+                          <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700 overflow-hidden">
+                            {isImageUrl(bid.avatar) ? (
+                              <img 
+                                src={bid.avatar} 
+                                alt={bid.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to initials if image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const fallback = target.nextElementSibling as HTMLElement;
+                                  if (fallback) {
+                                    fallback.classList.remove('hidden');
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <span className={isImageUrl(bid.avatar) ? 'hidden' : ''}>
+                              {bid.avatar}
+                            </span>
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-2">
@@ -384,7 +547,7 @@ export const AdminViewDetails = ({
                             <div className="flex items-center gap-4 mb-3">
                               <div className="flex items-center gap-1">
                                 {renderStars(Math.floor(bid.rating))}
-                                <span className="text-sm text-gray-600 ml-1">{bid.rating}</span>
+                                <span className="text-sm text-gray-600 ml-1">{bid.rating.toFixed(1)}</span>
                               </div>
                               <span className="text-sm text-gray-600">{bid.completedJobs} jobs completed</span>
                               <span className="text-sm text-gray-500">Submitted: {bid.submittedDate}</span>
@@ -436,17 +599,44 @@ export const AdminViewDetails = ({
             {/* Client Info Card */}
             <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
+                <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center mr-4 overflow-hidden">
+                  {loadingClient ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+                  ) : clientData?.avatar && isImageUrl(clientData.avatar) ? (
+                    <img 
+                      src={clientData.avatar} 
+                      alt={clientData.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) {
+                          fallback.classList.remove('hidden');
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <span className={clientData?.avatar && isImageUrl(clientData.avatar) ? 'hidden' : 'text-gray-600 font-medium'}>
+                    {clientData?.avatar || 'C'}
+                  </span>
                 </div>
                 <div>
-                  <h3 className="font-semibold">{gig.client || "Lagos Properties Ltd."}</h3>
+                  <h3 className="font-semibold">
+                    {loadingClient ? 'Loading...' : clientData?.name || 'Client Information Unavailable'}
+                  </h3>
                   <div className="flex items-center text-amber-500">
-                    <Star className="w-4 h-4 fill-current" />
-                    <span className="ml-1 text-sm font-medium">4.8</span>
-                    <span className="ml-2 text-xs text-gray-500">15 project posted</span>
+                    {loadingClient ? (
+                      <div className="animate-pulse bg-gray-200 h-4 w-8 rounded"></div>
+                    ) : (
+                      <>
+                        <Star className="w-4 h-4 fill-current" />
+                        <span className="ml-1 text-sm font-medium">{clientData?.rating?.toFixed(1) || '0.0'}</span>
+                        <span className="ml-2 text-xs text-gray-500">
+                          {clientData?.projectsPosted || 0} project{clientData?.projectsPosted !== 1 ? 's' : ''} posted
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -504,7 +694,28 @@ export const AdminViewDetails = ({
             {/* Admin Info */}
             <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
               <h4 className="text-sm font-medium text-blue-800 mb-2">Admin Notes</h4>
-              <p className="text-xs text-blue-700">Last reviewed: {new Date().toLocaleDateString()}</p>
+              <div className="space-y-2 text-xs text-blue-700">
+                <p>
+                  <span className="font-medium">Status:</span> {adminReviewData?.status || gig.status}
+                </p>
+                <p>
+                  <span className="font-medium">Last reviewed:</span> {
+                    adminReviewData?.lastReviewed 
+                      ? formatDate(adminReviewData.lastReviewed) 
+                      : 'Not reviewed yet'
+                  }
+                </p>
+                {adminReviewData?.reviewedBy && (
+                  <p>
+                    <span className="font-medium">Reviewed by:</span> {adminReviewData.reviewedBy}
+                  </p>
+                )}
+                {adminReviewData?.reviewNotes && (
+                  <p>
+                    <span className="font-medium">Notes:</span> {adminReviewData.reviewNotes}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
