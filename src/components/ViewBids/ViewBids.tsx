@@ -468,9 +468,22 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
     }
 
     try {
+      // Update the bid status to accepted
       await api.bids.updateBid(bidId, { status: 'accepted' });
+      
+      // Update the gig status to active
+      await api.gigs.updateGig(gig.id, {
+        title: gig.title,
+        description: gig.description,
+        categories: gig.category ? [gig.category] : [],
+        budget: gig.budget,
+        deadline: gig.deadline,
+        status: 'active',
+        buyer_id: undefined // This will be set by the backend
+      });
+      
       await loadBids();
-      addToast("Bid accepted successfully", "success");
+      addToast("Bid accepted successfully and gig marked as active", "success");
     } catch (err) {
       console.error('Error accepting bid:', err);
       addToast("Failed to accept bid", "error");

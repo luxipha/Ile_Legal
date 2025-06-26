@@ -151,39 +151,78 @@ export const SellerDashboard = (): JSX.Element => {
       
       setLoadingOngoing(true);
       try {
-        // For sellers, we need to get gigs where they have accepted bids
-        // This is a simplified approach - in reality you'd need to join bids and gigs tables
-        const myGigs = await api.gigs.getMyGigs(user.id);
+        // Get the seller's active bids (pending and accepted)
+        const activeBids = await api.bids.getActiveBids(user.id);
         
-        // Convert to OngoingGig format for accepted/in-progress gigs
-        const ongoing: OngoingGig[] = myGigs
-          .filter((gig: any) => gig.status?.toLowerCase() === 'in progress' || gig.status?.toLowerCase() === 'accepted')
-          .map((gig: any) => ({
-            id: gig.id.toString(),
-            title: gig.title || "Legal Service",
-            company: gig.buyer?.first_name && gig.buyer?.last_name 
-              ? `${gig.buyer.first_name} ${gig.buyer.last_name}` 
-              : gig.buyer?.first_name || gig.buyer?.last_name,
-            price: formatCurrency.naira(gig.budget, "Budget not specified"),
-            dueDate: formatDate.full(gig.deadline),
-            progress: gig.progress || 0, // Use real progress if available
-            description: gig.description || "No description provided"
+        // Filter for accepted bids only
+        const acceptedBids = activeBids.filter((bid: any) => bid.status === 'accepted');
+        
+        // Fetch gig data for each accepted bid
+        const ongoingGigsWithData = await Promise.all(
+          acceptedBids.map(async (bid: any) => {
+            try {
+              const gigData = await api.gigs.getGigById(bid.gig_id);
+              return {
+                bid: bid,
+                gig: gigData
+              };
+            } catch (error) {
+              console.error(`Error fetching gig data for bid ${bid.id}:`, error);
+              return null;
+            }
+          })
+        );
+        
+        // Filter out any null results and convert to OngoingGig format
+        const ongoing: OngoingGig[] = ongoingGigsWithData
+          .filter((item: any) => item !== null)
+          .map((item: any) => ({
+            id: item.gig.id.toString(),
+            title: item.gig.title || "Legal Service",
+            company: item.gig.buyer?.first_name && item.gig.buyer?.last_name 
+              ? `${item.gig.buyer.first_name} ${item.gig.buyer.last_name}` 
+              : item.gig.buyer?.first_name || item.gig.buyer?.last_name || "Anonymous Client",
+            price: formatCurrency.naira(item.gig.budget, "Budget not specified"),
+            dueDate: formatDate.full(item.gig.deadline),
+            progress: item.gig.progress || 0, // Use real progress if available
+            description: item.gig.description || "No description provided"
           }));
         
+        console.log("acceptedBids:", acceptedBids);
+        console.log("ongoing:", ongoing);
         setOngoingGigs(ongoing);
         
-        // Also load completed gigs
-        const completed = myGigs
-          .filter((gig: any) => gig.status?.toLowerCase() === 'completed')
-          .map((gig: any) => ({
-            id: gig.id.toString(),
-            title: gig.title || "Legal Service",
-            company: gig.buyer?.first_name && gig.buyer?.last_name 
-              ? `${gig.buyer.first_name} ${gig.buyer.last_name}` 
-              : gig.buyer?.first_name || gig.buyer?.last_name ,
-            price: formatCurrency.naira(gig.budget, "Budget not specified"),
-            completedDate: formatDate.full(gig.updated_at || gig.created_at),
-            description: gig.description || "No description provided"
+        // For completed gigs, we need to get gigs where the seller had accepted bids and the gig status is completed
+        const completedGigsWithData = await Promise.all(
+          acceptedBids.map(async (bid: any) => {
+            try {
+              const gigData = await api.gigs.getGigById(bid.gig_id);
+              // Only include if the gig status is completed
+              if (gigData.status?.toLowerCase() === 'completed') {
+                return {
+                  bid: bid,
+                  gig: gigData
+                };
+              }
+              return null;
+            } catch (error) {
+              console.error(`Error fetching gig data for bid ${bid.id}:`, error);
+              return null;
+            }
+          })
+        );
+        
+        const completed = completedGigsWithData
+          .filter((item: any) => item !== null)
+          .map((item: any) => ({
+            id: item.gig.id.toString(),
+            title: item.gig.title || "Legal Service",
+            company: item.gig.buyer?.first_name && item.gig.buyer?.last_name 
+              ? `${item.gig.buyer.first_name} ${item.gig.buyer.last_name}` 
+              : item.gig.buyer?.first_name || item.gig.buyer?.last_name || "Anonymous Client",
+            price: formatCurrency.naira(item.gig.budget, "Budget not specified"),
+            completedDate: formatDate.full(item.gig.updated_at || item.gig.created_at),
+            description: item.gig.description || "No description provided"
           }));
         
         setCompletedGigs(completed);

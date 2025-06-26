@@ -123,12 +123,15 @@ export const BuyerDashboard = (): JSX.Element => {
         // Fetch all gigs for the current user
         const gigs = await api.gigs.getMyGigs(user.id);
         console.log("gigs", gigs);
+        
         // Map and split gigs by status
         const active: Gig[] = [];
         const inProgress: InProgressGig[] = [];
         const completed: CompletedGig[] = [];
-        gigs.forEach((gig: any) => {
-          if ( gig.status?.toLowerCase() === "pending") {
+        
+        // Process each gig
+        for (const gig of gigs) {
+          if (gig.status?.toLowerCase() === "pending") {
             active.push({
               ...gig,
               status: gig.status?.toLowerCase() === "pending" ? "Open" : gig.status, // Display "Open" for pending
@@ -146,31 +149,101 @@ export const BuyerDashboard = (): JSX.Element => {
               projectsPosted: gig.projectsPosted || 0,
               is_flagged: gig.is_flagged || false
             });
-          } else if (gig.status?.toLowerCase() === "in progress" || gig.status?.toLowerCase() === "active" ) {
-            inProgress.push({
-              id: gig.id,
-              title: gig.title,
-              provider: gig.provider || "",
-              providerAvatar: gig.providerAvatar || "",
-              dueDate: gig.dueDate || gig.deadline,
-              amount: gig.amount || gig.budget,
-              progress: gig.progress || 0,
-              status: "In Progress"
-            });
+          } else if (gig.status?.toLowerCase() === "in progress" || gig.status?.toLowerCase() === "active") {
+            // For in-progress gigs, we need to get the accepted bid to find the provider
+            try {
+              const bids = await api.bids.getBidsByGigId(gig.id.toString());
+              const acceptedBid = bids.find((bid: any) => bid.status === 'accepted');
+              
+              if (acceptedBid) {
+                // Get seller profile information
+                const { supabase } = await import('../../lib/supabase');
+                const { data: sellerProfile } = await supabase
+                  .from('Profiles')
+                  .select('*')
+                  .eq('id', acceptedBid.seller_id)
+                  .single();
+                
+                const providerName = sellerProfile?.name || 
+                  `${sellerProfile?.first_name || ''} ${sellerProfile?.last_name || ''}`.trim() || 
+                  'Legal Professional';
+                const providerAvatar = sellerProfile?.avatar_url || providerName.charAt(0).toUpperCase();
+                
+                inProgress.push({
+                  id: gig.id,
+                  title: gig.title,
+                  provider: providerName,
+                  providerAvatar: providerAvatar,
+                  dueDate: gig.dueDate || gig.deadline,
+                  amount: gig.amount || gig.budget,
+                  progress: gig.progress || 0,
+                  status: "In Progress"
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching bid data for gig ${gig.id}:`, error);
+              // Fallback with default provider info
+              inProgress.push({
+                id: gig.id,
+                title: gig.title,
+                provider: "Legal Professional",
+                providerAvatar: "L",
+                dueDate: gig.dueDate || gig.deadline,
+                amount: gig.amount || gig.budget,
+                progress: gig.progress || 0,
+                status: "In Progress"
+              });
+            }
           } else if (gig.status?.toLowerCase() === "completed") {
-            completed.push({
-              id: gig.id,
-              title: gig.title,
-              provider: gig.provider || "",
-              providerAvatar: gig.providerAvatar || "",
-              amount: gig.amount || gig.budget,
-              completedDate: gig.completedDate || gig.deadline,
-              postedDate: gig.postedDate || gig.created_at || "",
-              deadline: gig.deadline || "",
-              status: "Completed"
-            });
+            // For completed gigs, we need to get the accepted bid to find the provider
+            try {
+              const bids = await api.bids.getBidsByGigId(gig.id.toString());
+              const acceptedBid = bids.find((bid: any) => bid.status === 'accepted');
+              
+              if (acceptedBid) {
+                // Get seller profile information
+                const { supabase } = await import('../../lib/supabase');
+                const { data: sellerProfile } = await supabase
+                  .from('Profiles')
+                  .select('*')
+                  .eq('id', acceptedBid.seller_id)
+                  .single();
+                
+                const providerName = sellerProfile?.name || 
+                  `${sellerProfile?.first_name || ''} ${sellerProfile?.last_name || ''}`.trim() || 
+                  'Legal Professional';
+                const providerAvatar = sellerProfile?.avatar_url || providerName.charAt(0).toUpperCase();
+                
+                completed.push({
+                  id: gig.id,
+                  title: gig.title,
+                  provider: providerName,
+                  providerAvatar: providerAvatar,
+                  amount: gig.amount || gig.budget,
+                  completedDate: gig.completedDate || gig.deadline,
+                  postedDate: gig.postedDate || gig.created_at || "",
+                  deadline: gig.deadline || "",
+                  status: "Completed"
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching bid data for gig ${gig.id}:`, error);
+              // Fallback with default provider info
+              completed.push({
+                id: gig.id,
+                title: gig.title,
+                provider: "Legal Professional",
+                providerAvatar: "L",
+                amount: gig.amount || gig.budget,
+                completedDate: gig.completedDate || gig.deadline,
+                postedDate: gig.postedDate || gig.created_at || "",
+                deadline: gig.deadline || "",
+                status: "Completed"
+              });
+            }
           }
-        });
+        }
+        
         setActiveGigs(active);
         setInProgressGigs(inProgress);
         setCompletedGigs(completed);
@@ -436,8 +509,32 @@ export const BuyerDashboard = (): JSX.Element => {
         
         {/* Provider Info */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium">
-            {gig.providerAvatar}
+          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium overflow-hidden">
+            {gig.providerAvatar && (
+              gig.providerAvatar.startsWith('http://') || 
+              gig.providerAvatar.startsWith('https://') || 
+              gig.providerAvatar.startsWith('data:image/')
+            ) ? (
+              <img 
+                src={gig.providerAvatar} 
+                alt={gig.provider}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Fallback to initials if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const fallback = target.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.classList.remove('hidden');
+                }}
+              />
+            ) : null}
+            <span className={gig.providerAvatar && (
+              gig.providerAvatar.startsWith('http://') || 
+              gig.providerAvatar.startsWith('https://') || 
+              gig.providerAvatar.startsWith('data:image/')
+            ) ? 'hidden' : ''}>
+              {gig.providerAvatar || gig.provider.charAt(0).toUpperCase()}
+            </span>
           </div>
           <div>
             <div className="font-medium text-gray-900">{gig.provider}</div>
@@ -487,8 +584,32 @@ export const BuyerDashboard = (): JSX.Element => {
           <div className="flex-1">
             <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium">
-                {gig.providerAvatar}
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium overflow-hidden">
+                {gig.providerAvatar && (
+                  gig.providerAvatar.startsWith('http://') || 
+                  gig.providerAvatar.startsWith('https://') || 
+                  gig.providerAvatar.startsWith('data:image/')
+                ) ? (
+                  <img 
+                    src={gig.providerAvatar} 
+                    alt={gig.provider}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to initials if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <span className={gig.providerAvatar && (
+                  gig.providerAvatar.startsWith('http://') || 
+                  gig.providerAvatar.startsWith('https://') || 
+                  gig.providerAvatar.startsWith('data:image/')
+                ) ? 'hidden' : ''}>
+                  {gig.providerAvatar || gig.provider.charAt(0).toUpperCase()}
+                </span>
               </div>
               <span className="text-gray-700">{gig.provider}</span>
             </div>
