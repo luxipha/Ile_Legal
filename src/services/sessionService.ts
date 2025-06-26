@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { ActivityService } from './activityService';
+import { generateRandom12DigitId } from '../lib/utils';
 
 export interface UserSession {
   id: string;
@@ -65,14 +66,14 @@ export class SessionService {
       if (!user.data.user) return;
 
       const sessionInfo = this.getCurrentSessionInfo();
-      const sessionId = crypto.randomUUID();
+      const sessionId = generateRandom12DigitId();
 
       // Note: This is a simplified implementation
       // In a real app, you'd want proper session management with refresh tokens
       const sessionData = {
         id: sessionId,
         user_id: user.data.user.id,
-        session_token: user.data.user.access_token || sessionId,
+        session_token: sessionId,
         device_info: `${sessionInfo.os} • ${sessionInfo.browser}`,
         ip_address: 'Unknown', // Would be set server-side
         location: sessionInfo.location,

@@ -44,6 +44,20 @@ interface Bid {
   requirements?: string[];
   postedDate?: string;
   previousBid?: string;
+  sellerRating?: number;
+  gigDeadline?: string | null;
+  gigBudget?: number | null;
+  // Seller information from Profiles table
+  seller?: {
+    id: string;
+    full_name?: string;
+    first_name?: string;
+    last_name?: string;
+    title?: string;
+    avatar_url?: string;
+    bio?: string;
+    email?: string;
+  };
 }
 
 export const ActiveBids = (): JSX.Element => {
@@ -56,11 +70,37 @@ export const ActiveBids = (): JSX.Element => {
   const [activeBids, setActiveBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gigBids, setGigBids] = useState<Bid[]>([]);
+  const [gigData, setGigData] = useState<any>(null);
+  const [buyerRating, setBuyerRating] = useState<number>(0);
+  const [buyerGigsCount, setBuyerGigsCount] = useState<number>(0);
   
   // Fetch active bids on component mount
   useEffect(() => {
     fetchActiveBids();
   }, []);
+
+  // Fetch bids for specific gig when in view-details mode and bids tab is active
+  useEffect(() => {
+    if (viewMode === "view-details" && activeTab === "bids" && selectedBid?.gig_id) {
+      fetchGigBids(selectedBid.gig_id);
+    }
+  }, [viewMode, activeTab, selectedBid?.gig_id]);
+
+  // Fetch gig data when in view-details mode
+  useEffect(() => {
+    if (viewMode === "view-details" && selectedBid?.gig_id) {
+      fetchGigData(selectedBid.gig_id);
+    }
+  }, [viewMode, selectedBid?.gig_id]);
+
+  // Fetch buyer rating when gig data is available
+  useEffect(() => {
+    if (gigData?.buyer?.id) {
+      fetchBuyerRating(gigData.buyer.id);
+      fetchBuyerGigsCount(gigData.buyer.id);
+    }
+  }, [gigData?.buyer?.id]);
 
   // Handle navigation state for editing bids
   useEffect(() => {
@@ -89,13 +129,95 @@ export const ActiveBids = (): JSX.Element => {
     try {
       setLoading(true);
       const bids = await api.bids.getActiveBids(user.id);
-      setActiveBids(bids);
+      
+      // Fetch gig data for each bid to get deadlines
+      const bidsWithGigData = await Promise.all(
+        bids.map(async (bid) => {
+          try {
+            const gigData = await api.gigs.getGigById(bid.gig_id);
+            return {
+              ...bid,
+              gigDeadline: gigData?.deadline,
+              gigBudget: gigData?.budget
+            };
+          } catch (error) {
+            console.error(`Error fetching gig data for bid ${bid.id}:`, error);
+            return {
+              ...bid,
+              gigDeadline: null,
+              gigBudget: null
+            };
+          }
+        })
+      );
+      
+      setActiveBids(bidsWithGigData);
       setError(null);
     } catch (err) {
       setError("Failed to fetch active bids");
       console.error("Error fetching active bids:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchGigBids = async (gigId: string) => {
+    try {
+      const bids = await api.bids.getBidsByGigId(gigId);
+      
+      // Fetch average ratings for each seller
+      const bidsWithRatings = await Promise.all(
+        bids.map(async (bid) => {
+          try {
+            const averageRating = await api.feedback.getAverageRating(bid.seller_id);
+            return {
+              ...bid,
+              sellerRating: averageRating
+            };
+          } catch (error) {
+            console.error(`Error fetching rating for seller ${bid.seller_id}:`, error);
+            return {
+              ...bid,
+              sellerRating: 0
+            };
+          }
+        })
+      );
+      
+      setGigBids(bidsWithRatings);
+    } catch (err) {
+      console.error("Error fetching gig bids:", err);
+      setError("Failed to fetch bids for this gig");
+    }
+  };
+
+  const fetchGigData = async (gigId: string) => {
+    try {
+      const data = await api.gigs.getGigById(gigId);
+      setGigData(data);
+    } catch (err) {
+      console.error("Error fetching gig data:", err);
+      setError("Failed to fetch gig data");
+    }
+  };
+
+  const fetchBuyerRating = async (buyerId: string) => {
+    try {
+      const rating = await api.feedback.getAverageRating(buyerId);
+      setBuyerRating(rating);
+    } catch (err) {
+      console.error("Error fetching buyer rating:", err);
+      setError("Failed to fetch buyer rating");
+    }
+  };
+
+  const fetchBuyerGigsCount = async (buyerId: string) => {
+    try {
+      const gigs = await api.gigs.getMyGigs(buyerId);
+      setBuyerGigsCount(gigs.length);
+    } catch (err) {
+      console.error("Error fetching buyer gigs count:", err);
+      setError("Failed to fetch buyer gigs count");
     }
   };
   
@@ -271,11 +393,11 @@ export const ActiveBids = (): JSX.Element => {
                   <div className="grid grid-cols-3 gap-6">
                     <div>
                       <span className="text-gray-600">Budget:</span>
-                      <div className="font-semibold text-gray-900">{selectedBid.originalBudget}</div>
+                      <div className="font-semibold text-gray-900">{gigData?.budget ? formatCurrency.naira(gigData.budget) : 'N/A'}</div>
                     </div>
                     <div>
                       <span className="text-gray-600">Deadline:</span>
-                      <div className="font-semibold text-gray-900">{selectedBid.dueDate}</div>
+                      <div className="font-semibold text-gray-900">{gigData?.deadline ? formatDate.full(gigData.deadline) : 'N/A'}</div>
                     </div>
                     <div>
                       <span className="text-gray-600">Previous Bid:</span>
@@ -442,9 +564,9 @@ export const ActiveBids = (): JSX.Element => {
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">{selectedBid.title}</h1>
                   <div className="flex items-center gap-6 text-gray-600">
-                    <span>Posted {selectedBid.postedDate}</span>
-                    <span>Deadline {selectedBid.dueDate}</span>
-                    <span>Budget {selectedBid.originalBudget}</span>
+                    <span>Posted {formatDate.full(selectedBid.created_at)}</span>
+                    <span>Deadline {gigData?.deadline ? formatDate.full(gigData.deadline) : 'N/A'}</span>
+                    <span>Budget {gigData?.budget ? formatCurrency.naira(gigData.budget) : 'N/A'}</span>
                   </div>
                 </div>
                 <span className="bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium">
@@ -457,7 +579,7 @@ export const ActiveBids = (): JSX.Element => {
                 <nav className="flex gap-8">
                   {[
                     { id: "details", label: "Details" },
-                    { id: "bids", label: `Bids (${activeBids.length + 1})` },
+                    { id: "bids", label: `Bids (${viewMode === "view-details" ? gigBids.length : activeBids.length})` },
                     { id: "messages", label: "Messages" }
                   ].map((tab) => (
                     <button
@@ -500,104 +622,95 @@ export const ActiveBids = (): JSX.Element => {
 
                   {activeTab === "bids" && (
                     <div className="space-y-6">
-                      {/* Your Bid */}
-                      <Card className="border-2 border-[#FEC85F] bg-[#FEC85F]/5">
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between mb-4">
-                            <span className="bg-[#FEC85F] text-[#1B1828] px-3 py-1 rounded-full text-sm font-medium">
-                              Your Bid
-                            </span>
-                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedBid.statusColor}`}>
-                              {selectedBid.status}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-start gap-4 mb-4">
-                            <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-                              DS
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-2">
-                                <div>
-                                  <h4 className="font-semibold text-gray-900">Demo Seller</h4>
-                                  <p className="text-gray-600">Senior Property Lawyer</p>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-2xl font-bold text-gray-900">{selectedBid.amount}</div>
-                                  <div className="text-sm text-gray-500">{selectedBid.deliveryTime}</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-4 mb-3">
-                                <div className="flex items-center gap-1">
-                                  {renderStars(5)}
-                                  <span className="text-sm text-gray-600 ml-1">4.9</span>
-                                </div>
-                                <span className="text-sm text-gray-600">127 jobs completed</span>
-                                <span className="text-sm text-gray-500">Submitted: {selectedBid.bidSubmitted}</span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="mb-4">
-                            <h5 className="font-medium text-gray-900 mb-2">Proposal</h5>
-                            <p className="text-gray-600">{selectedBid.description}</p>
-                          </div>
-
-                          <div className="flex gap-3">
-                            <Button 
-                              onClick={() => handleEditBid(selectedBid)}
-                              className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                            >
-                              Edit Bid
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              onClick={() => handleMessageClient(selectedBid)}
-                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                              Message Client
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-
                       {/* Other Bids */}
-                      {activeBids.map((bid) => (
-                        <Card key={bid.id} className="border border-gray-200">
-                          <CardContent className="p-6">
-                            <div className="flex items-start gap-4 mb-4">
-                              <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-                                {bid.company?.charAt(0)}
+                      {(viewMode === "view-details" ? gigBids : activeBids).map((bid) => {
+                        const isUserBid = bid.seller_id === user?.id;
+                        console.log("bid:", bid);
+                        return (
+                          <Card key={bid.id} className={`border ${isUserBid ? 'border-2 border-[#FEC85F] bg-[#FEC85F]/5' : 'border-gray-200'}`}>
+                            <CardContent className="p-6">
+                              <div className="flex items-center justify-between mb-4">
+                                {isUserBid && (
+                                  <span className="bg-[#FEC85F] text-[#1B1828] px-3 py-1 rounded-full text-sm font-medium">
+                                    Your Bid
+                                  </span>
+                                )}
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${bid.statusColor || 
+                                  bid.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {bid.status}
+                                </span>
                               </div>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div>
-                                    <h4 className="font-semibold text-gray-900">{bid.company}</h4>
-                                    <p className="text-gray-600">{bid.title}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-2xl font-bold text-gray-900">{bid.amount}</div>
-                                    <div className="text-sm text-gray-500">{bid.deliveryTime}</div>
+                              
+                              <div className="flex items-start gap-4 mb-4">
+                                <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700 overflow-hidden">
+                                  {bid.seller?.avatar_url ? (
+                                    <img 
+                                      src={bid.seller.avatar_url} 
+                                      alt={`${bid.seller?.first_name} ${bid.seller?.last_name}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        // Fallback to initials if image fails to load
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        target.nextElementSibling?.classList.remove('hidden');
+                                      }}
+                                    />
+                                  ) : null}
+                                  <div className={`${bid.seller?.avatar_url ? 'hidden' : ''} w-full h-full flex items-center justify-center`}>
+                                    {bid.seller?.first_name?.charAt(0) || bid.seller?.last_name?.charAt(0) || bid.company?.charAt(0) || 'U'}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-4 mb-3">
-                                  <div className="flex items-center gap-1">
-                                    {renderStars(Math.floor(bid.companyRating || 0))}
-                                    <span className="text-sm text-gray-600 ml-1">{bid.companyRating?.toFixed(1) || 'N/A'}</span>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900">{bid.seller?.first_name + " " + bid.seller?.last_name || bid.company}</h4>
+                                      <p className="text-gray-600">{bid.seller?.title || bid.title}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-2xl font-bold text-gray-900">{bid.amount}</div>
+                                      <div className="text-sm text-gray-500">{bid.deliveryTime}</div>
+                                    </div>
                                   </div>
-                                  <span className="text-sm text-gray-600">{bid.projectsPosted} projects posted</span>
-                                  <span className="text-sm text-gray-500">Submitted: {bid.bidSubmitted}</span>
+                                  <div className="flex items-center gap-4 mb-3">
+                                    <div className="flex items-center gap-1">
+                                      {renderStars(Math.floor(bid.sellerRating || 0))}
+                                      <span className="text-sm text-gray-600 ml-1">{bid.sellerRating?.toFixed(1) || 'N/A'}</span>
+                                    </div>
+                                    {/* <span className="text-sm text-gray-600">{bid.projectsPosted} projects posted</span> */}
+                                    <span className="text-sm text-gray-500">Submitted: {formatDate.full(bid.created_at)}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            
-                            <div className="mb-4">
-                              <h5 className="font-medium text-gray-900 mb-2">Proposal</h5>
-                              <p className="text-gray-600">{bid.description}</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                              
+                              <div className="mb-4">
+                                <h5 className="font-medium text-gray-900 mb-2">Proposal</h5>
+                                <p className="text-gray-600">{bid.description}</p>
+                              </div>
+
+                              {isUserBid && (
+                                <div className="flex gap-3">
+                                  <Button 
+                                    onClick={() => handleEditBid(bid)}
+                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                                  >
+                                    Edit Bid
+                                  </Button>
+                                  <Button 
+                                    variant="outline"
+                                    onClick={() => handleMessageClient(bid)}
+                                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Message Client
+                                  </Button>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -641,15 +754,35 @@ export const ActiveBids = (): JSX.Element => {
                 <div className="col-span-1">
                   <Card className="border border-gray-200 mb-6">
                     <CardContent className="p-6 text-center">
-                      <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
-                        <BuildingIcon className="w-8 h-8 text-gray-600" />
+                      <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4 overflow-hidden">
+                        {gigData?.buyer?.avatar_url ? (
+                          <img 
+                            src={gigData.buyer.avatar_url} 
+                            alt={`${gigData.buyer?.first_name} ${gigData.buyer?.last_name}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to icon if image fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`${gigData?.buyer?.avatar_url ? 'hidden' : ''} w-full h-full flex items-center justify-center`}>
+                          <BuildingIcon className="w-8 h-8 text-gray-600" />
+                        </div>
                       </div>
-                      <h3 className="font-semibold text-gray-900 mb-2">{selectedBid.company}</h3>
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        {gigData?.buyer?.first_name && gigData?.buyer?.last_name 
+                          ? `${gigData.buyer.first_name} ${gigData.buyer.last_name}` 
+                          : selectedBid.company || 'Unknown Buyer'
+                        }
+                      </h3>
                       <div className="flex items-center justify-center gap-1 mb-2">
-                        {renderStars(Math.floor(selectedBid.companyRating || 0))}
-                        <span className="text-sm text-gray-600 ml-1">{selectedBid.companyRating?.toFixed(1) || 'N/A'}</span>
+                        {renderStars(Math.floor(buyerRating || 0))}
+                        <span className="text-sm text-gray-600 ml-1">{buyerRating?.toFixed(1) || 'N/A'}</span>
                       </div>
-                      <p className="text-sm text-gray-600">{selectedBid.projectsPosted} projects posted</p>
+                      <p className="text-sm text-gray-600">{buyerGigsCount} gigs created</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -714,6 +847,17 @@ export const ActiveBids = (): JSX.Element => {
                         <div className="text-sm text-gray-900 font-medium">
                           {formatDate.full(bid.created_at)}
                         </div>
+                        {bid.gigBudget && (
+                          <>
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <DollarSignIcon className="w-4 h-4" />
+                              <span className="text-sm">Gig Budget</span>
+                            </div>
+                            <div className="text-sm text-gray-900 font-medium">
+                              {formatCurrency.naira(bid.gigBudget)}
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Price and Due Date */}
@@ -722,7 +866,7 @@ export const ActiveBids = (): JSX.Element => {
                         <div className="text-right">
                           <div className="text-sm text-gray-600 mb-1">Due Date:</div>
                           <div className="bg-[#FEC85F] text-[#1B1828] px-3 py-1 rounded-lg font-medium">
-                            {bid.dueDate}
+                            {bid.gigDeadline ? formatDate.full(bid.gigDeadline) : 'N/A'}
                           </div>
                         </div>
                       </div>

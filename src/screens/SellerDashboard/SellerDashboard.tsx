@@ -914,9 +914,11 @@ export const SellerDashboard = (): JSX.Element => {
                             <Button 
                               onClick={() => handlePlaceBid(gig)}
                               className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                              disabled={gig.status === 'suspended'}
+                              disabled={gig.status === 'suspended' || user?.user_metadata?.verification_status === 'pending' || user?.user_metadata?.verification_status === 'rejected'}
                             >
-                              {gig.status === 'suspended' ? 'Gig Suspended' : 'Place Bid'}
+                              {gig.status === 'suspended' ? 'Gig Suspended' : 
+                               user?.user_metadata?.verification_status === 'pending' ? 'Verification Pending' :
+                               user?.user_metadata?.verification_status === 'rejected' ? 'Verification Rejected' : 'Place Bid'}
                             </Button>
                             <Button 
                               variant="outline"

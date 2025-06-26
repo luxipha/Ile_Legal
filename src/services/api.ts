@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { ipfsService, IPFSUploadResult } from './ipfsService';
 import { reputationService } from './reputationService';
+import { generateRandom12DigitId } from '../lib/utils';
 
 
 // Mock API service for frontend-only development
@@ -55,8 +56,8 @@ export const api = {
         throw new Error('User must be logged in to create a bid');
       }
 
-      // Use UUID for bid ID to prevent collisions
-      const randomId = crypto.randomUUID();
+      // Use random 12-digit ID for bid ID to prevent collisions
+      const randomId = generateRandom12DigitId();
 
       const { data, error } = await supabase
         .from('Bids')
@@ -110,7 +111,10 @@ export const api = {
     getBidsByGigId: async (gigId: string) => {
       const { data, error } = await supabase
         .from('Bids')
-        .select('*')
+        .select(`
+          *,
+          seller:Profiles!seller_id(*)
+        `)
         .eq('gig_id', gigId)
         .order('created_at', { ascending: false });
 
@@ -269,7 +273,10 @@ export const api = {
     getGigById: async (gigId: string) => {
       const { data, error } = await supabase
         .from('Gigs')
-        .select('*')
+        .select(`
+          *,
+          buyer:Profiles!buyer_id(*)
+        `)
         .eq('id', gigId)
         .single();
       if (error) {
@@ -366,8 +373,8 @@ export const api = {
       attachments?: FileList | File[];
       buyer_id: string | undefined;
     }) => {
-      // Use UUID for gig ID to prevent collisions
-      const randomId = crypto.randomUUID();
+      // Use random 12-digit ID for gig ID to prevent collisions
+      const randomId = generateRandom12DigitId();
       
       let attachmentUrls: string[] = [];
       
