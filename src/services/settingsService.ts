@@ -78,8 +78,9 @@ export class SettingsService {
           name: "Circle", 
           enabled: true, 
           testMode: true,
-          apiKey: "TEST_API_KEY:10a0b7b4cedfaa42d6ce306592fec59f:cfae665cde083f9236de7be92d08f54c",
-          escrowWalletId: "52a2c755-6045-5217-8d70-8ac28dc221ba"
+          // API keys now managed securely in backend - no longer stored in frontend
+          apiKey: "BACKEND_MANAGED",
+          escrowWalletId: "BACKEND_MANAGED"
         },
         { name: "Flutterwave", enabled: false, testMode: true },
         { name: "Paystack", enabled: true, testMode: true }
@@ -142,11 +143,19 @@ export class SettingsService {
   }
 
   /**
-   * Get Circle API configuration
+   * Get Circle API configuration (now managed in backend)
+   * @deprecated Circle API keys are now managed securely in backend Edge Functions
    */
   static async getCircleConfig(): Promise<PaymentProvider | null> {
     const settings = await this.getSettings();
-    return settings.paymentProviders.find(p => p.name === 'Circle') || null;
+    const circleProvider = settings.paymentProviders.find(p => p.name === 'Circle') || null;
+    
+    if (circleProvider) {
+      // Return provider config but note that API keys are backend-managed
+      console.warn('⚠️ Circle API configuration is now managed in backend for security. Frontend should use secureCircleService.');
+    }
+    
+    return circleProvider;
   }
 
   /**

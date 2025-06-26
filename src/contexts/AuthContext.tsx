@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import * as circleSdk from '../services/circleSdk';
+import { backendWalletService } from '../services/backendWalletService';
 
 // User types
 type UserRole = 'buyer' | 'seller' | 'admin';
@@ -426,52 +426,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         
         try {
-          // Create a Circle wallet for the new user using SDK
-          console.log('Creating Circle wallet for new user:', newUser.id);
+          // Create a Circle wallet for the new user using backend service
+          console.log('Creating Circle wallet via backend for new user:', newUser.id);
           
           if (!newUser.id) {
             throw new Error('No user ID available for wallet creation');
           }
           
-          const walletDescription = `${newUser.role.charAt(0).toUpperCase() + newUser.role.slice(1)} wallet for ${newUser.name}`;
-          const wallet = await circleSdk.createWallet(newUser.id, walletDescription);
+          const walletResponse = await backendWalletService.createWallet({
+            userId: newUser.id,
+            userType: newUser.role as 'buyer' | 'seller',
+            name: newUser.name,
+            email: newUser.email
+          });
           
-          if (!wallet?.walletId) {
-            throw new Error('Failed to create Circle wallet - no wallet ID returned');
+          if (!walletResponse.success || !walletResponse.wallet) {
+            throw new Error(`Backend wallet creation failed: ${walletResponse.error || 'Unknown error'}`);
           }
           
-          console.log('Circle wallet created:', wallet.walletId);
-          
-          // Generate a wallet address
-          const addressData = await circleSdk.generateWalletAddress(wallet.walletId);
-          
-          if (!addressData?.address) {
-            throw new Error('Failed to generate wallet address');
-          }
-          
-          console.log('Wallet address generated:', addressData.address);
+          const wallet = walletResponse.wallet;
+          console.log('Backend wallet created successfully:', wallet.circle_wallet_id);
           
           // Update the user object with wallet information
           newUser.user_metadata = {
             ...newUser.user_metadata,
-            circle_wallet_id: wallet.walletId,
-            circle_wallet_address: addressData.address
+            circle_wallet_id: wallet.circle_wallet_id,
+            circle_wallet_address: wallet.wallet_address || undefined
           };
           
           // Update the user in Supabase with the wallet information
           await supabase.auth.updateUser({
             data: {
-              circle_wallet_id: wallet.walletId,
-              circle_wallet_address: addressData.address
+              circle_wallet_id: wallet.circle_wallet_id,
+              circle_wallet_address: wallet.wallet_address
             }
           });
           
-          console.log('Real Circle wallet setup complete!');
+          console.log('Backend Circle wallet setup complete!');
         } catch (walletError) {
           // Log the error but don't fail the registration process
-          console.error('Error creating Circle wallet:', walletError);
+          console.error('Error creating Circle wallet via backend:', walletError);
           
-          // Fallback to mock wallet if Circle API fails
+          // Fallback to mock wallet if backend service fails
           console.log('Falling back to mock wallet...');
           const mockWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
           

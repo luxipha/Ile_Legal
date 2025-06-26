@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import * as circleSdk from './circleSdk';
+import { backendWalletService } from './backendWalletService';
+import { secureCircleService } from './secureCircleService';
 import { User } from '../types';
 
 /**
@@ -27,27 +28,34 @@ export const createUserWallet = async (user: User) => {
       return { walletId: profile.circle_wallet_id, address: profile.circle_wallet_address };
     }
     
-    // Create a new wallet in Circle using SDK
-    const walletDescription = `${user.role.charAt(0).toUpperCase() + user.role.slice(1)} wallet for ${user.name}`;
-    const wallet = await circleSdk.createWallet(user.id, walletDescription);
+    // Create a new wallet using backend service
+    const walletResponse = await backendWalletService.createWallet({
+      userId: user.id,
+      userType: user.role as 'buyer' | 'seller',
+      name: user.name,
+      email: user.email
+    });
     
-    // Generate a wallet address using SDK
-    const addressData = await circleSdk.generateWalletAddress(wallet.walletId);
+    if (!walletResponse.success || !walletResponse.wallet) {
+      throw new Error(`Backend wallet creation failed: ${walletResponse.error || 'Unknown error'}`);
+    }
+    
+    const wallet = walletResponse.wallet;
     
     // Update user profile with wallet information
     await supabase
       .from('Profiles')
       .update({
-        circle_wallet_id: wallet.walletId,
-        circle_wallet_address: addressData.address,
+        circle_wallet_id: wallet.circle_wallet_id,
+        circle_wallet_address: wallet.wallet_address,
         circle_wallet_created_at: new Date().toISOString(),
         circle_wallet_status: 'active'
       })
       .eq('id', user.id);
     
     return {
-      walletId: wallet.walletId,
-      address: addressData.address
+      walletId: wallet.circle_wallet_id,
+      address: wallet.wallet_address
     };
   } catch (error) {
     console.error('Error creating user wallet:', error);
