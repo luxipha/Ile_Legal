@@ -3,7 +3,7 @@ import {
   Container, Typography, Box, Button, Paper, CircularProgress, Alert, 
   Grid, Card, CardContent, Divider, List, ListItem, ListItemText, Chip
 } from '@mui/material';
-import { testCircleConnection } from '../../services/circleApi';
+import { secureCircleService } from '../../services/secureCircleService';
 
 const WalletTest: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -16,17 +16,30 @@ const WalletTest: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      const connectionResult = await testCircleConnection();
-      setResult(connectionResult);
+      // Test secure Circle service connection
+      const userWallet = await secureCircleService.getUserWallet();
+      
+      if (!userWallet) {
+        setError('No wallet found for user');
+        setResult({ success: false, error: 'No wallet found' });
+        return;
+      }
+
+      // Test wallet balance retrieval
+      const balances = await secureCircleService.getWalletBalance(userWallet.circle_wallet_id);
+      
+      setResult({
+        success: true,
+        wallet: userWallet,
+        balances: balances,
+        message: 'Secure Circle service connection successful'
+      });
       setLastTestedAt(new Date().toLocaleString());
       
-      if (!connectionResult.success) {
-        setError(connectionResult.error || 'Connection failed');
-      }
     } catch (err: any) {
-      console.error('Error testing Circle API:', err);
-      setError(err.message || 'An unexpected error occurred');
-      setResult(null);
+      console.error('Error testing secure Circle service:', err);
+      setError(err.message || 'Connection test failed');
+      setResult({ success: false, error: err.message });
     } finally {
       setLoading(false);
     }

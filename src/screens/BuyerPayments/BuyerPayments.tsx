@@ -10,6 +10,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
 import { paymentIntegrationService } from "../../services/paymentIntegrationService";
 import { usePaystackInline } from "../../hooks/usePaystackInline";
+import { transactionService, Transaction, BankAccount } from "../../services/transactionService";
+import { api } from "../../services/api";
 import { 
   TrendingUpIcon,
   TrendingDownIcon,
@@ -20,15 +22,6 @@ import {
   DollarSignIcon,
   ArrowLeftIcon
 } from "lucide-react";
-
-interface BankAccount {
-  id: string;
-  bankName: string;
-  accountNumber: string;
-  accountName: string;
-  isDefault: boolean;
-  currency: "NGN" | "USDC";
-}
 
 interface Task {
   id: string;
@@ -56,168 +49,154 @@ export const BuyerPayments = (): JSX.Element => {
     address: string;
     currency: string;
   } | null>(null);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
-    {
-      id: "1",
-      bankName: "First Bank",
-      accountNumber: "1234567890",
-      accountName: "Demo Client",
-      isDefault: true,
-      currency: "NGN"
-    }
-  ]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load wallet data
+  // Load all data
   useEffect(() => {
-    const loadWalletData = async () => {
-      if (user?.id) {
-        try {
-          const data = await getUserWalletData(user.id);
-          setFullWalletData(data);
-          setWalletData({
-            balance: data.balance,
-            address: data.ethAddress || data.circleWalletAddress || '',
-            currency: data.currency
-          });
-        } catch (error) {
-          console.error('Error loading wallet data:', error);
-        }
+    const loadData = async () => {
+      if (!user?.id) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Load wallet data
+        const walletData = await getUserWalletData(user.id);
+        setFullWalletData(walletData);
+        setWalletData({
+          balance: walletData.balance,
+          address: walletData.ethAddress || walletData.circleWalletAddress || '',
+          currency: walletData.currency
+        });
+
+        // Load bank accounts
+        const accounts = await transactionService.getUserBankAccounts();
+        setBankAccounts(accounts);
+
+        // Load transactions
+        const userTransactions = await transactionService.getUserTransactions(user.id, 20);
+        setTransactions(userTransactions);
+
+        // Load user's gigs (convert to tasks format)
+        const userGigs = await api.gigs.getMyGigs();
+        const formattedTasks = userGigs.map(gig => ({
+          id: gig.id,
+          title: gig.title,
+          provider: gig.assigned_seller_name || 'Unassigned',
+          providerAvatar: gig.assigned_seller_name?.split(' ').map(n => n[0]).join('') || 'U',
+          amount: `₦${gig.budget.toLocaleString()}`,
+          status: mapGigStatusToTaskStatus(gig.status),
+          statusColor: getStatusColor(gig.status),
+          date: new Date(gig.created_at).toLocaleDateString('en-GB'),
+          description: gig.description,
+          category: gig.category
+        }));
+        setTasks(formattedTasks);
+
+      } catch (error: any) {
+        console.error('Error loading payment data:', error);
+        setError(error.message || 'Failed to load payment data');
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadWalletData();
+    loadData();
   }, [user?.id]);
 
-  const tasks: Task[] = [
-    {
-      id: "550e8400-e29b-41d4-a716-446655440001",
-      title: "Land Title Verification - Victoria Island",
-      provider: "Chioma Okonkwo",
-      providerAvatar: "CO",
-      amount: "₦65,000",
-      status: "Completed",
-      statusColor: "bg-green-100 text-green-800",
-      date: "28/04/2025",
-      description: "Comprehensive title verification for commercial property in Victoria Island",
-      category: "Title Verification"
-    },
-    {
-      id: "550e8400-e29b-41d4-a716-446655440002",
-      title: "Contract Review for Commercial Lease",
-      provider: "Adebayo Ogundimu",
-      providerAvatar: "AO",
-      amount: "₦45,000",
-      status: "In Progress",
-      statusColor: "bg-blue-100 text-blue-800",
-      date: "25/04/2025",
-      description: "Legal review of commercial lease agreement terms and conditions",
-      category: "Contract Review"
-    },
-    {
-      id: "550e8400-e29b-41d4-a716-446655440003",
-      title: "Property Survey - Lekki Phase 1",
-      provider: "Funmi Adebisi",
-      providerAvatar: "FA",
-      amount: "₦80,000",
-      status: "Pending Payment",
-      statusColor: "bg-yellow-100 text-yellow-800",
-      date: "30/04/2025",
-      description: "Comprehensive property survey and boundary verification",
-      category: "Property Survey"
-    },
-    {
-      id: "550e8400-e29b-41d4-a716-446655440004",
-      title: "Due Diligence Report",
-      provider: "Kemi Adeyemi",
-      providerAvatar: "KA",
-      amount: "₦120,000",
-      status: "Completed",
-      statusColor: "bg-green-100 text-green-800",
-      date: "20/04/2025",
-      description: "Complete due diligence investigation for residential development",
-      category: "Due Diligence"
-    },
-    {
-      id: "550e8400-e29b-41d4-a716-446655440005",
-      title: "Legal Documentation Review",
-      provider: "Tunde Bakare",
-      providerAvatar: "TB",
-      amount: "₦35,000",
-      status: "Cancelled",
-      statusColor: "bg-red-100 text-red-800",
-      date: "15/04/2025",
-      description: "Review of property transfer documentation",
-      category: "Documentation"
+  // Helper functions to map gig status to task status
+  const mapGigStatusToTaskStatus = (gigStatus: string): Task['status'] => {
+    switch (gigStatus) {
+      case 'completed':
+        return 'Completed';
+      case 'assigned':
+      case 'in_progress':
+        return 'In Progress';
+      case 'active':
+      case 'open':
+        return 'Pending Payment';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Pending Payment';
     }
-  ];
+  };
 
-  const transactions = [
-    {
-      id: 1,
-      type: "payment",
-      description: "Payment to Chioma Okonkwo - Title Verification",
-      date: "28/04/2025",
-      amount: "-65,000",
-      icon: "down",
-      color: "text-red-600"
-    },
-    {
-      id: 2,
-      type: "payment",
-      description: "Payment to Kemi Adeyemi - Due Diligence",
-      date: "20/04/2025",
-      amount: "-120,000",
-      icon: "down",
-      color: "text-red-600"
-    },
-    {
-      id: 3,
-      type: "refund",
-      description: "Refund from Tunde Bakare - Cancelled Project",
-      date: "16/04/2025",
-      amount: "+35,000",
-      icon: "up",
-      color: "text-green-600"
+  const getStatusColor = (gigStatus: string): string => {
+    switch (gigStatus) {
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'assigned':
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'active':
+      case 'open':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
-  ];
+  };
 
-  // Calculate totals
+  // Calculate totals from real data
   const completedTasks = tasks.filter(task => task.status === "Completed");
   const pendingTasks = tasks.filter(task => task.status === "Pending Payment");
   const totalSpent = completedTasks.reduce((sum, task) => sum + parseInt(task.amount.replace(/[₦,]/g, "")), 0);
   const pendingAmount = pendingTasks.reduce((sum, task) => sum + parseInt(task.amount.replace(/[₦,]/g, "")), 0);
 
-  const handleAddBankAccount = (account: Omit<BankAccount, "id">) => {
-    const newAccount: BankAccount = {
-      ...account,
-      id: Date.now().toString()
-    };
-    
-    if (account.isDefault) {
-      setBankAccounts(prev => prev.map(acc => ({ ...acc, isDefault: false })));
+  // Format transactions for display
+  const formattedTransactions = transactions.map(transaction => ({
+    id: transaction.id,
+    type: transaction.type,
+    description: transaction.description,
+    date: new Date(transaction.created_at).toLocaleDateString('en-GB'),
+    amount: transaction.type === 'payment_sent' || transaction.type === 'withdrawal' 
+      ? `-${transaction.amount.toLocaleString()}`
+      : `+${transaction.amount.toLocaleString()}`,
+    icon: transaction.type === 'payment_sent' || transaction.type === 'withdrawal' ? "down" : "up",
+    color: transaction.type === 'payment_sent' || transaction.type === 'withdrawal' 
+      ? "text-red-600" : "text-green-600"
+  }));
+
+  const handleAddBankAccount = async (account: Omit<BankAccount, "id" | "user_id" | "created_at" | "updated_at">) => {
+    try {
+      const newAccount = await transactionService.addBankAccount(account);
+      setBankAccounts(prev => [...prev, newAccount]);
+    } catch (error: any) {
+      console.error('Error adding bank account:', error);
+      setError(error.message || 'Failed to add bank account');
     }
-    
-    setBankAccounts(prev => [...prev, newAccount]);
   };
 
-  const handleSetDefault = (accountId: string) => {
-    setBankAccounts(prev => prev.map(acc => ({
-      ...acc,
-      isDefault: acc.id === accountId
-    })));
+  const handleSetDefault = async (accountId: string) => {
+    try {
+      await transactionService.updateBankAccount(accountId, { is_default: true });
+      setBankAccounts(prev => prev.map(acc => ({
+        ...acc,
+        is_default: acc.id === accountId
+      })));
+    } catch (error: any) {
+      console.error('Error setting default account:', error);
+      setError(error.message || 'Failed to set default account');
+    }
   };
 
-  const handleRemoveAccount = (accountId: string) => {
-    setBankAccounts(prev => {
-      const filtered = prev.filter(acc => acc.id !== accountId);
-      if (filtered.length > 0 && !filtered.some(acc => acc.isDefault)) {
-        filtered[0].isDefault = true;
-      }
-      return filtered;
-    });
+  const handleRemoveAccount = async (accountId: string) => {
+    try {
+      await transactionService.deleteBankAccount(accountId);
+      setBankAccounts(prev => prev.filter(acc => acc.id !== accountId));
+    } catch (error: any) {
+      console.error('Error removing bank account:', error);
+      setError(error.message || 'Failed to remove bank account');
+    }
   };
 
-  const handlePayNow = (taskId: number) => {
+  const handlePayNow = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (task) {
       setSelectedTaskForPayment(task);
@@ -458,13 +437,13 @@ export const BuyerPayments = (): JSX.Element => {
                       <Card className="bg-white border border-gray-200">
                         <CardContent className="p-6">
                           <div className="space-y-4">
-                            {transactions.map((transaction) => (
+                            {formattedTransactions.map((transaction) => (
                               <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                                 <div className="flex items-center gap-4">
                                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                    transaction.type === 'refund' ? 'bg-green-100' : 'bg-red-100'
+                                    transaction.icon === 'up' ? 'bg-green-100' : 'bg-red-100'
                                   }`}>
-                                    {transaction.type === 'refund' ? (
+                                    {transaction.icon === 'up' ? (
                                       <TrendingUpIcon className="w-5 h-5 text-green-600" />
                                     ) : (
                                       <TrendingDownIcon className="w-5 h-5 text-red-600" />
@@ -476,7 +455,7 @@ export const BuyerPayments = (): JSX.Element => {
                                   </div>
                                 </div>
                                 <div className={`font-bold text-lg ${transaction.color}`}>
-                                  ₦{Math.abs(parseInt(transaction.amount)).toLocaleString()}
+                                  ₦{Math.abs(parseInt(transaction.amount.replace(/[+\-,]/g, ''))).toLocaleString()}
                                 </div>
                               </div>
                             ))}

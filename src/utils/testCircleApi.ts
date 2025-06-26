@@ -1,107 +1,157 @@
 /**
  * Utility to test Circle API configuration and connection
+ * Updated to use secure backend service
  */
 
-import { testCircleConnection } from '../services/circleApi';
-import { SettingsService } from '../services/settingsService';
+import { secureCircleService } from '../services/secureCircleService';
+import { backendWalletService } from '../services/backendWalletService';
 
 export const testCircleApiConfiguration = async () => {
-  console.log('🔍 Testing Circle API Configuration...');
+  console.log('🔍 Testing Secure Circle API Backend Service...');
   
   try {
-    // Test 1: Check if Circle config is loaded correctly
-    console.log('1. Loading Circle configuration from settings...');
-    const circleConfig = await SettingsService.getCircleConfig();
+    // Test 1: Check if user has a wallet
+    console.log('1. Checking user wallet...');
+    const userWallet = await secureCircleService.getUserWallet();
     
-    if (!circleConfig) {
-      console.error('❌ Circle configuration not found');
-      return false;
-    }
-    
-    console.log('✅ Circle configuration loaded:', {
-      name: circleConfig.name,
-      enabled: circleConfig.enabled,
-      testMode: circleConfig.testMode,
-      hasApiKey: !!circleConfig.apiKey,
-      hasEscrowWallet: !!circleConfig.escrowWalletId,
-      apiKeyLength: circleConfig.apiKey?.length || 0
-    });
-    
-    // Test 2: Validate API key format
-    console.log('2. Validating API key format...');
-    if (!circleConfig.apiKey) {
-      console.error('❌ No API key found');
-      return false;
-    }
-    
-    // Check if it's Base64 encoded
-    const isBase64 = /^[A-Za-z0-9+/=]+$/.test(circleConfig.apiKey);
-    console.log(`API key appears to be Base64: ${isBase64}`);
-    
-    // Try to decode if it looks like Base64
-    if (isBase64) {
-      try {
-        const decoded = atob(circleConfig.apiKey);
-        console.log('✅ API key successfully decoded from Base64');
-        console.log('Decoded format:', decoded.substring(0, 20) + '...');
-      } catch (error) {
-        console.error('❌ Failed to decode Base64 API key:', error);
-      }
-    }
-    
-    // Test 3: Test API connection
-    console.log('3. Testing Circle API connection...');
-    const connectionResult = await testCircleConnection();
-    
-    if (connectionResult.success) {
-      console.log('✅ Circle API connection successful!');
-      console.log('Response data:', connectionResult.data);
-    } else {
-      console.error('❌ Circle API connection failed:', connectionResult.error);
+    if (!userWallet) {
+      console.log('No wallet found. Testing wallet creation...');
       
-      // Provide specific troubleshooting based on error
-      if (connectionResult.error?.includes('401')) {
-        console.log('💡 Troubleshooting 401 Unauthorized:');
-        console.log('   - Check if API key is correct');
-        console.log('   - Verify if API key is properly formatted');
-        console.log('   - Ensure you\'re using the right environment (sandbox vs production)');
+      // Test wallet creation via backend
+      try {
+        const { data: { session } } = await import('../lib/supabase').then(m => m.supabase.auth.getSession());
+        
+        if (!session) {
+          console.error('❌ No authenticated session for wallet creation test');
+          return false;
+        }
+
+        const walletResponse = await backendWalletService.createWallet({
+          userId: session.user.id,
+          userType: 'buyer',
+          name: session.user.user_metadata?.name || 'Test User',
+          email: session.user.email || 'test@example.com'
+        });
+
+        if (walletResponse.success) {
+          console.log('✅ Wallet created successfully via backend service');
+        } else {
+          console.error('❌ Wallet creation failed:', walletResponse.error);
+          return false;
+        }
+      } catch (error: any) {
+        console.error('❌ Wallet creation test failed:', error.message);
+        return false;
       }
+    } else {
+      console.log('✅ User wallet found:', {
+        wallet_id: userWallet.circle_wallet_id,
+        wallet_state: userWallet.wallet_state,
+        created_at: userWallet.created_at
+      });
     }
     
-    return connectionResult.success;
+    // Test 2: Test wallet balance retrieval via secure backend
+    console.log('2. Testing wallet balance retrieval...');
+    try {
+      const finalWallet = userWallet || await secureCircleService.getUserWallet();
+      
+      if (!finalWallet) {
+        throw new Error('No wallet available for balance test');
+      }
+
+      const balances = await secureCircleService.getWalletBalance(finalWallet.circle_wallet_id);
+      console.log('✅ Wallet balance retrieved successfully:', {
+        wallet_id: finalWallet.circle_wallet_id,
+        balances_count: balances.length,
+        balances: balances
+      });
+    } catch (error: any) {
+      console.error('❌ Balance retrieval failed:', error.message);
+      return false;
+    }
     
-  } catch (error) {
-    console.error('❌ Error during Circle API testing:', error);
+    // Test 3: Test wallet addresses retrieval
+    console.log('3. Testing wallet addresses retrieval...');
+    try {
+      const finalWallet = userWallet || await secureCircleService.getUserWallet();
+      const addresses = await secureCircleService.getWalletAddresses(finalWallet.circle_wallet_id);
+      console.log('✅ Wallet addresses retrieved successfully:', {
+        addresses_count: addresses.length,
+        addresses: addresses
+      });
+    } catch (error: any) {
+      console.error('❌ Addresses retrieval failed:', error.message);
+      return false;
+    }
+    
+    console.log('✅ All secure Circle API backend tests passed!');
+    return true;
+    
+  } catch (error: any) {
+    console.error('❌ Error during secure Circle API testing:', error.message);
     return false;
   }
 };
 
 /**
- * Test different API key formats
+ * Test secure backend service connectivity
  */
-export const testApiKeyFormats = async (rawApiKey: string) => {
-  console.log('🔧 Testing different API key formats...');
+export const testBackendConnectivity = async () => {
+  console.log('🔧 Testing backend Edge Function connectivity...');
   
-  const formats = [
-    { name: 'Raw (as provided)', value: rawApiKey },
-    { name: 'Base64 Encoded', value: btoa(rawApiKey) },
-    { name: 'Base64 Decoded', value: (() => {
+  try {
+    const { supabase } = await import('../lib/supabase');
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+    
+    if (!baseUrl) {
+      console.error('❌ VITE_SUPABASE_URL not configured');
+      return false;
+    }
+
+    const functions = [
+      'create-wallet',
+      'wallet-operations', 
+      'manage-api-keys'
+    ];
+    
+    const results: any = {};
+    
+    for (const func of functions) {
       try {
-        return atob(rawApiKey);
-      } catch {
-        return null;
+        const response = await fetch(`${baseUrl}/functions/v1/${func}`, {
+          method: 'OPTIONS', // CORS preflight
+        });
+        
+        results[func] = {
+          reachable: response.ok || response.status === 405, // 405 = Method Not Allowed is OK for OPTIONS
+          status: response.status
+        };
+        
+        const status = results[func].reachable ? '✅' : '❌';
+        console.log(`${status} ${func}: ${results[func].reachable ? 'Reachable' : 'Unreachable'} (Status: ${response.status})`);
+        
+      } catch (error: any) {
+        results[func] = {
+          reachable: false,
+          error: error.message
+        };
+        console.log(`❌ ${func}: ${error.message}`);
       }
-    })() }
-  ];
-  
-  for (const format of formats) {
-    if (!format.value) continue;
+    }
     
-    console.log(`Testing format: ${format.name}`);
-    console.log(`Key length: ${format.value.length}`);
-    console.log(`Key preview: ${format.value.substring(0, 20)}...`);
+    const allReachable = Object.values(results).every((r: any) => r.reachable);
     
-    // Here you could temporarily update the settings and test
-    // For now, just log the format analysis
+    if (allReachable) {
+      console.log('✅ All backend Edge Functions are reachable');
+    } else {
+      console.log('❌ Some backend Edge Functions are unreachable');
+    }
+    
+    return allReachable;
+    
+  } catch (error: any) {
+    console.error('❌ Backend connectivity test failed:', error.message);
+    return false;
   }
 };

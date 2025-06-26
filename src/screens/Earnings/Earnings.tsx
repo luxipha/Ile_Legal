@@ -11,6 +11,7 @@ import { useToast } from "../../components/ui/toast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
 import { paymentIntegrationService } from "../../services/paymentIntegrationService";
+import { transactionService, Transaction as ApiTransaction, BankAccount as ApiBankAccount, EarningSummary } from "../../services/transactionService";
 import { 
   TrendingUpIcon,
   TrendingDownIcon,
@@ -27,7 +28,7 @@ interface BankAccount {
 }
 
 interface Transaction {
-  id: number;
+  id: string;
   type: "payment" | "withdrawal";
   description: string;
   date: string;
@@ -40,111 +41,107 @@ interface Transaction {
 export const Earnings = (): JSX.Element => {
   const { user } = useAuth();
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [disputeTransactionId, setDisputeTransactionId] = useState<number | null>(null);
+  const [disputeTransactionId, setDisputeTransactionId] = useState<string | null>(null);
   const [walletData, setWalletData] = useState<UnifiedWalletData | null>(null);
   const { addToast } = useToast();
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
-    {
-      id: "1",
-      bankName: "First Bank",
-      accountNumber: "1234567890",
-      accountName: "Demo Seller",
-      isDefault: true,
-      currency: "NGN"
-    }
-  ]);
+  const [bankAccounts, setBankAccounts] = useState<ApiBankAccount[]>([]);
+  const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
+  const [earningSummary, setEarningSummary] = useState<EarningSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load wallet data
+  // Load all data
   useEffect(() => {
-    const loadWalletData = async () => {
-      if (user?.id) {
-        try {
-          const data = await getUserWalletData(user.id);
-          setWalletData(data);
-        } catch (error) {
-          console.error('Error loading wallet data:', error);
-        }
+    const loadData = async () => {
+      if (!user?.id) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Load wallet data
+        const walletData = await getUserWalletData(user.id);
+        setWalletData(walletData);
+
+        // Load bank accounts
+        const accounts = await transactionService.getUserBankAccounts();
+        setBankAccounts(accounts);
+
+        // Load transactions
+        const userTransactions = await transactionService.getUserTransactions(user.id, 20);
+        setTransactions(userTransactions);
+
+        // Load earning summary
+        const summary = await transactionService.getEarningSummary(user.id);
+        setEarningSummary(summary);
+
+      } catch (error: any) {
+        console.error('Error loading earnings data:', error);
+        setError(error.message || 'Failed to load earnings data');
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadWalletData();
+    loadData();
   }, [user?.id]);
 
-  const transactions: Transaction[] = [
-    {
-      id: 1,
-      type: "payment",
-      description: "Payment for Land Title Verification",
-      date: "22/04/2025",
-      amount: "+65,000",
-      icon: "up",
-      color: "text-green-600",
-      counterparty: "John Doe"
-    },
-    {
-      id: 2,
-      type: "withdrawal",
-      description: "Withdrawal to Bank Account",
-      date: "20/04/2025",
-      amount: "-100,000",
-      icon: "down",
-      color: "text-red-600"
-    },
-    {
-      id: 3,
-      type: "payment",
-      description: "Payment for Contract Review",
-      date: "18/04/2025",
-      amount: "+45,000",
-      icon: "up",
-      color: "text-green-600",
-      counterparty: "Sarah Johnson"
-    },
-    {
-      id: 4,
-      type: "payment",
-      description: "Payment for Property Survey",
-      date: "15/04/2025",
-      amount: "+80,000",
-      icon: "up",
-      color: "text-green-600",
-      counterparty: "Michael Brown"
-    }
-  ];
+  // Format transactions for display
+  const formattedTransactions = transactions.map(transaction => ({
+    id: transaction.id,
+    type: transaction.type === 'payment_received' ? 'payment' : 'withdrawal',
+    description: transaction.description,
+    date: new Date(transaction.created_at).toLocaleDateString('en-GB'),
+    amount: transaction.type === 'payment_received' 
+      ? `+${transaction.amount.toLocaleString()}`
+      : `-${transaction.amount.toLocaleString()}`,
+    icon: transaction.type === 'payment_received' ? 'up' : 'down',
+    color: transaction.type === 'payment_received' ? 'text-green-600' : 'text-red-600',
+    counterparty: transaction.counterparty_name
+  }));
 
-  const handleAddBankAccount = (account: Omit<BankAccount, "id">) => {
-    const newAccount: BankAccount = {
-      ...account,
-      id: Date.now().toString()
-    };
-    
-    // If this is the first account or it's set as default, update other accounts
-    if (account.isDefault) {
-      setBankAccounts(prev => prev.map(acc => ({ ...acc, isDefault: false })));
+  const handleAddBankAccount = async (account: Omit<BankAccount, "id">) => {
+    try {
+      const newAccount = await transactionService.addBankAccount({
+        account_holder_name: account.accountName,
+        bank_name: account.bankName,
+        account_number: account.accountNumber,
+        account_type: 'checking',
+        currency: account.currency,
+        is_default: account.isDefault,
+        is_verified: false
+      });
+      setBankAccounts(prev => [...prev, newAccount]);
+    } catch (error: any) {
+      console.error('Error adding bank account:', error);
+      setError(error.message || 'Failed to add bank account');
     }
-    
-    setBankAccounts(prev => [...prev, newAccount]);
   };
 
-  const handleSetDefault = (accountId: string) => {
-    setBankAccounts(prev => prev.map(acc => ({
-      ...acc,
-      isDefault: acc.id === accountId
-    })));
+  const handleSetDefault = async (accountId: string) => {
+    try {
+      await transactionService.updateBankAccount(accountId, { is_default: true });
+      setBankAccounts(prev => prev.map(acc => ({
+        ...acc,
+        is_default: acc.id === accountId
+      })));
+    } catch (error: any) {
+      console.error('Error setting default account:', error);
+      setError(error.message || 'Failed to set default account');
+    }
   };
 
-  const handleRemoveAccount = (accountId: string) => {
-    setBankAccounts(prev => {
-      const filtered = prev.filter(acc => acc.id !== accountId);
-      // If we removed the default account, make the first remaining account default
-      if (filtered.length > 0 && !filtered.some(acc => acc.isDefault)) {
-        filtered[0].isDefault = true;
-      }
-      return filtered;
-    });
+  const handleRemoveAccount = async (accountId: string) => {
+    try {
+      await transactionService.deleteBankAccount(accountId);
+      setBankAccounts(prev => prev.filter(acc => acc.id !== accountId));
+    } catch (error: any) {
+      console.error('Error removing bank account:', error);
+      setError(error.message || 'Failed to remove bank account');
+    }
   };
   
-  const handleOpenDispute = (transactionId: number) => {
+  const handleOpenDispute = (transactionId: string) => {
     setDisputeTransactionId(transactionId);
   };
   
@@ -182,7 +179,9 @@ export const Earnings = (): JSX.Element => {
                 <CardContent className="p-6">
                   <div className="mb-4">
                     <h3 className="text-[#1B1828] text-sm font-medium mb-2">Available Balance</h3>
-                    <div className="text-3xl font-bold text-[#1B1828] mb-4">₦150,000</div>
+                    <div className="text-3xl font-bold text-[#1B1828] mb-4">
+                      ₦{earningSummary?.available_balance?.toLocaleString() || '0'}
+                    </div>
                     <Button 
                       onClick={() => setShowWithdrawModal(true)}
                       className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white w-full"
@@ -198,7 +197,9 @@ export const Earnings = (): JSX.Element => {
                 <CardContent className="p-6">
                   <div>
                     <h3 className="text-gray-600 text-sm font-medium mb-2">Pending Earnings</h3>
-                    <div className="text-3xl font-bold text-gray-900">₦65,000</div>
+                    <div className="text-3xl font-bold text-gray-900">
+                      ₦{earningSummary?.pending_earnings?.toLocaleString() || '0'}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -208,7 +209,9 @@ export const Earnings = (): JSX.Element => {
                 <CardContent className="p-6">
                   <div>
                     <h3 className="text-gray-600 text-sm font-medium mb-2">Total Earned</h3>
-                    <div className="text-3xl font-bold text-gray-900">₦450,000</div>
+                    <div className="text-3xl font-bold text-gray-900">
+                      ₦{earningSummary?.total_earned?.toLocaleString() || '0'}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -223,7 +226,7 @@ export const Earnings = (): JSX.Element => {
                     <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Transactions</h3>
                     
                     <div className="space-y-4">
-                      {transactions.map((transaction) => (
+                      {formattedTransactions.map((transaction) => (
                         <div key={transaction.id} className="mb-2">
                           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                             <div className="flex items-center gap-4">
@@ -243,7 +246,7 @@ export const Earnings = (): JSX.Element => {
                             </div>
                             <div className="flex items-center gap-3">
                               <div className={`font-bold text-lg ${transaction.color}`}>
-                                {transaction.amount}
+                                ₦{Math.abs(parseInt(transaction.amount.replace(/[+\-,]/g, ''))).toLocaleString()}
                               </div>
                               {transaction.type === 'payment' && (
                                 <Button 
@@ -289,7 +292,14 @@ export const Earnings = (): JSX.Element => {
                 
                 <div className="mt-6">
                   <PaymentMethods
-                    bankAccounts={bankAccounts}
+                    bankAccounts={bankAccounts.map(acc => ({
+                      id: acc.id,
+                      bankName: acc.bank_name,
+                      accountNumber: acc.account_number,
+                      accountName: acc.account_holder_name,
+                      isDefault: acc.is_default,
+                      currency: acc.currency as "NGN" | "USDC"
+                    }))}
                     onAddBankAccount={handleAddBankAccount}
                     onSetDefault={handleSetDefault}
                     onRemoveAccount={handleRemoveAccount}
@@ -305,8 +315,15 @@ export const Earnings = (): JSX.Element => {
       <WithdrawFundsModal
         isOpen={showWithdrawModal}
         onClose={() => setShowWithdrawModal(false)}
-        availableBalance="₦150,000"
-        bankAccounts={bankAccounts}
+        availableBalance={`₦${earningSummary?.available_balance?.toLocaleString() || '0'}`}
+        bankAccounts={bankAccounts.map(acc => ({
+          id: acc.id,
+          bankName: acc.bank_name,
+          accountNumber: acc.account_number,
+          accountName: acc.account_holder_name,
+          isDefault: acc.is_default,
+          currency: acc.currency as "NGN" | "USDC"
+        }))}
         walletAddress={walletData?.ethAddress || walletData?.circleWalletAddress}
         hasWallet={walletData?.hasEthWallet || walletData?.hasCircleWallet || false}
         userId={user?.id}
