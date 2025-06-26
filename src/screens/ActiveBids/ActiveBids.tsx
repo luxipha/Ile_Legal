@@ -232,11 +232,16 @@ export const ActiveBids = (): JSX.Element => {
   const [newMessage, setNewMessage] = useState("");
 
   const handleEditBid = (bid: Bid) => {
+    // Disable editing for accepted bids
+    if (bid.status === 'accepted') {
+      return;
+    }
+    
     console.log('bid:', bid);
     setSelectedBid(bid);
     setEditFormData({
       bidAmount: bid.amount.toString(),
-      deliveryTime: bid.delivery_time,
+      deliveryTime: bid.deliveryTime || "",
       proposal: bid.description
     });
     setViewMode("edit-bid");
@@ -406,7 +411,7 @@ export const ActiveBids = (): JSX.Element => {
                     </div>
                     <div>
                       <span className="text-gray-600">Previous Bid:</span>
-                      <div className="font-semibold text-gray-900">{selectedBid.previous_amount ? formatCurrency.naira(selectedBid.previous_amount) : 'N/A'}</div>
+                      <div className="font-semibold text-gray-900">{selectedBid.previousBid ? formatCurrency.naira(selectedBid.previousBid) : 'N/A'}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -700,12 +705,14 @@ export const ActiveBids = (): JSX.Element => {
 
                               {isUserBid && (
                                 <div className="flex gap-3">
-                                  <Button 
-                                    onClick={() => handleEditBid(bid)}
-                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                                  >
-                                    Edit Bid
-                                  </Button>
+                                  {bid.status !== 'accepted' && (
+                                    <Button 
+                                      onClick={() => handleEditBid(bid)}
+                                      className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                                    >
+                                      Edit Bid
+                                    </Button>
+                                  )}
                                   <Button 
                                     variant="outline"
                                     onClick={() => handleMessageClient(bid)}
@@ -881,12 +888,14 @@ export const ActiveBids = (): JSX.Element => {
 
                       {/* Action Buttons */}
                       <div className="flex gap-3">
-                        <Button 
-                          onClick={() => handleEditBid(bid)}
-                          className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
-                        >
-                          Edit Bid
-                        </Button>
+                        {bid.status !== 'accepted' && (
+                          <Button 
+                            onClick={() => handleEditBid(bid)}
+                            className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                          >
+                            Edit Bid
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           onClick={() => handleMessageClient(bid)}
