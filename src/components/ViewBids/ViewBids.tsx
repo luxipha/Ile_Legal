@@ -106,7 +106,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   backButtonText,
   useStaticData = false
 }) => {
-  console.log("GIG:", gig);
+  
   const [activeTab, setActiveTab] = useState<string>("bids");
   const [activeBidder, setActiveBidder] = useState<string | null>(null);
   const [bidderMessages, setBidderMessages] = useState<Record<string, Message[]>>({});

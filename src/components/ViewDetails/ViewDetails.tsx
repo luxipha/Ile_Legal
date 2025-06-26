@@ -128,6 +128,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
   bidCount
 }) => {
   console.log("gig:", gig);
+  console.log(gig.buyer);
   const { user } = useAuth();
   const { addToast } = useToast();
   
@@ -495,10 +496,11 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
 
   // Render individual bid (supporting both data structures)
   const renderBid = (bid: Bid) => {
+    console.log("bid:", bid);
     const name = bid.seller?.full_name || bid.name || 'Anonymous';
     const title = bid.title || 'Professional';
-    const rating = bid.seller?.rating || bid.rating || 0;
-    const completedJobs = bid.seller?.completed_jobs || bid.completedJobs || 0;
+    const rating = bid.seller?.rating;
+    const completedJobs = bid.seller?.completed_jobs ;
     const amount = bid.amount ? `₦${bid.amount.toLocaleString()}` : 'Not specified';
     const submittedDate = bid.created_at ? new Date(bid.created_at).toLocaleDateString() : bid.submittedDate || 'Unknown';
     const proposal = bid.description || bid.proposal || 'No proposal provided';
@@ -508,8 +510,23 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
       <Card key={bid.id} className="border border-gray-200">
         <CardContent className="p-6">
           <div className="flex items-start gap-4 mb-4">
-            <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700">
-              {avatar}
+            <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700 overflow-hidden">
+              {avatar.startsWith('http') ? (
+                <img 
+                  src={avatar} 
+                  alt={`${name}'s avatar`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to initials if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <span className={avatar.startsWith('http') ? 'hidden' : ''}>
+                {avatar}
+              </span>
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
@@ -938,7 +955,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
           {/* Only show Place Bid button if showPlaceBid is true and gig is pending */}
           {showPlaceBid && getStatus() === 'pending' && getStatus() !== 'suspended' && (
             <>
-              {gig.buyer?.verification_status === "verified" ? (
+              {user?.user_metadata?.verification_status === "verified" ? (
                 <Button
                   onClick={() => onPlaceBid(gig)}
                   className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 mb-4"

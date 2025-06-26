@@ -135,10 +135,13 @@ export const ActiveBids = (): JSX.Element => {
         bids.map(async (bid) => {
           try {
             const gigData = await api.gigs.getGigById(bid.gig_id);
+            console.log('gigData:', gigData);
             return {
               ...bid,
               gigDeadline: gigData?.deadline,
-              gigBudget: gigData?.budget
+              gigBudget: gigData?.budget,
+              previousBid: bid.previous_amount,
+              deliveryTime: bid.delivery_time
             };
           } catch (error) {
             console.error(`Error fetching gig data for bid ${bid.id}:`, error);
@@ -229,10 +232,11 @@ export const ActiveBids = (): JSX.Element => {
   const [newMessage, setNewMessage] = useState("");
 
   const handleEditBid = (bid: Bid) => {
+    console.log('bid:', bid);
     setSelectedBid(bid);
     setEditFormData({
       bidAmount: bid.amount.toString(),
-      deliveryTime: bid.deliveryTime || "",
+      deliveryTime: bid.delivery_time,
       proposal: bid.description
     });
     setViewMode("edit-bid");
@@ -255,7 +259,8 @@ export const ActiveBids = (): JSX.Element => {
     try {
       await api.bids.updateBid(selectedBid.id, {
         amount: parseFloat(editFormData.bidAmount),
-        description: editFormData.proposal
+        description: editFormData.proposal,
+        delivery_time: editFormData.deliveryTime
       });
       
       // Refresh the bids list
@@ -393,15 +398,15 @@ export const ActiveBids = (): JSX.Element => {
                   <div className="grid grid-cols-3 gap-6">
                     <div>
                       <span className="text-gray-600">Budget:</span>
-                      <div className="font-semibold text-gray-900">{gigData?.budget ? formatCurrency.naira(gigData.budget) : 'N/A'}</div>
+                      <div className="font-semibold text-gray-900">{selectedBid.gigBudget ? formatCurrency.naira(selectedBid.gigBudget) : 'N/A'}</div>
                     </div>
                     <div>
                       <span className="text-gray-600">Deadline:</span>
-                      <div className="font-semibold text-gray-900">{gigData?.deadline ? formatDate.full(gigData.deadline) : 'N/A'}</div>
+                      <div className="font-semibold text-gray-900">{selectedBid.gigDeadline ? formatDate.full(selectedBid.gigDeadline) : 'N/A'}</div>
                     </div>
                     <div>
                       <span className="text-gray-600">Previous Bid:</span>
-                      <div className="font-semibold text-gray-900">{selectedBid.previousBid}</div>
+                      <div className="font-semibold text-gray-900">{selectedBid.previous_amount ? formatCurrency.naira(selectedBid.previous_amount) : 'N/A'}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -431,7 +436,10 @@ export const ActiveBids = (): JSX.Element => {
                         <input
                           type="text"
                           value={editFormData.deliveryTime}
-                          onChange={(e) => setEditFormData(prev => ({ ...prev, deliveryTime: e.target.value }))}
+                          onChange={(e) => {
+                            console.log('editFormData:', editFormData);
+                            setEditFormData(prev => ({ ...prev, deliveryTime: e.target.value }));
+                          }}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                           required
                         />

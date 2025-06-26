@@ -161,6 +161,8 @@ export const api = {
       amount?: number;
       description?: string;
       status?: 'pending' | 'active' | 'rejected';
+      previous_amount?: number;
+      delivery_time?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       console.log("user", user);
@@ -172,7 +174,7 @@ export const api = {
       // First verify that the bid belongs to either the current user (as seller) or the buyer
       const { data: existingBid, error: fetchError } = await supabase
         .from('Bids')
-        .select('seller_id, buyer_id, gig_id')
+        .select('seller_id, buyer_id, gig_id, amount')
         .eq('id', bidId)
         .single();
 
@@ -215,9 +217,17 @@ export const api = {
         }
       }
 
+      // Prepare the update object
+      const updateData = { ...updates };
+
+      // If amount is being updated and it's different from current amount, store previous amount
+      if (updates.amount !== undefined && updates.amount !== existingBid.amount) {
+        updateData.previous_amount = existingBid.amount;
+      }
+
       const { data, error } = await supabase
         .from('Bids')
-        .update(updates)
+        .update(updateData)
         .eq('id', bidId)
         .select()
         .single();

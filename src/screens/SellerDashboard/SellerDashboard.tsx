@@ -218,6 +218,8 @@ export const SellerDashboard = (): JSX.Element => {
   }, [user?.id]);
 
   const handleViewDetails = (gig: SellerGig) => {
+    
+    
     setSelectedGig(gig);
     setViewMode("view-details");
   };
@@ -954,6 +956,10 @@ export const SellerDashboard = (): JSX.Element => {
                 ) : (
                   <div className="space-y-4">
                     {activeBids.map((bid) => (
+                      bid.gigDeadline = bid.gig?.deadline,
+                      bid.gigBudget = bid.gig?.budget,
+                      bid.deliveryTime = bid.delivery_time,
+                      console.log('bid:', bid),
                       <Card key={bid.id} className="bg-white border border-gray-200">
                         <CardContent className="p-6">
                           <h4 className="font-semibold text-gray-900 mb-2">Bid #{bid.id}</h4>
