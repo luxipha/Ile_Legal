@@ -5,6 +5,16 @@ import { ArrowLeftIcon } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { api } from "../../services/api";
 
+// Helper function to format date in mm/dd/yyyy format
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric'
+  });
+};
+
 export interface LeaveFeedbackProps {
   isOpen: boolean;
   onClose: () => void;
@@ -96,7 +106,7 @@ export const LeaveFeedback = ({
             </div>
             <div className="ml-4">
               <h3 className="font-medium text-lg">{provider}</h3>
-              <p className="text-gray-600">Completed Date: {completedDate}</p>
+              <p className="text-gray-600">Completed Date: {formatDate(completedDate)}</p>
             </div>
           </div>
 

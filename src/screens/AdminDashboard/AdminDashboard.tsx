@@ -36,6 +36,7 @@ interface User {
     type?: string;
     status?: string;
     submittedDate?: string;
+    firstName?: string;
   };
   role?: string;
   user_type?: string;
@@ -348,7 +349,9 @@ export const AdminDashboard = (): JSX.Element => {
         <div className="bg-[#FFF9E7] rounded-lg p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-[#1B1828] mb-2">Welcome back, Demo</h2>
+              <h2 className="text-2xl font-bold text-[#1B1828] mb-2">
+                Welcome back, {authUser?.name || authUser?.user_metadata?.firstName || 'Admin'}
+              </h2>
               <p className="text-[#1B1828]/80">Admin dashboard - Manage platform operations</p>
             </div>
             <Button 

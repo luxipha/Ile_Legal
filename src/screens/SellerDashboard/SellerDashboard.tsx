@@ -890,7 +890,9 @@ export const SellerDashboard = (): JSX.Element => {
           <div className="bg-gradient-to-r from-[#FEC85F] to-[#f5c55a] rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-[#1B1828] mb-2">Welcome back, Demo</h2>
+                <h2 className="text-2xl font-bold text-[#1B1828] mb-2">
+                  Welcome back, {user?.name || user?.user_metadata?.firstName || 'User'}
+                </h2>
                 <p className="text-[#1B1828]/80">Find and manage legal gigs for property services</p>
               </div>
               <Link to="/find-gigs">

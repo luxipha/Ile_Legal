@@ -52,6 +52,7 @@ interface CompletedGig {
   postedDate: string;
   deadline: string;
   status: "Completed";
+  paymentStatus: "completed" | "paid" | "pending";
 }
 
 interface InProgressGig {
@@ -194,7 +195,7 @@ export const BuyerDashboard = (): JSX.Element => {
                 status: "In Progress"
               });
             }
-          } else if (gig.status?.toLowerCase() === "completed") {
+          } else if (gig.status?.toLowerCase() === "completed" || gig.status?.toLowerCase() === "paid") {
             // For completed gigs, we need to get the accepted bid to find the provider
             try {
               const bids = await api.bids.getBidsByGigId(gig.id.toString());
@@ -223,7 +224,8 @@ export const BuyerDashboard = (): JSX.Element => {
                   completedDate: gig.completedDate || gig.deadline,
                   postedDate: gig.postedDate || gig.created_at || "",
                   deadline: gig.deadline || "",
-                  status: "Completed"
+                  status: "Completed",
+                  paymentStatus: gig.status?.toLowerCase() // TODO: Check actual payment status from payment records
                 });
               }
             } catch (error) {
@@ -238,7 +240,8 @@ export const BuyerDashboard = (): JSX.Element => {
                 completedDate: gig.completedDate || gig.deadline,
                 postedDate: gig.postedDate || gig.created_at || "",
                 deadline: gig.deadline || "",
-                status: "Completed"
+                status: "Completed",
+                paymentStatus: "completed"
               });
             }
           }
@@ -369,8 +372,14 @@ export const BuyerDashboard = (): JSX.Element => {
     // Find the completed gig by ID
     const gig = completedGigs.find(g => g.id === gigId);
     if (gig) {
-      setSelectedCompletedGig(gig);
-      setFeedbackModalOpen(true);
+      if (gig.paymentStatus === "completed") {
+        // Navigate to payments page for completed gigs that haven't been paid
+        navigate("/payments");
+      } else if (gig.paymentStatus === "paid") {
+        // Open feedback modal for paid gigs
+        setSelectedCompletedGig(gig);
+        setFeedbackModalOpen(true);
+      }
     }
   };
 
@@ -546,8 +555,12 @@ export const BuyerDashboard = (): JSX.Element => {
         <div className="flex items-center justify-between mb-4">
           <div className="text-2xl font-bold text-gray-900">{gig.amount}</div>
           <div>
-            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-              Completed
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              gig.paymentStatus === "completed" 
+                ? "bg-red-100 text-red-800" 
+                : "bg-green-100 text-green-800"
+            }`}>
+              {gig.paymentStatus === "completed" ? "Pay Now" : "Completed"}
             </span>
           </div>
         </div>
@@ -570,7 +583,7 @@ export const BuyerDashboard = (): JSX.Element => {
             onClick={() => handleLeaveFeedback(gig.id)}
             className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-2 rounded-full flex-1"
           >
-            Leave Feedback
+            {gig.paymentStatus === "completed" ? "Pay Now" : "Leave Feedback"}
           </Button>
         </div>
       </CardContent>
@@ -691,7 +704,9 @@ export const BuyerDashboard = (): JSX.Element => {
           <div className="bg-gradient-to-r from-[#FEC85F] to-[#f5c55a] rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-[#1B1828] mb-2">Welcome back, Demo</h2>
+                <h2 className="text-2xl font-bold text-[#1B1828] mb-2">
+                  Welcome back, {user?.name || user?.user_metadata?.firstName || 'User'}
+                </h2>
                 <p className="text-[#1B1828]/80">Manage your legal tasks and find qualified professionals</p>
               </div>
               <Link to="/post-gig">
