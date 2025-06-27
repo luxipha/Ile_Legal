@@ -30,10 +30,10 @@ export const PaymentProcessingModal = ({
   initialProviders = [
     { 
       name: "Circle", 
-      enabled: true, 
+      enabled: false, 
       testMode: true,
-      apiKey: "TEST_API_KEY:10a0b7b4cedfaa42d6ce306592fec59f:cfae665cde083f9236de7be92d08f54c",
-      escrowWalletId: "52a2c755-6045-5217-8d70-8ac28dc221ba"
+      apiKey: "",
+      escrowWalletId: ""
     },
     { name: "Flutterwave", enabled: false, testMode: true },
     { name: "Paystack", enabled: false, testMode: true }
@@ -181,7 +181,7 @@ export const PaymentProcessingModal = ({
                         type="text"
                         value={provider.escrowWalletId || ""}
                         onChange={(e) => handleUpdateProvider(provider.name, "escrowWalletId", e.target.value)}
-                        placeholder="52a2c755-6045-5217-8d70-8ac28dc221ba"
+                        placeholder="Enter escrow wallet ID"
                         className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>

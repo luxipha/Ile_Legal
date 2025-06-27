@@ -1,8 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import ToastWrapper from './components/ToastWrapper';
+import { ProfileCompletionModal } from './components/ProfileCompletionModal/ProfileCompletionModal';
 
 // Lazy load screens for code splitting
 // Keep critical/public screens as regular imports for faster initial load
@@ -37,9 +38,32 @@ const LoadingSpinner = () => (
   </div>
 );
 
+function ProfileCompletionHandler() {
+  const { pendingMetaMaskProfile, completeMetaMaskProfile, setPendingMetaMaskProfile } = useAuth();
+
+  const handleProfileCompletion = async (profileData: { firstName: string; lastName: string; email: string; phone?: string }) => {
+    await completeMetaMaskProfile(profileData);
+  };
+
+  const handleModalClose = () => {
+    // Modal can't be closed without completing profile
+    return;
+  };
+
+  return (
+    <ProfileCompletionModal
+      isOpen={!!pendingMetaMaskProfile}
+      onClose={handleModalClose}
+      onSubmit={handleProfileCompletion}
+      walletAddress={pendingMetaMaskProfile?.address || ''}
+    />
+  );
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<LoadingSpinner />}>
+      <ProfileCompletionHandler />
       <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Home />} />

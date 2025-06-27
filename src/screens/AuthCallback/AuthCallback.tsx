@@ -8,9 +8,17 @@ export const AuthCallback = () => {
   const navigate = useNavigate();
   const { setUser } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      // Prevent multiple concurrent executions
+      if (isProcessing) {
+        console.log('AuthCallback already processing, skipping...');
+        return;
+      }
+      
+      setIsProcessing(true);
       try {
         // Get the session from the URL
         const { data, error } = await supabase.auth.getSession();
@@ -73,23 +81,71 @@ export const AuthCallback = () => {
             setUser(appUser);
             localStorage.setItem('ileUser', JSON.stringify(appUser));
             
-            // Check if user has a Circle wallet, create one if not
+            // Check if user exists in Profiles table, create if not
             try {
-              const { data: profile } = await supabase
+              const { data: profile, error: profileError } = await supabase
                 .from('Profiles')
-                .select('circle_wallet_id')
+                .select('*')
                 .eq('id', userData.user.id)
                 .single();
               
-              if (!profile?.circle_wallet_id) {
+              if (profileError && profileError.code === 'PGRST116') {
+                // User doesn't exist in Profiles table, create them
+                console.log('Creating profile for new Google user:', userData.user.id);
+                
+                const { data: newProfile, error: createError } = await supabase
+                  .from('Profiles')
+                  .insert({
+                    id: userData.user.id,
+                    first_name: userData.user.user_metadata?.name?.split(' ')[0] || 'User',
+                    last_name: userData.user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
+                    email: userData.user.email,
+                    phone: userData.user.user_metadata?.phone,
+                    user_type: role,
+                    verification_status: 'pending',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  })
+                  .select()
+                  .single();
+                
+                if (createError) {
+                  // Handle duplicate key constraint (race condition)
+                  if (createError.code === '23505') {
+                    console.log('Profile already exists (race condition), continuing...');
+                    // Try to fetch the existing profile
+                    const { data: existingProfile } = await supabase
+                      .from('Profiles')
+                      .select('*')
+                      .eq('id', userData.user.id)
+                      .single();
+                    
+                    if (existingProfile) {
+                      console.log('Retrieved existing profile after race condition');
+                    }
+                  } else {
+                    console.error('Error creating profile:', createError);
+                    throw createError;
+                  }
+                }
+                
+                console.log('Profile created successfully:', newProfile);
+                
+                // Now create Circle wallet for the new user
                 console.log('Creating Circle wallet for new Google user:', userData.user.id);
-                // Import the wallet service
+                const { createUserWallet } = await import('../../services/walletService');
+                const walletData = await createUserWallet(appUser);
+                console.log('Circle wallet created successfully:', walletData);
+                
+              } else if (!profileError && profile && !profile.circle_wallet_id) {
+                // Profile exists but no Circle wallet, create one
+                console.log('Creating Circle wallet for existing Google user:', userData.user.id);
                 const { createUserWallet } = await import('../../services/walletService');
                 const walletData = await createUserWallet(appUser);
                 console.log('Circle wallet created successfully:', walletData);
               }
             } catch (walletError) {
-              console.error('Error checking/creating Circle wallet:', walletError);
+              console.error('Error checking/creating profile and Circle wallet:', walletError);
               // Don't fail the authentication process if wallet creation fails
             }
             
@@ -118,11 +174,13 @@ export const AuthCallback = () => {
         setError(err.message || 'Authentication failed');
         // Redirect to login after a delay
         setTimeout(() => navigate('/login'), 3000);
+      } finally {
+        setIsProcessing(false);
       }
     };
 
     handleAuthCallback();
-  }, [navigate, setUser]);
+  }, [navigate, setUser, isProcessing]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">

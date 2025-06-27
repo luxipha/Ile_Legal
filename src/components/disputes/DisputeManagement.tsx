@@ -5,6 +5,8 @@ import { DisputeReviewPage } from "./DisputeReviewPage";
 import { ContactPartiesPage } from "./ContactPartiesPage";
 import { DollarSignIcon, UserIcon, UsersIcon } from "lucide-react";
 import { api } from "../../services/api";
+import { disputeMessagingService, DisputeMessage } from "../../services/disputeMessagingService";
+import { useAuth } from "../../contexts/AuthContext";
 
 export interface Dispute {
   id: number;
@@ -59,11 +61,15 @@ export const DisputeManagement = ({
   selectedTab, 
   onTabChange 
 }: DisputeManagementProps) => {
+  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<"list" | "review" | "contact">("list");
   const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [messageLoading, setMessageLoading] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [messageSuccess, setMessageSuccess] = useState(false);
 
   const handleReviewCase = (dispute: Dispute) => {
     setSelectedDispute(dispute);
@@ -109,17 +115,55 @@ export const DisputeManagement = ({
     }
   };
 
-  const handleContactSend = (message: {
+  const handleContactSend = async (message: {
     recipient: "buyer" | "seller" | "both";
     subject: string;
     message: string;
   }) => {
-    // Here you would typically call an API to send the message
-    console.log("Message sent:", message);
-    console.log("For dispute:", selectedDispute?.id);
-    
-    // Return to the list view
-    setCurrentView("list");
+    if (!selectedDispute || !user?.id) {
+      setMessageError("Authentication required or no dispute selected");
+      return;
+    }
+
+    setMessageLoading(true);
+    setMessageError(null);
+    setMessageSuccess(false);
+
+    try {
+      const messageData: DisputeMessage = {
+        recipient: message.recipient,
+        subject: message.subject,
+        message: message.message
+      };
+
+      // Send message using the dispute messaging service
+      const results = await disputeMessagingService.sendDisputeMessage(
+        selectedDispute.id,
+        user.id,
+        messageData
+      );
+
+      // Check if all messages were sent successfully
+      const failedMessages = results.filter(result => !result.success);
+      
+      if (failedMessages.length > 0) {
+        const errorMsg = `Failed to send message to: ${failedMessages.map(f => f.recipient).join(', ')}`;
+        setMessageError(errorMsg);
+      } else {
+        setMessageSuccess(true);
+        // Return to the list view after success
+        setTimeout(() => {
+          setMessageSuccess(false);
+          setCurrentView("list");
+        }, 2000);
+      }
+
+    } catch (error) {
+      console.error("Error sending dispute message:", error);
+      setMessageError("Failed to send message. Please try again.");
+    } finally {
+      setMessageLoading(false);
+    }
   };
 
   const filteredDisputes = disputes.filter(dispute => {
@@ -143,6 +187,9 @@ export const DisputeManagement = ({
         dispute={selectedDispute}
         onBack={handleBackToList}
         onSend={handleContactSend}
+        loading={messageLoading}
+        error={messageError}
+        success={messageSuccess}
       />
     );
   }

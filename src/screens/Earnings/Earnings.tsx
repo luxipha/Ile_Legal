@@ -10,7 +10,6 @@ import { DisputeForm, DisputeData } from "../../components/DisputeForm/DisputeFo
 import { useToast } from "../../components/ui/toast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
-import { paymentIntegrationService } from "../../services/paymentIntegrationService";
 import { transactionService, Transaction as ApiTransaction, BankAccount as ApiBankAccount, EarningSummary } from "../../services/transactionService";
 import { 
   TrendingUpIcon,
@@ -27,16 +26,6 @@ interface BankAccount {
   currency: "NGN" | "USDC";
 }
 
-interface Transaction {
-  id: string;
-  type: "payment" | "withdrawal";
-  description: string;
-  date: string;
-  amount: string;
-  icon: string;
-  color: string;
-  counterparty?: string;
-}
 
 export const Earnings = (): JSX.Element => {
   const { user } = useAuth();
@@ -47,16 +36,11 @@ export const Earnings = (): JSX.Element => {
   const [bankAccounts, setBankAccounts] = useState<ApiBankAccount[]>([]);
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
   const [earningSummary, setEarningSummary] = useState<EarningSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Load all data
   useEffect(() => {
     const loadData = async () => {
       if (!user?.id) return;
-      
-      setLoading(true);
-      setError(null);
       
       try {
         // Load wallet data
@@ -77,9 +61,7 @@ export const Earnings = (): JSX.Element => {
 
       } catch (error: any) {
         console.error('Error loading earnings data:', error);
-        setError(error.message || 'Failed to load earnings data');
-      } finally {
-        setLoading(false);
+        addToast(error.message || 'Failed to load earnings data', 'error');
       }
     };
 
@@ -114,7 +96,7 @@ export const Earnings = (): JSX.Element => {
       setBankAccounts(prev => [...prev, newAccount]);
     } catch (error: any) {
       console.error('Error adding bank account:', error);
-      setError(error.message || 'Failed to add bank account');
+      addToast(error.message || 'Failed to add bank account', 'error');
     }
   };
 
@@ -127,7 +109,7 @@ export const Earnings = (): JSX.Element => {
       })));
     } catch (error: any) {
       console.error('Error setting default account:', error);
-      setError(error.message || 'Failed to set default account');
+      addToast(error.message || 'Failed to set default account', 'error');
     }
   };
 
@@ -137,7 +119,7 @@ export const Earnings = (): JSX.Element => {
       setBankAccounts(prev => prev.filter(acc => acc.id !== accountId));
     } catch (error: any) {
       console.error('Error removing bank account:', error);
-      setError(error.message || 'Failed to remove bank account');
+      addToast(error.message || 'Failed to remove bank account', 'error');
     }
   };
   
@@ -150,14 +132,38 @@ export const Earnings = (): JSX.Element => {
   };
   
   const handleSubmitDispute = async (disputeData: DisputeData) => {
-    // Here you would typically call an API to submit the dispute
-    console.log('Dispute submitted:', disputeData);
-    
-    // Show success message
-    addToast("Your dispute has been submitted successfully", "success");
-    
-    // Close the dispute form
-    setDisputeTransactionId(null);
+    try {
+      if (!user?.id) {
+        addToast("Authentication required", "error");
+        return;
+      }
+
+      // Find the transaction to get gig and counterparty details
+      const transaction = transactions.find(t => t.id === disputeData.transactionId.toString());
+      if (!transaction) {
+        addToast("Transaction not found", "error");
+        return;
+      }
+
+      // Map DisputeForm data to API format
+      const apiDisputeData = {
+        gig_id: transaction.gig_id || disputeData.transactionId.toString(),
+        buyer_id: transaction.type === 'payment_sent' ? user.id : transaction.counterparty_id || '',
+        seller_id: transaction.type === 'payment_sent' ? transaction.counterparty_id || '' : user.id,
+        details: `${disputeData.disputeType}: ${disputeData.description}`,
+        comments: disputeData.requestedResolution,
+      };
+
+      // Import and call the API
+      const { api } = await import('../../services/api');
+      await api.disputes.createDispute(apiDisputeData);
+      
+      addToast("Your dispute has been submitted successfully", "success");
+      setDisputeTransactionId(null);
+    } catch (error) {
+      console.error('Error submitting dispute:', error);
+      addToast("Failed to submit dispute. Please try again.", "error");
+    }
   };
 
   return (
