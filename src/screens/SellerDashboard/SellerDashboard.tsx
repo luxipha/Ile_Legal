@@ -176,6 +176,10 @@ export const SellerDashboard = (): JSX.Element => {
         // Filter out any null results and convert to OngoingGig format
         const ongoing: OngoingGig[] = ongoingGigsWithData
           .filter((item: any) => item !== null)
+          .filter((item: any) => {
+            const status = item.gig.status?.toLowerCase();
+            return status !== 'completed' && status !== 'paid';
+          })
           .map((item: any) => ({
             id: item.gig.id.toString(),
             title: item.gig.title || "Legal Service",
