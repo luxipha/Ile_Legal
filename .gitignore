@@ -18,3 +18,14 @@ test-*.mjs
 query-*.mjs
 check-*.mjs
 list-*.mjs
+test-*.cjs
+compare-*.cjs
+encrypt-*.cjs
+extract-*.js
+*-debug-*.cjs
+get-*.cjs
+
+# Backup and temporary Edge Function files
+supabase/functions/*/index.ts.backup
+supabase/functions/*/index.ts.production
+supabase/functions/*/debug-version.ts
