@@ -452,6 +452,12 @@ export const api = {
       status?: string;
       deadline?: { start: number; end: number };
     }) => {
+      // Validate userId to prevent undefined queries
+      if (!userId || userId === 'undefined') {
+        console.error('getMyGigs called with invalid userId:', userId);
+        return [];
+      }
+
       let query = supabase
         .from("Gigs")
         .select("*")
@@ -981,7 +987,7 @@ export const api = {
     /**
      * Admin-only: Unsuspend a gig (set status from 'suspended' back to 'pending')
      */
-    unsuspendGig: async (gigId: string, adminNotes?: string) => {
+    unsuspendGig: async (gigId: string, _adminNotes?: string) => {
       // Check if user is admin using session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session?.user) {

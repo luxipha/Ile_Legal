@@ -36,6 +36,7 @@ export interface User {
     circle_wallet_address?: string;
     status?: string;
     verification_status?: string;
+    real_email?: string;
   };
 }
 
@@ -58,6 +59,9 @@ export interface AuthContextType {
   getAllUsers: (sellers?: boolean) => Promise<User[]>;
   updateUserStatus: (userId: string, status: string) => Promise<void>;
   getUserStats: () => Promise<{ recentAccounts: number; recentSignIns: number }>;
+  completeMetaMaskProfile: (profileData: { firstName: string; lastName: string; email: string; phone?: string }) => Promise<void>;
+  pendingMetaMaskProfile: { userId: string; address: string; role: UserRole } | null;
+  setPendingMetaMaskProfile: (data: { userId: string; address: string; role: UserRole } | null) => void;
 }
 
 // Mock users for demo
@@ -133,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [ethAddress, setEthAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [pendingMetaMaskProfile, setPendingMetaMaskProfile] = useState<{ userId: string; address: string; role: UserRole } | null>(null);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -142,7 +147,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        // Validate that the user object has required fields
+        if (parsedUser.id && parsedUser.email && parsedUser.role) {
+          setUser(parsedUser);
+        } else {
+          console.warn('Invalid stored user data, clearing localStorage');
+          localStorage.clear();
+        }
       }
       if (storedToken) {
         setToken(storedToken);
@@ -152,9 +164,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Failed to parse stored user', error);
-      localStorage.removeItem('ileUser');
-      localStorage.removeItem('ileToken');
-      localStorage.removeItem('ileEthAddress');
+      // Clear all localStorage data if parsing fails
+      localStorage.clear();
     }
     setIsLoading(false);
   }, []);
@@ -212,7 +223,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (profileError) {
         console.error('Error fetching profile data:', profileError);
-        // Fallback to session data if profile fetch fails
+        
+        // If it's a MetaMask user without a profile, trigger profile completion
+        if (profileError.code === 'PGRST116' && session.user.user_metadata?.eth_address) {
+          console.log('MetaMask user found without profile, setting up profile completion');
+          // Don't set loading to false yet, keep them in pending state
+          setIsLoading(false); // Allow the modal to show
+          setPendingMetaMaskProfile({
+            userId: session.user.id,
+            address: session.user.user_metadata.eth_address,
+            role: (session.user.user_metadata.role as UserRole) || 'buyer'
+          });
+          return null; // Return null so they're not logged in until profile is complete
+        }
+        
+        // Fallback to session data if profile fetch fails for other reasons
         return createUserFromSession(session);
       }
 
@@ -250,10 +275,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profilePictureUrl = data;
       }
       
+      // Use real email from profile or metadata, fallback to auth email
+      const displayEmail = profileData.email || session.user.user_metadata.real_email || email;
+      const displayName = profileData.first_name && profileData.last_name 
+        ? `${profileData.first_name} ${profileData.last_name}`
+        : session.user.user_metadata.name || '';
+
       return {
         id: session.user.id,
-        name: profileData.name || session.user.user_metadata.name || '',
-        email: email,
+        name: displayName,
+        email: displayEmail,
         role: detectedRole,
         isVerified: profileData.email_verified || session.user.user_metadata.email_verified || false,
         user_metadata: {
@@ -602,16 +633,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     }
     if (authUser) {
-      // Update the profiles table
-      const userName = authUser.user_metadata?.name || '';
-      const { error: profileUpdateError } = await supabase.from('Profiles').update({
-        first_name: userName.split(' ')[0] || '',
-        last_name: userName.split(' ').slice(1).join(' ') || '',
+      // Update the profiles table with proper field mapping
+      const firstName = authUser.user_metadata?.firstName || authUser.user_metadata?.name?.split(' ')[0] || '';
+      const lastName = authUser.user_metadata?.lastName || authUser.user_metadata?.name?.split(' ').slice(1).join(' ') || '';
+      
+      const { error: profileUpdateError } = await supabase.from('Profiles').upsert({
+        id: authUser.id,
+        first_name: firstName,
+        last_name: lastName,
         email: authUser.email,
+        phone: authUser.user_metadata?.phone,
         user_type: authUser.user_metadata?.role_title || authUser.user_metadata?.role,
         verification_status: authUser.user_metadata?.email_verified ? 'verified' : 'pending',
-        avatar_url: authUser.user_metadata?.profile_picture
-      }).eq('id', authUser.id);
+        avatar_url: authUser.user_metadata?.profile_picture,
+        eth_address: authUser.user_metadata?.eth_address
+      });
       if (profileUpdateError) {
         console.error('Error updating profiles table:', profileUpdateError);
         throw profileUpdateError;
@@ -715,15 +751,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .update({ eth_address: address })
             .eq('id', userData.id);
           
+          const fullName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || `ETH User ${address.substring(0, 6)}`;
+          
           const updatedUser: User = {
             id: userData.id,
-            name: userData.name || `ETH User ${address.substring(0, 6)}`,
-            email: userData.email || '',
+            name: fullName,
+            email: userData.email || '', // Use real email from Profiles table
             role: (userData.user_type as UserRole) || 'buyer',
             isVerified: true, // ETH users are considered verified
             user_metadata: {
-              ...userData,
-              eth_address: address
+              firstName: userData.first_name,
+              lastName: userData.last_name,
+              phone: userData.phone,
+              eth_address: address,
+              real_email: userData.email // Store real email for reference
             }
           };
           
@@ -732,16 +773,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.setItem('ileUser', JSON.stringify(updatedUser));
           localStorage.setItem('ileEthAddress', address);
           
-          // Check if user has a Circle wallet, create one if not
-          if (!userData.circle_wallet_id) {
-            try {
-              console.log('Creating mock wallet for existing MetaMask user:', updatedUser.id);
-              const mockWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
-              console.log('Mock wallet created for MetaMask user:', mockWalletAddress);
-            } catch (walletError) {
-              console.error('Error setting up wallet for MetaMask user:', walletError);
-            }
-          }
+          console.log('Existing MetaMask user logged in:', updatedUser.name);
         } else {
           // Create new user with ETH address
           const { data: userProfile } = await supabase
@@ -772,44 +804,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             
             if (newUser?.user) {
-              // Insert profile for new MetaMask user
-              await supabase.from('Profiles').insert([
-                {
-                  id: newUser.user.id,
-                  first_name: `Ethereum User ${address.slice(0, 6)}`,
-                  last_name: '',
-                  email: newUser.user.email || '',
-                  user_type: role,
-                  verification_status: 'verified',
-                  eth_address: address
-                }
-              ]);
+              // Set pending profile for completion modal
+              setPendingMetaMaskProfile({
+                userId: newUser.user.id,
+                address: address,
+                role: role
+              });
               
-              const createdUser: User = {
-                id: newUser.user.id,
-                name: `Ethereum User ${address.slice(0, 6)}`,
-                email: newUser.user.email || '',
-                role: role,
-                isVerified: true,
-                user_metadata: {
-                  ...newUser.user.user_metadata,
-                  eth_address: address
-                }
-              };
-              
-              setUser(createdUser);
-              setEthAddress(address);
-              localStorage.setItem('ileUser', JSON.stringify(createdUser));
-              localStorage.setItem('ileEthAddress', address);
-              
-              // Create a mock wallet for the new MetaMask user
-              try {
-                console.log('Creating mock wallet for new MetaMask user:', createdUser.id);
-                const mockWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
-                console.log('Mock wallet created for MetaMask user:', mockWalletAddress);
-              } catch (walletError) {
-                console.error('Error setting up wallet for MetaMask user:', walletError);
-              }
+              console.log('MetaMask user created, pending profile completion:', newUser.user.id);
             }
           }
         }
@@ -878,7 +880,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // New getAllUsers function
-  const getAllUsers = async (sellers?: boolean): Promise<User[]> => {
+  const getAllUsers = async (_sellers?: boolean): Promise<User[]> => {
     // Check if current user is admin
     console.log("user", user);
     if (!user || user.user_metadata?.role_title !== 'admin') {
@@ -921,6 +923,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .eq('id', userId);
     if (error) {
       console.error('Error updating user status:', error);
+      throw error;
+    }
+  };
+
+  // Complete MetaMask profile with real user details
+  const completeMetaMaskProfile = async (profileData: { firstName: string; lastName: string; email: string; phone?: string }) => {
+    if (!pendingMetaMaskProfile) {
+      throw new Error('No pending MetaMask profile to complete');
+    }
+
+    const { userId, address, role } = pendingMetaMaskProfile;
+
+    try {
+      // Update the auth user metadata (don't change email - Supabase restricts this)
+      const fullName = `${profileData.firstName} ${profileData.lastName}`;
+      
+      await supabase.auth.updateUser({
+        data: {
+          name: fullName,
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          phone: profileData.phone,
+          eth_address: address,
+          role: role,
+          real_email: profileData.email // Store real email in metadata
+        }
+      });
+
+      // Update or create profile in Profiles table
+      const { error: profileError } = await supabase
+        .from('Profiles')
+        .upsert({
+          id: userId,
+          first_name: profileData.firstName,
+          last_name: profileData.lastName,
+          email: profileData.email,
+          phone: profileData.phone,
+          user_type: role,
+          verification_status: 'pending',
+          eth_address: address
+        });
+
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+        throw profileError;
+      }
+
+      // Update current user state - use real email for display
+      const updatedUser: User = {
+        id: userId,
+        name: fullName,
+        email: profileData.email, // Use the real email for display
+        role: role,
+        isVerified: true,
+        user_metadata: {
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          phone: profileData.phone,
+          eth_address: address,
+          real_email: profileData.email // Store real email for reference
+        }
+      };
+
+      setUser(updatedUser);
+      setEthAddress(address);
+      localStorage.setItem('ileUser', JSON.stringify(updatedUser));
+      localStorage.setItem('ileEthAddress', address);
+      
+      // Clear pending profile
+      setPendingMetaMaskProfile(null);
+      
+      console.log('MetaMask profile completed successfully');
+    } catch (error) {
+      console.error('Error completing MetaMask profile:', error);
       throw error;
     }
   };
@@ -995,7 +1071,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return user.user_metadata?.profile_picture || '';
         },
         updateUserStatus,
-        getUserStats
+        getUserStats,
+        completeMetaMaskProfile,
+        pendingMetaMaskProfile,
+        setPendingMetaMaskProfile
       }}
     >
       {children}

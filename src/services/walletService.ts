@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { backendWalletService } from './backendWalletService';
+import { frontendWalletService } from './frontendWalletService';
 import { secureCircleService } from './secureCircleService';
+import { SettingsService } from './settingsService';
 import { User } from '../types';
 
 /**
@@ -28,8 +30,8 @@ export const createUserWallet = async (user: User) => {
       return { walletId: profile.circle_wallet_id, address: profile.circle_wallet_address };
     }
     
-    // Create a new wallet using backend service
-    const walletResponse = await backendWalletService.createWallet({
+    // Create a new wallet using frontend service (with node-forge encryption)
+    const walletResponse = await frontendWalletService.createWallet({
       userId: user.id,
       userType: user.role as 'buyer' | 'seller',
       name: user.name,
@@ -37,7 +39,7 @@ export const createUserWallet = async (user: User) => {
     });
     
     if (!walletResponse.success || !walletResponse.wallet) {
-      throw new Error(`Backend wallet creation failed: ${walletResponse.error || 'Unknown error'}`);
+      throw new Error(`Frontend wallet creation failed: ${walletResponse.error || 'Unknown error'}`);
     }
     
     const wallet = walletResponse.wallet;
@@ -79,10 +81,10 @@ export const createUserWallet = async (user: User) => {
  */
 export const getUserWallet = async (userId: string) => {
   try {
-    // Get wallet ID from user profile
+    // Get wallet data from user profile - check for both Circle and ETH wallets
     const { data: profile, error } = await supabase
       .from('Profiles')
-      .select('circle_wallet_id, circle_wallet_address')
+      .select('circle_wallet_id, circle_wallet_address, eth_address')
       .eq('id', userId)
       .single();
     
@@ -95,10 +97,25 @@ export const getUserWallet = async (userId: string) => {
         balances: [
           { currency: 'USD', amount: '1250.00' }
         ],
-        status: 'mock'
+        status: 'mock',
+        type: 'mock'
       };
     }
     
+    // Check for MetaMask wallet first
+    if (profile?.eth_address) {
+      return {
+        walletId: `metamask_${userId}`,
+        address: profile.eth_address,
+        balances: [
+          { currency: 'ETH', amount: '0.00' }
+        ],
+        status: 'connected',
+        type: 'metamask'
+      };
+    }
+    
+    // Check for Circle wallet
     if (!profile?.circle_wallet_id) {
       throw new Error('User does not have a wallet');
     }
@@ -196,7 +213,11 @@ export const createEscrowTransaction = async (
     
     // Get platform escrow wallet ID from settings
     const circleConfig = await SettingsService.getCircleConfig();
-    const escrowWalletId = circleConfig?.escrowWalletId || '52a2c755-6045-5217-8d70-8ac28dc221ba';
+    const escrowWalletId = circleConfig?.escrowWalletId;
+    
+    if (!escrowWalletId) {
+      throw new Error('Escrow wallet ID not configured. Please configure Circle payment settings.');
+    }
     
     // Transfer funds from buyer to escrow wallet
     const transfer = await circleApi.transferBetweenWallets(
@@ -277,7 +298,11 @@ export const releaseEscrowFunds = async (escrowTransactionId: string) => {
     
     // Get platform escrow wallet ID from settings
     const circleConfig = await SettingsService.getCircleConfig();
-    const escrowWalletId = circleConfig?.escrowWalletId || '52a2c755-6045-5217-8d70-8ac28dc221ba';
+    const escrowWalletId = circleConfig?.escrowWalletId;
+    
+    if (!escrowWalletId) {
+      throw new Error('Escrow wallet ID not configured. Please configure Circle payment settings.');
+    }
     
     // Transfer funds from escrow wallet to seller
     const transfer = await circleApi.transferBetweenWallets(

@@ -86,9 +86,43 @@ class PaymentIntegrationService {
         throw new Error('Insufficient wallet balance');
       }
 
-      // Create payment record
-      const transactionId = `wallet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Create payment record with real blockchain transaction
+      const transactionId = `wallet_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       
+      // Call the backend Edge Function for real blockchain transaction
+      const { data: userSession } = await supabase.auth.getSession();
+      if (!userSession.session) {
+        throw new Error('Authentication required for wallet operations');
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pleuwhgjpjnkqvbemmhl.supabase.co';
+      const transferResponse = await fetch(`${supabaseUrl}/functions/v1/wallet-operations`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${userSession.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation: 'transfer',
+          walletId: walletData.circleWalletId,
+          amount: paymentRequest.amount.toString(),
+          recipientAddress: await this.getSellerWalletAddress(paymentRequest.sellerId),
+          tokenId: this.getCurrencyTokenId(paymentRequest.currency),
+          metadata: {
+            gigId: paymentRequest.taskId,
+            description: paymentRequest.description
+          }
+        })
+      });
+
+      if (!transferResponse.ok) {
+        const errorData = await transferResponse.json();
+        throw new Error(`Wallet transfer failed: ${errorData.error || 'Unknown error'}`);
+      }
+
+      const transferData = await transferResponse.json();
+      const realTransactionHash = transferData.data.transactionHash;
+
       const { error } = await supabase
         .from('Payments')
         .insert({
@@ -99,10 +133,11 @@ class PaymentIntegrationService {
           amount: paymentRequest.amount,
           currency: paymentRequest.currency,
           payment_method: 'wallet',
-          status: 'completed', // Simulate instant wallet payment
+          status: 'completed',
           description: paymentRequest.description,
           wallet_address: walletData.ethAddress || walletData.circleWalletAddress,
-          transaction_hash: `0x${Math.random().toString(16).substr(2, 64)}`, // Mock hash
+          transaction_hash: realTransactionHash,
+          external_transaction_id: transferData.data.id,
           created_at: new Date().toISOString()
         });
 
@@ -142,7 +177,7 @@ class PaymentIntegrationService {
       }
 
       // Create payment record with pending status
-      const transactionId = `paystack_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const transactionId = `paystack_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       
       const { error } = await supabase
         .from('Payments')
@@ -215,7 +250,7 @@ class PaymentIntegrationService {
    */
   async processWithdrawal(withdrawalRequest: WithdrawalRequest): Promise<WithdrawalResponse> {
     try {
-      const withdrawalId = `withdrawal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const withdrawalId = `withdrawal_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
       if (withdrawalRequest.method === 'bank') {
         return await this.processBankWithdrawal(withdrawalRequest, withdrawalId);
@@ -268,13 +303,54 @@ class PaymentIntegrationService {
   }
 
   /**
-   * Process wallet withdrawal
+   * Process wallet withdrawal using real blockchain transaction
    */
   private async processWalletWithdrawal(
     withdrawalRequest: WithdrawalRequest,
     withdrawalId: string
   ): Promise<WithdrawalResponse> {
     try {
+      // Get user's wallet data
+      const walletData = await getUserWalletData(withdrawalRequest.userId);
+      
+      if (!walletData.hasCircleWallet) {
+        throw new Error('User does not have a Circle wallet for withdrawal');
+      }
+
+      // Call the backend Edge Function for real withdrawal transaction
+      const { data: userSession } = await supabase.auth.getSession();
+      if (!userSession.session) {
+        throw new Error('Authentication required for withdrawal');
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pleuwhgjpjnkqvbemmhl.supabase.co';
+      const transferResponse = await fetch(`${supabaseUrl}/functions/v1/wallet-operations`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${userSession.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operation: 'transfer',
+          walletId: walletData.circleWalletId,
+          amount: withdrawalRequest.amount.toString(),
+          recipientAddress: withdrawalRequest.walletAddress,
+          tokenId: 'usd-coin', // Default to USDC for withdrawals
+          metadata: {
+            type: 'withdrawal',
+            withdrawalId: withdrawalId
+          }
+        })
+      });
+
+      if (!transferResponse.ok) {
+        const errorData = await transferResponse.json();
+        throw new Error(`Withdrawal transfer failed: ${errorData.error || 'Unknown error'}`);
+      }
+
+      const transferData = await transferResponse.json();
+      const realTransactionHash = transferData.data.transactionHash;
+
       const { error } = await supabase
         .from('Withdrawals')
         .insert({
@@ -283,8 +359,9 @@ class PaymentIntegrationService {
           amount: withdrawalRequest.amount,
           method: 'wallet',
           wallet_address: withdrawalRequest.walletAddress,
-          status: 'completed', // Simulate instant crypto withdrawal
-          transaction_hash: `0x${Math.random().toString(16).substr(2, 64)}`, // Mock hash
+          status: 'completed',
+          transaction_hash: realTransactionHash,
+          external_transaction_id: transferData.data.id,
           created_at: new Date().toISOString()
         });
 
@@ -296,7 +373,7 @@ class PaymentIntegrationService {
         success: true,
         withdrawalId,
         message: 'Wallet withdrawal completed successfully',
-        estimatedTime: 'Instant'
+        estimatedTime: '5-15 minutes (blockchain confirmation)'
       };
     } catch (error) {
       throw error;
@@ -445,6 +522,44 @@ class PaymentIntegrationService {
       console.warn('Failed to get Paystack config:', error);
       return { enabled: false };
     }
+  }
+
+  /**
+   * Get seller's wallet address for transfers
+   */
+  private async getSellerWalletAddress(sellerId: string): Promise<string> {
+    const { data: sellerProfile, error } = await supabase
+      .from('Profiles')
+      .select('circle_wallet_address, eth_address')
+      .eq('id', sellerId)
+      .single();
+
+    if (error || !sellerProfile) {
+      throw new Error('Seller wallet address not found');
+    }
+
+    // Prefer Circle wallet address, fallback to ETH address
+    const walletAddress = sellerProfile.circle_wallet_address || sellerProfile.eth_address;
+    
+    if (!walletAddress) {
+      throw new Error('Seller does not have a valid wallet address');
+    }
+
+    return walletAddress;
+  }
+
+  /**
+   * Get token ID for currency
+   */
+  private getCurrencyTokenId(currency: string): string {
+    const tokenMap: { [key: string]: string } = {
+      'USD': 'usd-coin', // USDC
+      'USDC': 'usd-coin',
+      'ETH': 'ethereum',
+      'MATIC': 'matic-network'
+    };
+
+    return tokenMap[currency.toUpperCase()] || 'usd-coin';
   }
 }
 

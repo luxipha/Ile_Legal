@@ -40,7 +40,9 @@ export const WalletStatusNotification: React.FC<WalletStatusNotificationProps> =
     }
   }, [isEnabled, user?.id]);
 
-  const walletBalance = walletInfo?.balances?.find((b: any) => b.currency === 'USD')?.amount || propWalletBalance || '0.00';
+  const walletBalance = walletInfo?.balances?.[0]?.amount || propWalletBalance || '0.00';
+  const walletCurrency = walletInfo?.balances?.[0]?.currency || 'USD';
+  const walletType = walletInfo?.type || 'unknown';
   
   const copyWalletAddress = () => {
     if (walletInfo?.address) {
@@ -62,7 +64,9 @@ export const WalletStatusNotification: React.FC<WalletStatusNotificationProps> =
             <div className="flex items-center gap-2 mb-3">
               <CheckCircleIcon className="w-5 h-5 text-green-500" />
               <p className="text-gray-600">
-                Your USDC wallet address was created during registration.
+                {walletType === 'metamask' 
+                  ? 'Your MetaMask wallet is connected.' 
+                  : 'Your USDC wallet address was created during registration.'}
               </p>
             </div>
             
@@ -81,7 +85,7 @@ export const WalletStatusNotification: React.FC<WalletStatusNotificationProps> =
                 <p className="text-sm text-red-600">{error}</p>
               ) : (
                 <p className="text-xl font-bold text-amber-700">
-                  ${isLoading ? '...' : walletBalance} USDC
+                  {walletCurrency === 'ETH' ? '' : '$'}{isLoading ? '...' : walletBalance} {walletCurrency}
                 </p>
               )}
             </div>
