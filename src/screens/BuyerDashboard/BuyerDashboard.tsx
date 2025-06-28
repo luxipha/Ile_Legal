@@ -46,6 +46,7 @@ interface Gig {
 interface CompletedGig {
   id: number;
   title: string;
+  description: string;
   provider: string;
   providerAvatar: string;
   amount: string;
@@ -54,6 +55,9 @@ interface CompletedGig {
   deadline: string;
   status: "Completed" | "pending_payment";
   paymentStatus: "completed" | "paid" | "pending" | "pending_payment";
+  providerLocation: string;
+  providerRating: number;
+  completedJobsCount: number;
 }
 
 interface InProgressGig {
@@ -158,15 +162,10 @@ export const BuyerDashboard = (): JSX.Element => {
               const acceptedBid = bids.find((bid: any) => bid.status === 'accepted');
               
               if (acceptedBid) {
-                // Get seller profile information
-                const { supabase } = await import('../../lib/supabase');
-                const { data: sellerProfile } = await supabase
-                  .from('Profiles')
-                  .select('*')
-                  .eq('id', acceptedBid.seller_id)
-                  .single();
+                // Get seller profile information using the new getUserProfile function
+                const sellerProfile = await api.metrics.getUserProfile(acceptedBid.seller_id);
                 
-                const providerName = sellerProfile?.name || 
+                const providerName = 
                   `${sellerProfile?.first_name || ''} ${sellerProfile?.last_name || ''}`.trim() || 
                   'Legal Professional';
                 const providerAvatar = sellerProfile?.avatar_url || providerName.charAt(0).toUpperCase();
@@ -203,22 +202,31 @@ export const BuyerDashboard = (): JSX.Element => {
               const acceptedBid = bids.find((bid: any) => bid.status === 'accepted');
               
               if (acceptedBid) {
-                // Get seller profile information
-                const { supabase } = await import('../../lib/supabase');
-                const { data: sellerProfile } = await supabase
-                  .from('Profiles')
-                  .select('*')
-                  .eq('id', acceptedBid.seller_id)
-                  .single();
+                // Get seller profile information using the new getUserProfile function
+                const sellerProfile = await api.metrics.getUserProfile(acceptedBid.seller_id);
                 
-                const providerName = sellerProfile?.name || 
+                const providerName = 
                   `${sellerProfile?.first_name || ''} ${sellerProfile?.last_name || ''}`.trim() || 
                   'Legal Professional';
                 const providerAvatar = sellerProfile?.avatar_url || providerName.charAt(0).toUpperCase();
+                const providerLocation = sellerProfile?.location || '';
                 
+                // Get seller's rating
+                let sellerRating = 0;
+                try {
+                  sellerRating = await api.feedback.getAverageRating(acceptedBid.seller_id);
+                } catch (error) {
+                  console.error('Error fetching seller rating:', error);
+                }
+                
+                // Use jobs_completed from the profile instead of calculating manually
+                const completedJobsCount = sellerProfile?.jobs_completed || 0;
+                console.log('completedJobsCount', completedJobsCount);
+                console.log('completed gig', gig);
                 completed.push({
                   id: gig.id,
                   title: gig.title,
+                  description: gig.description,
                   provider: providerName,
                   providerAvatar: providerAvatar,
                   amount: gig.amount || gig.budget,
@@ -226,7 +234,10 @@ export const BuyerDashboard = (): JSX.Element => {
                   postedDate: gig.postedDate || gig.created_at || "",
                   deadline: gig.deadline || "",
                   status: ["completed", "pending_payment"].includes(gig.status?.toLowerCase()) ? "Completed" : gig.status,
-                  paymentStatus: gig.status?.toLowerCase() // TODO: Check actual payment status from payment records
+                  paymentStatus: gig.status?.toLowerCase(),
+                  providerLocation: providerLocation,
+                  providerRating: sellerRating,
+                  completedJobsCount: completedJobsCount
                 });
               }
             } catch (error) {
@@ -235,6 +246,7 @@ export const BuyerDashboard = (): JSX.Element => {
               completed.push({
                 id: gig.id,
                 title: gig.title,
+                description: gig.description,
                 provider: "Legal Professional",
                 providerAvatar: "L",
                 amount: gig.amount || gig.budget,
@@ -242,7 +254,10 @@ export const BuyerDashboard = (): JSX.Element => {
                 postedDate: gig.postedDate || gig.created_at || "",
                 deadline: gig.deadline || "",
                 status: ["completed", "pending_payment"].includes(gig.status?.toLowerCase()) ? "Completed" : gig.status,
-                paymentStatus: "completed"
+                paymentStatus: "completed",
+                providerLocation: '',
+                providerRating: 0,
+                completedJobsCount: 0
               });
             }
           }
@@ -424,6 +439,7 @@ export const BuyerDashboard = (): JSX.Element => {
   // The view-details mode is meant for sellers, while buyers should use ViewBids
   
   if (viewMode === "view-deliverables" && selectedCompletedGig) {
+    console.log('selectedCompletedGig', selectedCompletedGig);
     return (
       <div className="flex min-h-screen bg-gray-50">
         {/* Sidebar */}
@@ -442,11 +458,13 @@ export const BuyerDashboard = (): JSX.Element => {
               deadline={formatDate(selectedCompletedGig.completedDate)}
               budget={selectedCompletedGig.amount}
               status={selectedCompletedGig.status}
+              description={selectedCompletedGig.description}
               provider={{
                 name: selectedCompletedGig.provider,
                 avatar: selectedCompletedGig.providerAvatar,
-                rating: 4.9,
-                projectsPosted: 12
+                rating: selectedCompletedGig.providerRating,
+                projectsPosted: selectedCompletedGig.completedJobsCount,
+                location: selectedCompletedGig.providerLocation
               }}
               onBack={() => setViewMode("dashboard")}
               onMessage={handleMessageProvider}

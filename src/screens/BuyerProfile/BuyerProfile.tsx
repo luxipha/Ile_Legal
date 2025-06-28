@@ -52,6 +52,7 @@ interface ProfileData {
   phone: string;
   company: string;
   industry: string;
+  location: string;
   about: string;
   interests: string[];
   education: Education[];
@@ -105,6 +106,7 @@ export const BuyerProfile = (): JSX.Element => {
       phone: meta.phone || '',
       company: meta.company || '',
       industry: meta.industry || '',
+      location: meta.location || '',
       about: meta.about || '',
       interests: Array.isArray(meta.interests) ? meta.interests : [],
       education: Array.isArray(meta.education) ? meta.education : [],
@@ -240,6 +242,7 @@ export const BuyerProfile = (): JSX.Element => {
         phone: editFormData.phone,
         company: editFormData.company,
         industry: editFormData.industry,
+        location: editFormData.location,
         about: editFormData.about,
         interests: editFormData.interests,
         education: editFormData.education,
@@ -626,6 +629,45 @@ export const BuyerProfile = (): JSX.Element => {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Location
+                        </label>
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+                            <MapPinIcon className="w-5 h-5 text-gray-400" />
+                          </div>
+                          <input
+                            type="text"
+                            name="location"
+                            value={editFormData.location}
+                            onChange={handleInputChange}
+                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
+                            placeholder="Enter your location"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Phone Number
+                        </label>
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+                            <PhoneIcon className="w-5 h-5 text-gray-400" />
+                          </div>
+                          <input
+                            type="tel"
+                            name="phone"
+                            value={editFormData.phone}
+                            onChange={handleInputChange}
+                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -647,22 +689,7 @@ export const BuyerProfile = (): JSX.Element => {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Phone Number
-                        </label>
-                        <div className="relative">
-                          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-                            <PhoneIcon className="w-5 h-5 text-gray-400" />
-                          </div>
-                          <input
-                            type="tel"
-                            name="phone"
-                            value={editFormData.phone}
-                            onChange={handleInputChange}
-                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
-                            required
-                          />
-                        </div>
+                        {/* Empty div to maintain grid layout */}
                       </div>
                     </div>
                   </CardContent>
@@ -970,7 +997,9 @@ export const BuyerProfile = (): JSX.Element => {
                     </div>
                     <div className="flex items-center gap-3">
                       <MapPinIcon className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-700">Location not specified</span>
+                      <span className="text-gray-700">
+                        {profileData.location || "Location not specified"}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
