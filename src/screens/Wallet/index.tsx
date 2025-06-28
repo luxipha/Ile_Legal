@@ -4,7 +4,7 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-
 import WalletDashboard from './WalletDashboard';
 import WalletTransactions from './WalletTransactions';
 import WalletFunding from './WalletFunding';
-import WalletTest from './WalletTest';
+// WalletTest component removed
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -18,7 +18,6 @@ const WalletIndex: React.FC = () => {
   const [activeTab, setActiveTab] = useState<number>(() => {
     if (location.pathname.includes('/transactions')) return 1;
     if (location.pathname.includes('/funding')) return 2;
-    if (location.pathname.includes('/test')) return 3;
     return 0;
   });
 
@@ -49,9 +48,6 @@ const WalletIndex: React.FC = () => {
         break;
       case 2:
         navigate('/wallet/funding');
-        break;
-      case 3:
-        navigate('/wallet/test');
         break;
       default:
         navigate('/wallet');
@@ -88,14 +84,7 @@ const WalletIndex: React.FC = () => {
             label="Deposit & Withdraw" 
             iconPosition="start"
           />
-          {/* Only show API Test tab for admin users */}
-          {user.role === 'admin' && (
-            <Tab 
-              icon={<BugReportIcon />} 
-              label="API Test" 
-              iconPosition="start"
-            />
-          )}
+          {/* API Test tab removed */}
         </Tabs>
       </Paper>
       
@@ -104,10 +93,8 @@ const WalletIndex: React.FC = () => {
           <Route path="/" element={<WalletDashboard />} />
           <Route path="/transactions" element={<WalletTransactions />} />
           <Route path="/funding" element={<WalletFunding />} />
-          {/* Only render the WalletTest component for admin users */}
-          <Route path="/test" element={
-            user.role === 'admin' ? <WalletTest /> : <Navigate to="/wallet" replace />
-          } />
+          {/* WalletTest removed - redirect to dashboard */}
+          <Route path="/test" element={<Navigate to="/wallet" replace />} />
           <Route path="*" element={<WalletDashboard />} />
         </Routes>
       </Box>

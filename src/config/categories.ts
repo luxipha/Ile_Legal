@@ -1,17 +1,21 @@
-// Single source of truth for all legal service categories
+// Single source of truth for real estate legal service categories
 export const LEGAL_CATEGORIES = [
-  { value: "contract-law", label: "Contract Law", color: "blue" },
-  { value: "business-law", label: "Business Law", color: "green" },
-  { value: "family-law", label: "Family Law", color: "purple" },
-  { value: "property-law", label: "Property Law", color: "orange" },
-  { value: "immigration-law", label: "Immigration Law", color: "red" },
+  { value: "property-purchase", label: "Property Purchase Agreement", color: "blue" },
+  { value: "property-sale", label: "Property Sale Documentation", color: "green" },
   { value: "land-title", label: "Land Title Verification", color: "teal" },
-  { value: "contract-review", label: "Contract Review", color: "indigo" },
-  { value: "due-diligence", label: "Due Diligence", color: "pink" },
-  { value: "c-of-o", label: "C of O Processing", color: "yellow" },
-  { value: "legal-documentation", label: "Legal Documentation", color: "gray" },
-  { value: "compliance-check", label: "Compliance Check", color: "cyan" },
-  { value: "other", label: "Other", color: "slate" }
+  { value: "c-of-o", label: "Certificate of Occupancy (C of O)", color: "yellow" },
+  { value: "deed-preparation", label: "Deed of Assignment Preparation", color: "purple" },
+  { value: "survey-plan", label: "Survey Plan Verification", color: "orange" },
+  { value: "property-due-diligence", label: "Property Due Diligence", color: "pink" },
+  { value: "lease-agreement", label: "Lease Agreement Drafting", color: "indigo" },
+  { value: "rent-agreement", label: "Tenancy Agreement", color: "red" },
+  { value: "property-disputes", label: "Property Dispute Resolution", color: "cyan" },
+  { value: "land-acquisition", label: "Land Acquisition Services", color: "emerald" },
+  { value: "property-registration", label: "Property Registration", color: "amber" },
+  { value: "mortgage-documentation", label: "Mortgage Documentation", color: "violet" },
+  { value: "zoning-compliance", label: "Zoning & Planning Compliance", color: "rose" },
+  { value: "property-inspection", label: "Legal Property Inspection", color: "sky" },
+  { value: "other", label: "Other Real Estate Legal Services", color: "slate" }
 ] as const;
 
 // Helper functions
