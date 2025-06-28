@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { ipfsService, IPFSUploadResult } from './ipfsService';
 import { reputationService } from './reputationService';
 import { generateRandom12DigitId } from '../lib/utils';
+import { v4 as uuidv4 } from 'uuid';
 
 
 // Mock API service for frontend-only development
@@ -400,8 +401,8 @@ export const api = {
       attachments?: FileList | File[];
       buyer_id: string | undefined;
     }) => {
-      // Use random 12-digit ID for gig ID to prevent collisions
-      const randomId = generateRandom12DigitId();
+      // Use uuid for gig ID to prevent collisions
+      const gigId = uuidv4();
       
       let attachmentUrls: string[] = [];
       
@@ -412,7 +413,7 @@ export const api = {
         console.log('files:', files);
         
         const uploadPromises = files.map(async (file) => {
-          const filePath = `${randomId}/${gigData.buyer_id}/${file.name}`;
+          const filePath = `${gigId}/${gigData.buyer_id}/${file.name}`;
           console.log('filePath:', filePath);
           const { error: uploadError } = await supabase.storage
             .from('documents')
@@ -432,7 +433,7 @@ export const api = {
       const { data, error } = await supabase
         .from('Gigs')
         .insert({
-          id: randomId,
+          id: gigId,
           title: gigData.title,
           description: gigData.description,
           categories: gigData.categories,
@@ -1476,6 +1477,16 @@ export const api = {
 
       if (error) {
         throw error;
+      }
+
+      // Update the gig status to 'pending_payment'
+      const { error: gigUpdateError } = await supabase
+        .from('Gigs')
+        .update({ status: 'pending_payment' })
+        .eq('id', submissionData.gig_id);
+      if (gigUpdateError) {
+        console.error('Error updating gig status to pending_payment:', gigUpdateError);
+        // Don't throw error here as the submission was created successfully
       }
 
       return data;

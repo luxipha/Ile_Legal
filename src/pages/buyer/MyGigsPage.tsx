@@ -35,6 +35,7 @@ const MyGigsPage: React.FC = () => {
       case 'assigned':
         return <span className="badge-primary">In Progress</span>;
       case 'completed':
+      case 'pending_payment':
         return <span className="badge-success">Completed</span>;
       default:
         return <span className="badge-error">Cancelled</span>;

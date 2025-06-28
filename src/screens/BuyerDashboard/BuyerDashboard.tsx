@@ -24,7 +24,7 @@ type ViewMode = "dashboard" | "view-bids" | "view-details" | "view-deliverables"
 interface Gig {
   id: number;
   title: string;
-  status: "Active" | "Open" | "In Progress" | "Completed";
+  status: "Active" | "Open" | "In Progress" | "Completed" | "pending_payment";
   statusColor: string;
   bidsReceived: number;
   budget: string;
@@ -52,8 +52,8 @@ interface CompletedGig {
   completedDate: string;
   postedDate: string;
   deadline: string;
-  status: "Completed";
-  paymentStatus: "completed" | "paid" | "pending";
+  status: "Completed" | "pending_payment";
+  paymentStatus: "completed" | "paid" | "pending" | "pending_payment";
 }
 
 interface InProgressGig {
@@ -196,7 +196,7 @@ export const BuyerDashboard = (): JSX.Element => {
                 status: "In Progress"
               });
             }
-          } else if (gig.status?.toLowerCase() === "completed" || gig.status?.toLowerCase() === "paid") {
+          } else if (["completed", "pending_payment"].includes(gig.status?.toLowerCase()) || gig.status?.toLowerCase() === "paid") {
             // For completed gigs, we need to get the accepted bid to find the provider
             try {
               const bids = await api.bids.getBidsByGigId(gig.id.toString());
@@ -225,7 +225,7 @@ export const BuyerDashboard = (): JSX.Element => {
                   completedDate: gig.completedDate || gig.deadline,
                   postedDate: gig.postedDate || gig.created_at || "",
                   deadline: gig.deadline || "",
-                  status: "Completed",
+                  status: ["completed", "pending_payment"].includes(gig.status?.toLowerCase()) ? "Completed" : gig.status,
                   paymentStatus: gig.status?.toLowerCase() // TODO: Check actual payment status from payment records
                 });
               }
@@ -241,7 +241,7 @@ export const BuyerDashboard = (): JSX.Element => {
                 completedDate: gig.completedDate || gig.deadline,
                 postedDate: gig.postedDate || gig.created_at || "",
                 deadline: gig.deadline || "",
-                status: "Completed",
+                status: ["completed", "pending_payment"].includes(gig.status?.toLowerCase()) ? "Completed" : gig.status,
                 paymentStatus: "completed"
               });
             }
@@ -280,7 +280,7 @@ export const BuyerDashboard = (): JSX.Element => {
                 time: formatDate((gig as any).postedDate || (gig as any).created_at || ''),
                 icon: '🟡'
               });
-            } else if (gig.status?.toLowerCase() === 'completed') {
+            } else if (["completed", "pending_payment"].includes(gig.status?.toLowerCase()) || gig.status?.toLowerCase() === 'completed') {
               activities.push({
                 id: index + 1,
                 type: 'completed',
@@ -373,7 +373,7 @@ export const BuyerDashboard = (): JSX.Element => {
     // Find the completed gig by ID
     const gig = completedGigs.find(g => g.id === gigId);
     if (gig) {
-      if (gig.paymentStatus === "completed") {
+      if (gig.paymentStatus === "completed" || gig.paymentStatus === "pending_payment") {
         // Navigate to payments page for completed gigs that haven't been paid
         navigate("/payments");
       } else if (gig.paymentStatus === "paid") {
@@ -557,11 +557,11 @@ export const BuyerDashboard = (): JSX.Element => {
           <div className="text-2xl font-bold text-gray-900">{gig.amount}</div>
           <div>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-              gig.paymentStatus === "completed" 
+              gig.paymentStatus === "completed" || gig.paymentStatus === "pending_payment" 
                 ? "bg-red-100 text-red-800" 
                 : "bg-green-100 text-green-800"
             }`}>
-              {gig.paymentStatus === "completed" ? "Pay Now" : "Completed"}
+              {gig.paymentStatus === "completed" || gig.paymentStatus === "pending_payment" ? "Pay Now" : "Completed"}
             </span>
           </div>
         </div>
@@ -584,7 +584,7 @@ export const BuyerDashboard = (): JSX.Element => {
             onClick={() => handleLeaveFeedback(gig.id)}
             className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-2 rounded-full flex-1"
           >
-            {gig.paymentStatus === "completed" ? "Pay Now" : "Leave Feedback"}
+            {gig.paymentStatus === "completed" || gig.paymentStatus === "pending_payment" ? "Pay Now" : "Leave Feedback"}
           </Button>
         </div>
       </CardContent>

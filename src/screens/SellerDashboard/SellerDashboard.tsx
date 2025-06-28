@@ -179,7 +179,7 @@ export const SellerDashboard = (): JSX.Element => {
           .filter((item: any) => item !== null)
           .filter((item: any) => {
             const status = item.gig.status?.toLowerCase();
-            return status !== 'completed' && status !== 'paid';
+            return status !== 'completed' && status !== 'pending_payment' && status !== 'paid';
           })
           .map((item: any) => ({
             id: item.gig.id.toString(),
@@ -203,7 +203,7 @@ export const SellerDashboard = (): JSX.Element => {
             try {
               const gigData = await api.gigs.getGigById(bid.gig_id);
               // Only include if the gig status is completed
-              if (gigData.status?.toLowerCase() === 'completed') {
+              if (["completed", "pending_payment"].includes(gigData.status?.toLowerCase())) {
                 return {
                   bid: bid,
                   gig: gigData

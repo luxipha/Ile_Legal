@@ -246,7 +246,7 @@ export const AdminDashboard = (): JSX.Element => {
       case "pending":
         return gig.status.toLowerCase()  === "pending" || gig.status.toLowerCase() === "pending assignment";
       case "completed":
-        return gig.status.toLowerCase() === "completed";
+        return gig.status.toLowerCase() === "completed" || gig.status.toLowerCase() === "pending_payment";
       case "flagged":
         return gig.is_flagged === true;
       case "all":
