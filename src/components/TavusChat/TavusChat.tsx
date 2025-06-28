@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { MessageCircleIcon, MicIcon, MicOffIcon, VideoIcon, VideoOffIcon, CheckCircleIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { MessageCircleIcon, MicIcon, MicOffIcon, VideoIcon, VideoOffIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 
 interface TavusChatProps {
@@ -8,10 +8,11 @@ interface TavusChatProps {
 
 // Tavus configuration
 const TAVUS_CONFIG = {
-  apiKey: '972ffc6ee4d34c16b93a1e4ed04460d5',
-  personaId: 'p88964a7',
+  apiKey: import.meta.env.VITE_TAVUS_API_KEY,
+  personaId: import.meta.env.VITE_TAVUS_PERSONA_ID,
   baseUrl: 'https://tavusapi.com'
 };
+
 
 // Legal prompts for Ile-Legal
 const LEGAL_SYSTEM_PROMPT = `You are an AI legal assistant for Ile-Legal, Nigeria's premier legal marketplace platform. Here's what you should know:
@@ -42,7 +43,6 @@ KEY FEATURES TO HIGHLIGHT:
 TONE: Professional, helpful, and approachable. Always encourage users to sign up and explore our services.`;
 
 export const TavusChat: React.FC<TavusChatProps> = ({ className = '' }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +90,8 @@ export const TavusChat: React.FC<TavusChatProps> = ({ className = '' }) => {
             participant_left_timeout: 30,
             enable_recording: false,
             language: 'english'
-          }
+          },
+          custom_greeting: LEGAL_SYSTEM_PROMPT
         }),
       });
 

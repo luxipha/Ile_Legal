@@ -12,7 +12,8 @@ import {
   CalendarIcon,
   ClockIcon,
   DollarSignIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  ChevronRightIcon
 } from "lucide-react";
 import { api } from "../../services/api";
 import { messagingService } from "../../services/messagingService";
@@ -767,23 +768,37 @@ export const BuyerDashboard = (): JSX.Element => {
             {/* Left Column - Active Gigs (50%) */}
             <div>
               <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Active Gigs</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-gray-900">Active Gigs</h3>
+                  {activeGigs.length > 1 && (
+                    <Link to="/buyer-gigs" className="text-gray-400 hover:text-gray-600">
+                      <ChevronRightIcon className="w-5 h-5" />
+                    </Link>
+                  )}
+                </div>
                 <p className="text-gray-600">Your currently active gigs awaiting bids or assignments.</p>
               </div>
               
               <div className="space-y-4 mb-8">
-                {activeGigs.map(renderActiveGigCard)}
+                {activeGigs.slice(0, 1).map(renderActiveGigCard)}
               </div>
 
               {/* Completed Gigs */}
               <div>
                 <div className="mb-6">
-                  <h3 className="text-xl font-semibold text-gray-900">Completed Gigs</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold text-gray-900">Completed Gigs</h3>
+                    {completedGigs.length > 1 && (
+                      <Link to="/buyer-gigs?tab=completed" className="text-gray-400 hover:text-gray-600">
+                        <ChevronRightIcon className="w-5 h-5" />
+                      </Link>
+                    )}
+                  </div>
                   <p className="text-gray-600">Gigs that have been successfully completed.</p>
                 </div>
                 
                 <div className="space-y-4">
-                  {completedGigs.map(renderCompletedGigCard)}
+                  {completedGigs.slice(0, 1).map(renderCompletedGigCard)}
                 </div>
               </div>
             </div>
@@ -793,12 +808,19 @@ export const BuyerDashboard = (): JSX.Element => {
               {/* In Progress */}
               <div>
                 <div className="mb-6">
-                  <h3 className="text-xl font-semibold text-gray-900">In Progress</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold text-gray-900">In Progress</h3>
+                    {inProgressGigs.length > 1 && (
+                      <Link to="/buyer-gigs?tab=in-progress" className="text-gray-400 hover:text-gray-600">
+                        <ChevronRightIcon className="w-5 h-5" />
+                      </Link>
+                    )}
+                  </div>
                   <p className="text-gray-600">Gigs currently being worked on by legal professionals.</p>
                 </div>
                 
                 <div className="space-y-4">
-                  {inProgressGigs.map(renderInProgressCard)}
+                  {inProgressGigs.slice(0, 1).map(renderInProgressCard)}
                 </div>
               </div>
 

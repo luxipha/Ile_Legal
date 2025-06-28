@@ -24,6 +24,8 @@ encrypt-*.cjs
 extract-*.js
 *-debug-*.cjs
 get-*.cjs
+create-test-gigs.cjs
+src/lib/supabaseLocal.ts
 
 # Backup and temporary Edge Function files
 supabase/functions/*/index.ts.backup

@@ -246,14 +246,6 @@ class SecureCircleService {
 // Export singleton instance
 export const secureCircleService = new SecureCircleService();
 
-// Export types for components
-export type { 
-  WalletBalance, 
-  WalletAddress, 
-  TransferRequest, 
-  TransferResult, 
-  WalletTransaction 
-};
 
 // Replace the old Circle SDK with secure backend calls
 export const circleSdk = {

@@ -35,37 +35,27 @@ export interface FrontendWalletResponse {
   details?: string;
 }
 
-// Circle configuration - these will be moved to environment variables
+// Circle configuration from environment variables
 const CIRCLE_CONFIG = {
-  API_KEY: 'TEST_API_KEY:10a0b7b4cedfaa42d6ce306592fec59f:cfae665cde083f9236de7be92d08f54c',
-  API_URL: 'https://api.circle.com',
-  WALLET_SET_ID: '4150e7d9-990e-5310-8f10-f2d03ca86d09',
-  ENTITY_SECRET_HEX: '728de8dc586450a9d12ed504fb36467364b1442280e422b715e65e88ee9c4391',
-  PUBLIC_KEY_PEM: `-----BEGIN PUBLIC KEY-----
-MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAswT7jHetVDoX/r3OuFrG
-TgQWPprYoKstlRkz6DOPm6CPqY41KOMNhZ0jnlTpyoGhp3yEjhzNFKq6lndZcHa+
-5yJ4aeWGJhk153iTDH+TNU0hbY/3A1vAfx49c5IgIG5WxlLoiQjupaeEYE5HFCfk
-HmgxYC66KQDoX80/DqeZLIxeJTANEHfsb93LTcdoh0qQqtVa8XnL9AWMgihyxp3L
-WPKKrymKSTwuRLA0YvpA8pS0/tP0VMdKrQKJUNCnZakGUhA84HiEga73dgJ7BqFV
-j2mWk74T/sFm1ZNU30SRsiCZZeieOgq3sOzL6ketVHTIM5f7FB7xkm05tKtn1W72
-/IqveOa35e4H6WVfcK2ghVACLqT8RpDAOYwsz6Q6Ye/84QwG7eMRaFOePqhqXyhV
-yS+P7hRvhA86/YSMUf93X1XOrm7t8lA64T5nwKjeytlp16C9oe3lEMtictB/7OUb
-assLwdU+Sce50yCbzQFlF4cOFgA6KftEA9xcHMPhuG3BMtaHdFtmeFXZqa9IZCyR
-kGAuzgCMrJI16tQgW9nfJwS8cxYvmMiF5LixfyHR10E+GAWkJzxY8ZBD6DloBQGI
-ugMWOOZw8j8NSrSMd0/nIzHfiiCf8BdpW6QUADL6y1BlKEXbZf9CUFBwCkZQCNAd
-+nY2lo+TGfsXLlzYEvp+RHkCAwEAAQ==
------END PUBLIC KEY-----`
+  API_KEY: import.meta.env.VITE_CIRCLE_API_KEY,
+  API_URL: import.meta.env.VITE_CIRCLE_API_URL,
+  WALLET_SET_ID: import.meta.env.VITE_CIRCLE_WALLET_SET_ID,
+  ENTITY_SECRET_HEX: import.meta.env.VITE_CIRCLE_ENTITY_SECRET_HEX,
+  PUBLIC_KEY_PEM: import.meta.env.VITE_CIRCLE_PUBLIC_KEY_PEM
 };
 
 class FrontendWalletService {
-  private readonly functionsUrl: string;
-
   constructor() {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    if (!supabaseUrl) {
-      throw new Error('VITE_SUPABASE_URL is not configured');
+    // Validate required environment variables
+    if (!CIRCLE_CONFIG.API_KEY) {
+      throw new Error('VITE_CIRCLE_API_KEY is not configured');
     }
-    this.functionsUrl = `${supabaseUrl}/functions/v1`;
+    if (!CIRCLE_CONFIG.ENTITY_SECRET_HEX) {
+      throw new Error('VITE_CIRCLE_ENTITY_SECRET_HEX is not configured');
+    }
+    if (!CIRCLE_CONFIG.PUBLIC_KEY_PEM) {
+      throw new Error('VITE_CIRCLE_PUBLIC_KEY_PEM is not configured');
+    }
   }
 
   /**
@@ -101,7 +91,7 @@ class FrontendWalletService {
       
     } catch (error) {
       console.error('❌ Frontend encryption failed:', error);
-      throw new Error(`Failed to encrypt entity secret: ${error.message}`);
+      throw new Error(`Failed to encrypt entity secret: ${(error as Error).message}`);
     }
   }
 
@@ -298,5 +288,3 @@ class FrontendWalletService {
 // Export singleton instance
 export const frontendWalletService = new FrontendWalletService();
 
-// Export types for use in components
-export type { FrontendWalletRequest, WalletInfo, FrontendWalletResponse };

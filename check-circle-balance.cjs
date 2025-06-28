@@ -3,8 +3,10 @@
  * Check actual Circle wallet balance for your wallet
  */
 
-const API_KEY = 'TEST_API_KEY:10a0b7b4cedfaa42d6ce306592fec59f:cfae665cde083f9236de7be92d08f54c';
-const WALLET_ID = '6da4d520-25d9-5841-acc7-5d79a698f1e7'; // Your wallet ID
+require('dotenv').config();
+
+const API_KEY = process.env.CIRCLE_API_KEY;
+const WALLET_ID = process.env.CIRCLE_WALLET_ID;
 
 async function checkBalance() {
   console.log('🔍 Checking Circle wallet balance...');

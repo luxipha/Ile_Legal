@@ -17,7 +17,8 @@ import {
   DollarSignIcon,
   UserIcon,
   SearchIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  ChevronRightIcon
 } from "lucide-react";
 
 type ViewMode = "dashboard" | "place-bid" | "view-details" | "submit-work" | "edit-bid";
@@ -680,7 +681,7 @@ export const SellerDashboard = (): JSX.Element => {
           <main className="flex-1 p-6">
             {selectedGig ? (
               <ViewDetails
-                gig={(selectedGig)}
+                gig={convertToViewDetailsGig(selectedGig)}
                 onBack={() => setViewMode("dashboard")}
                 onPlaceBid={handleViewDetailsPlaceBid}
                 backButtonText="Back to Dashboard"
@@ -956,7 +957,14 @@ export const SellerDashboard = (): JSX.Element => {
           <div className="grid grid-cols-2 gap-8">
             {/* Available Gigs */}
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Available Gigs</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900">Available Gigs</h3>
+                {availableGigs.length > 1 && (
+                  <Link to="/find-gigs" className="text-gray-400 hover:text-gray-600">
+                    <ChevronRightIcon className="w-5 h-5" />
+                  </Link>
+                )}
+              </div>
               <p className="text-gray-600 mb-6">Recently posted gigs that matches your expertise</p>
               
               {loadingGigs ? (
@@ -970,7 +978,7 @@ export const SellerDashboard = (): JSX.Element => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {availableGigs.map((gig) => (
+                  {availableGigs.slice(0, 1).map((gig) => (
                     <Card key={gig.id} className="bg-white border border-gray-200">
                       <CardContent className="p-6">
                         <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
@@ -1007,7 +1015,14 @@ export const SellerDashboard = (): JSX.Element => {
             <div className="space-y-8">
               {/* Your Active Bids */}
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Your Active Bids</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">Your Active Bids</h3>
+                  {activeBids.length > 1 && (
+                    <Link to="/active-bids" className="text-gray-400 hover:text-gray-600">
+                      <ChevronRightIcon className="w-5 h-5" />
+                    </Link>
+                  )}
+                </div>
                 <p className="text-gray-600 mb-6">Bids you've placed that are awaiting client decisions</p>
                 
                 {loadingActiveBids ? (
@@ -1021,7 +1036,7 @@ export const SellerDashboard = (): JSX.Element => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {activeBids.map((bid) => (
+                    {activeBids.slice(0, 1).map((bid) => (
                       bid.gigDeadline = bid.gig?.deadline,
                       bid.gigBudget = bid.gig?.budget,
                       bid.deliveryTime = bid.delivery_time,
@@ -1066,7 +1081,14 @@ export const SellerDashboard = (): JSX.Element => {
 
               {/* Ongoing Gigs */}
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Ongoing Gigs</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">Ongoing Gigs</h3>
+                  {ongoingGigs.length > 1 && (
+                    <Link to="/seller-gigs?tab=ongoing" className="text-gray-400 hover:text-gray-600">
+                      <ChevronRightIcon className="w-5 h-5" />
+                    </Link>
+                  )}
+                </div>
                 <p className="text-gray-600 mb-6">Gigs you are currently working on</p>
                 
                 {loadingOngoing ? (
@@ -1079,42 +1101,44 @@ export const SellerDashboard = (): JSX.Element => {
                     <p className="text-sm text-gray-400 mt-2">Place bids on available gigs to start working</p>
                   </div>
                 ) : (
-                  ongoingGigs.map((gig) => (
-                    <Card key={gig.id} className="bg-white border border-gray-200">
-                      <CardContent className="p-6">
-                        <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
-                        <p className="text-sm text-gray-600 mb-2">Client: {gig.company}</p>
-                        <p className="text-sm text-gray-600 mb-2">Due: {gig.dueDate}</p>
-                        <p className="text-lg font-bold text-gray-900 mb-4">{gig.price}</p>
-                        
-                        {/* Progress Bar */}
-                        <div className="mb-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-gray-600">Progress: {gig.progress}%</span>
+                  <div className="space-y-4">
+                    {ongoingGigs.slice(0, 1).map((gig) => (
+                      <Card key={gig.id} className="bg-white border border-gray-200">
+                        <CardContent className="p-6">
+                          <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
+                          <p className="text-sm text-gray-600 mb-2">Client: {gig.company}</p>
+                          <p className="text-sm text-gray-600 mb-2">Due: {gig.dueDate}</p>
+                          <p className="text-lg font-bold text-gray-900 mb-4">{gig.price}</p>
+                          
+                          {/* Progress Bar */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-gray-600">Progress: {gig.progress}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div className="bg-green-500 h-2 rounded-full" style={{ width: `${gig.progress}%` }}></div>
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div className="bg-green-500 h-2 rounded-full" style={{ width: `${gig.progress}%` }}></div>
+                          
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => navigate("/seller-messages")}
+                              className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                            >
+                              Message Client
+                            </Button>
+                            <Button 
+                              onClick={() => handleSubmitWork(gig)}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              Submit Work
+                            </Button>
                           </div>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => navigate("/seller-messages")}
-                            className="border-blue-500 text-blue-500 hover:bg-blue-50"
-                          >
-                            Message Client
-                          </Button>
-                          <Button 
-                            onClick={() => handleSubmitWork(gig)}
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            Submit Work
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
