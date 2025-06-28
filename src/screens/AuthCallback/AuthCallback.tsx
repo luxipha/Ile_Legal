@@ -73,6 +73,44 @@ export const AuthCallback = () => {
             setUser(appUser);
             localStorage.setItem('ileUser', JSON.stringify(appUser));
             
+            // Check if user exists in profiles table, create if not
+            try {
+              const { data: existingProfile } = await supabase
+                .from('Profiles')
+                .select('*')
+                .eq('id', userData.user.id)
+                .single();
+              
+              if (!existingProfile) {
+                console.log('Creating profile for new Google user:', userData.user.id);
+                
+                // Insert into profiles table with authenticated context
+                const { error: profileError } = await supabase.from('Profiles').insert([
+                  {
+                    id: userData.user.id,
+                    first_name: appUser.name.split(' ')[0] || '',
+                    last_name: appUser.name.split(' ').slice(1).join(' ') || '',
+                    email: userData.user.email || '',
+                    user_type: role,
+                    verification_status: userData.user.email_confirmed_at ? 'verified' : 'pending',
+                    avatar_url: userData.user.user_metadata?.profile_picture
+                  }
+                ]);
+                
+                if (profileError) {
+                  console.error('Error inserting into profiles:', profileError);
+                  // Don't throw error to avoid breaking the authentication flow
+                } else {
+                  console.log('Profile created successfully for Google user');
+                }
+              } else {
+                console.log('Profile already exists for user:', userData.user.id);
+              }
+            } catch (profileError) {
+              console.error('Error checking/creating profile:', profileError);
+              // Don't fail the authentication process if profile creation fails
+            }
+            
             // Check if user has a Circle wallet, create one if not
             try {
               const { data: profile } = await supabase

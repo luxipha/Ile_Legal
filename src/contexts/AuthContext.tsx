@@ -495,6 +495,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Register function
   const register = async (name: string, email: string, password: string, role: UserRole) => {
+    console.log("register", name, email, password, role);
     setIsLoading(true);
     try {
       // Simulate API delay
