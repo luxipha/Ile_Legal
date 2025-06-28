@@ -262,6 +262,37 @@ class FrontendWalletService {
       return false;
     }
   }
+
+  /**
+   * Get wallet balance from Circle API
+   */
+  async getWalletBalance(walletId: string): Promise<any> {
+    try {
+      console.log('💰 Fetching wallet balance for:', walletId);
+      
+      const response = await fetch(`${CIRCLE_CONFIG.API_URL}/v1/w3s/wallets/${walletId}/balances`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${CIRCLE_CONFIG.API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Circle balance API error:', errorText);
+        throw new Error(`Circle balance API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Balance fetched:', result.data);
+      
+      return result.data;
+    } catch (error: any) {
+      console.error('Error fetching wallet balance:', error);
+      throw new Error(`Failed to fetch wallet balance: ${error.message}`);
+    }
+  }
 }
 
 // Export singleton instance

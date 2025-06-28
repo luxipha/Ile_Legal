@@ -38,28 +38,60 @@ export const WalletStatusNotification: React.FC<WalletStatusNotificationProps> =
           .single();
           
         if (!profileError && profileData?.circle_wallet_id) {
-          // Convert profile data to wallet format
+          // Get real-time balance from Circle API
+          let usdcBalance = '0.00';
+          let maticBalance = '0.00';
+          
+          try {
+            const balanceData = await frontendWalletService.getWalletBalance(profileData.circle_wallet_id);
+            if (balanceData?.tokenBalances?.length > 0) {
+              const usdcToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'USDC');
+              const maticToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'MATIC');
+              usdcBalance = usdcToken?.amount || '0.00';
+              maticBalance = maticToken?.amount || '0.00';
+            }
+          } catch (balanceError) {
+            console.log('Could not fetch real-time balance:', balanceError);
+          }
+          
+          // Convert profile data to wallet format with real balance
           setWalletInfo({
             walletId: profileData.circle_wallet_id,
             address: profileData.circle_wallet_address,
             status: profileData.circle_wallet_status || 'active',
             balances: [
-              { currency: 'USDC', amount: '0.00' }, // Default balances since not stored in Profiles
-              { currency: 'MATIC', amount: '0.00' }
+              { currency: 'USDC', amount: usdcBalance },
+              { currency: 'MATIC', amount: maticBalance }
             ],
             type: 'circle'
           });
           return;
         }
       } else {
-        // Convert frontend wallet data to notification format
+        // Get real-time balance from Circle API for user_wallets data too
+        let usdcBalance = walletData.balance_usdc?.toString() || '0.00';
+        let maticBalance = walletData.balance_matic?.toString() || '0.00';
+        
+        try {
+          const balanceData = await frontendWalletService.getWalletBalance(walletData.circle_wallet_id);
+          if (balanceData?.tokenBalances?.length > 0) {
+            const usdcToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'USDC');
+            const maticToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'MATIC');
+            usdcBalance = usdcToken?.amount || usdcBalance;
+            maticBalance = maticToken?.amount || maticBalance;
+          }
+        } catch (balanceError) {
+          console.log('Could not fetch real-time balance from user_wallets:', balanceError);
+        }
+        
+        // Convert frontend wallet data to notification format with real balance
         setWalletInfo({
           walletId: walletData.circle_wallet_id,
           address: walletData.wallet_address,
           status: walletData.wallet_state,
           balances: [
-            { currency: 'USDC', amount: walletData.balance_usdc?.toString() || '0.00' },
-            { currency: 'MATIC', amount: walletData.balance_matic?.toString() || '0.00' }
+            { currency: 'USDC', amount: usdcBalance },
+            { currency: 'MATIC', amount: maticBalance }
           ],
           type: 'circle'
         });
