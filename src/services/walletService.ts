@@ -132,18 +132,22 @@ export const getUserWallet = async (userId: string) => {
       };
     }
     
-    // Get wallet details from Circle using SDK (for real wallets)
-    const wallet = await circleSdk.getWallet(profile.circle_wallet_id);
+    // Get wallet details from frontend wallet service
+    const walletData = await frontendWalletService.getUserWallet(userId);
     
-    // Get wallet balance using SDK
-    const balance = await circleSdk.getWalletBalance(profile.circle_wallet_id);
+    if (!walletData) {
+      throw new Error('Wallet data not found');
+    }
     
     return {
-      walletId: profile.circle_wallet_id,
-      address: profile.circle_wallet_address,
-      status: wallet.status,
-      balances: balance.balances,
-      availableToWithdraw: balance.availableToWithdraw
+      walletId: walletData.circle_wallet_id,
+      address: walletData.wallet_address,
+      status: walletData.wallet_state,
+      balances: [
+        { currency: 'USDC', amount: walletData.balance_usdc?.toString() || '0.00' },
+        { currency: 'MATIC', amount: walletData.balance_matic?.toString() || '0.00' }
+      ],
+      availableToWithdraw: walletData.balance_usdc || 0
     };
   } catch (error) {
     console.error('Error getting user wallet:', error);

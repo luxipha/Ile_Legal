@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircleIcon, AlertCircleIcon, RefreshCcwIcon, ExternalLinkIcon, CopyIcon } from 'lucide-react';
-import { getUserWallet } from '../../services/walletService';
+import { frontendWalletService } from '../../services/frontendWalletService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
@@ -24,11 +24,52 @@ export const WalletStatusNotification: React.FC<WalletStatusNotificationProps> =
     try {
       setIsLoading(true);
       setError(null);
-      const wallet = await getUserWallet(user.id);
-      setWalletInfo(wallet);
+      
+      // First try user_wallets table
+      let walletData = await frontendWalletService.getUserWallet(user.id);
+      
+      // If not found in user_wallets, check Profiles table
+      if (!walletData) {
+        const { supabase } = await import('../../lib/supabase');
+        const { data: profileData, error: profileError } = await supabase
+          .from('Profiles')
+          .select('circle_wallet_id, circle_wallet_address, circle_wallet_status')
+          .eq('id', user.id)
+          .single();
+          
+        if (!profileError && profileData?.circle_wallet_id) {
+          // Convert profile data to wallet format
+          setWalletInfo({
+            walletId: profileData.circle_wallet_id,
+            address: profileData.circle_wallet_address,
+            status: profileData.circle_wallet_status || 'active',
+            balances: [
+              { currency: 'USDC', amount: '0.00' }, // Default balances since not stored in Profiles
+              { currency: 'MATIC', amount: '0.00' }
+            ],
+            type: 'circle'
+          });
+          return;
+        }
+      } else {
+        // Convert frontend wallet data to notification format
+        setWalletInfo({
+          walletId: walletData.circle_wallet_id,
+          address: walletData.wallet_address,
+          status: walletData.wallet_state,
+          balances: [
+            { currency: 'USDC', amount: walletData.balance_usdc?.toString() || '0.00' },
+            { currency: 'MATIC', amount: walletData.balance_matic?.toString() || '0.00' }
+          ],
+          type: 'circle'
+        });
+        return;
+      }
+      
+      setError('Wallet not found');
     } catch (err) {
       console.error('Error loading wallet info:', err);
-      setError('Failed to load wallet information');
+      setError('Wallet is being created...');
     } finally {
       setIsLoading(false);
     }

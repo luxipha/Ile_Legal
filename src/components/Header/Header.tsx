@@ -216,12 +216,6 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   {userType === 'buyer' ? 'Payments' : 'Earnings'}
                 </Link>
-                <Link 
-                  to="/#" 
-                  className="block px-4 py-3 text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                >
-                  Wallet
-                </Link>
                 <button 
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-2"

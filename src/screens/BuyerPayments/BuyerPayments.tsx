@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { PaymentMethods } from "../../components/PaymentMethods";
+import { PaymentMethods, BankAccount } from "../../components/PaymentMethods";
 import { Wallet } from "../../components/Wallet/Wallet";
 import { PaymentMethodModal } from "../../components/PaymentMethodModal/PaymentMethodModal";
 import { Header } from "../../components/Header";
@@ -10,7 +10,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
 import { paymentIntegrationService } from "../../services/paymentIntegrationService";
 import { usePaystackInline } from "../../hooks/usePaystackInline";
-import { transactionService, Transaction, BankAccount } from "../../services/transactionService";
+import { transactionService, Transaction, BankAccount as DBBankAccount } from "../../services/transactionService";
 import { api } from "../../services/api";
 import { 
   TrendingUpIcon,
@@ -39,6 +39,16 @@ interface Task {
 export const BuyerPayments = (): JSX.Element => {
   const { user } = useAuth();
   const { initializePayment } = usePaystackInline();
+
+  // Convert database BankAccount to component BankAccount type
+  const mapBankAccount = (dbAccount: DBBankAccount): BankAccount => ({
+    id: dbAccount.id,
+    bankName: dbAccount.bank_name,
+    accountNumber: dbAccount.account_number,
+    accountName: dbAccount.account_holder_name,
+    isDefault: dbAccount.is_default,
+    currency: dbAccount.currency as "NGN" | "USDC"
+  });
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -52,8 +62,8 @@ export const BuyerPayments = (): JSX.Element => {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setLoading] = useState(true);
+  const [, setError] = useState<string | null>(null);
 
   // Load all data
   useEffect(() => {
@@ -75,19 +85,19 @@ export const BuyerPayments = (): JSX.Element => {
 
         // Load bank accounts
         const accounts = await transactionService.getUserBankAccounts();
-        setBankAccounts(accounts);
+        setBankAccounts(accounts.map(mapBankAccount));
 
         // Load transactions
         const userTransactions = await transactionService.getUserTransactions(user.id, 20);
         setTransactions(userTransactions);
 
         // Load user's gigs (convert to tasks format)
-        const userGigs = await api.gigs.getMyGigs();
+        const userGigs = await api.gigs.getMyGigs(user.id);
         const formattedTasks = userGigs.map(gig => ({
           id: gig.id,
           title: gig.title,
           provider: gig.assigned_seller_name || 'Unassigned',
-          providerAvatar: gig.assigned_seller_name?.split(' ').map(n => n[0]).join('') || 'U',
+          providerAvatar: gig.assigned_seller_name?.split(' ').map((n: string) => n[0]).join('') || 'U',
           amount: `₦${gig.budget.toLocaleString()}`,
           status: mapGigStatusToTaskStatus(gig.status),
           statusColor: getStatusColor(gig.status),
@@ -163,10 +173,21 @@ export const BuyerPayments = (): JSX.Element => {
       ? "text-red-600" : "text-green-600"
   }));
 
-  const handleAddBankAccount = async (account: Omit<BankAccount, "id" | "user_id" | "created_at" | "updated_at">) => {
+  const handleAddBankAccount = async (account: Omit<BankAccount, "id">) => {
     try {
-      const newAccount = await transactionService.addBankAccount(account);
-      setBankAccounts(prev => [...prev, newAccount]);
+      // Convert component BankAccount to database BankAccount format
+      const dbAccount: Omit<DBBankAccount, "id" | "user_id" | "created_at" | "updated_at"> = {
+        account_holder_name: account.accountName,
+        bank_name: account.bankName,
+        account_number: account.accountNumber,
+        account_type: 'checking',
+        currency: account.currency,
+        is_default: account.isDefault,
+        is_verified: false
+      };
+      
+      const newDbAccount = await transactionService.addBankAccount(dbAccount);
+      setBankAccounts(prev => [...prev, mapBankAccount(newDbAccount)]);
     } catch (error: any) {
       console.error('Error adding bank account:', error);
       setError(error.message || 'Failed to add bank account');
@@ -204,14 +225,14 @@ export const BuyerPayments = (): JSX.Element => {
     }
   };
 
-  const handlePaymentMethodSelect = async (method: 'wallet' | 'paystack', details?: any) => {
+  const handlePaymentMethodSelect = async (method: 'wallet' | 'paystack', _details?: any) => {
     if (!selectedTaskForPayment || !user) return;
 
     try {
       const amountNum = parseFloat(selectedTaskForPayment.amount.replace(/[₦,]/g, ''));
       
       const paymentRequest = {
-        taskId: selectedTaskForPayment.id,
+        taskId: Number(selectedTaskForPayment.id),
         amount: amountNum,
         currency: 'NGN',
         buyerId: user.id,
@@ -368,7 +389,7 @@ export const BuyerPayments = (): JSX.Element => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header title="Payments" userName="Demo Client" userType="buyer" />
+        <Header title="Payments" userType="buyer" />
 
         {/* Payments Content */}
         <main className="flex-1 p-6">
@@ -465,23 +486,32 @@ export const BuyerPayments = (): JSX.Element => {
                     </div>
               </div>
 
-                  {/* Payment Methods & Wallet - 40% width (2 columns) */}
-                  <div className="col-span-2">
+                  {/* Right Column - Payment Methods & Wallet */}
+                  <div className="col-span-2 space-y-6">
+                    {/* Wallet Section - Top of right column */}
+                    {walletData && (
+                      <Card className="shadow-sm">
+                        <CardContent className="p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Wallet</h3>
+                          <Wallet
+                            balance={walletData.balance}
+                            address={walletData.address}
+                            currency={walletData.currency}
+                          />
+                        </CardContent>
+                        <CardContent className="p-6">
+                       {/* Payment Methods Section */}
                     <PaymentMethods
                       bankAccounts={bankAccounts}
                       onAddBankAccount={handleAddBankAccount}
                       onSetDefault={handleSetDefault}
                       onRemoveAccount={handleRemoveAccount}
-                    />
-                    
-                    {/* My Wallet Section */}
-                    {walletData && (
-                      <Wallet
-                        balance={walletData.balance}
-                        address={walletData.address}
-                        currency={walletData.currency}
-                      />
+                    /></CardContent>
+                      </Card>
                     )}
+                    
+                 
+               
               </div>
             </div>
               </>
