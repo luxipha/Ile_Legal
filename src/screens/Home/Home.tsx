@@ -1,4 +1,5 @@
 // React is used implicitly for JSX
+import { useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Separator } from "../../components/ui/separator";
@@ -9,6 +10,25 @@ import { useAuth } from "../../contexts/AuthContext";
 export const Home = (): JSX.Element => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Initialize Trustpilot widget
+  useEffect(() => {
+    // Check if Trustpilot script is loaded and initialize widgets
+    if (typeof window !== 'undefined' && (window as any).Trustpilot) {
+      (window as any).Trustpilot.loadFromElement(document.querySelector('.trustpilot-widget'));
+    } else {
+      // If script hasn't loaded yet, wait and try again
+      const checkTrustpilot = setInterval(() => {
+        if ((window as any).Trustpilot) {
+          (window as any).Trustpilot.loadFromElement(document.querySelector('.trustpilot-widget'));
+          clearInterval(checkTrustpilot);
+        }
+      }, 100);
+      
+      // Clear interval after 10 seconds to prevent infinite checking
+      setTimeout(() => clearInterval(checkTrustpilot), 10000);
+    }
+  }, []);
   
   const handleLogout = async () => {
     try {
@@ -289,6 +309,23 @@ export const Home = (): JSX.Element => {
                 professionals for property due diligence and compliance tasks.
               </p>
               
+              {/* Trustpilot Widget */}
+              <div className="mb-8">
+                <div 
+                  className="trustpilot-widget" 
+                  data-locale="en-US" 
+                  data-template-id="56278e9abfbbba0bdcd568bc" 
+                  data-businessunit-id="685fa67e885e63ea1c7b9d0e" 
+                  data-style-height="52px" 
+                  data-style-width="100%"
+                  style={{ minHeight: '52px', borderRadius: '4px', padding: '8px' }}
+                >
+                  <a href="https://www.trustpilot.com/review/ile.africa" target="_blank" rel="noopener" className="text-gray-300 text-sm">
+                    ⭐ View our reviews on Trustpilot
+                  </a>
+                </div>
+              </div>
+              
               {/* Social Media Links */}
               <div className="flex gap-4">
                 <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
@@ -338,17 +375,17 @@ export const Home = (): JSX.Element => {
                 <div className="flex items-start gap-3">
                   <div className="w-5 h-5 mt-1">📍</div>
                   <div>
-                    <p>123 Legal Square,</p>
-                    <p>Victoria Island, Lagos</p>
+                    <p>33 Adeyinka Street,</p>
+                    <p>Ileupju, Lagos</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-5 h-5">📞</div>
-                  <p>+2341234567890</p>
+                  <p>+2347068849553</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-5 h-5">✉️</div>
-                  <p>contact@ilelegal.com</p>
+                  <p>legal@ile.africa</p>
                 </div>
               </div>
             </div>
