@@ -122,12 +122,15 @@ export const BuyerPayments = (): JSX.Element => {
   const mapGigStatusToTaskStatus = (gigStatus: string): Task['status'] => {
     switch (gigStatus) {
       case 'completed':
+      case 'paid':
+      
         return 'Completed';
       case 'assigned':
       case 'in_progress':
         return 'In Progress';
       case 'active':
       case 'open':
+      case 'pending_payment':
         return 'Pending Payment';
       case 'cancelled':
         return 'Cancelled';
@@ -139,12 +142,14 @@ export const BuyerPayments = (): JSX.Element => {
   const getStatusColor = (gigStatus: string): string => {
     switch (gigStatus) {
       case 'completed':
+      case 'paid':
         return 'bg-green-100 text-green-800';
       case 'assigned':
       case 'in_progress':
         return 'bg-blue-100 text-blue-800';
       case 'active':
       case 'open':
+      case 'pending_payment':
         return 'bg-yellow-100 text-yellow-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
@@ -154,7 +159,7 @@ export const BuyerPayments = (): JSX.Element => {
   };
 
   // Calculate totals from real data
-  const completedTasks = tasks.filter(task => task.status === "Completed");
+  const completedTasks = tasks.filter(task => task.status === "Completed" || task.status === "Pending Payment");
   const pendingTasks = tasks.filter(task => task.status === "Pending Payment");
   const totalSpent = completedTasks.reduce((sum, task) => sum + parseInt(task.amount.replace(/[₦,]/g, "")), 0);
   const pendingAmount = pendingTasks.reduce((sum, task) => sum + parseInt(task.amount.replace(/[₦,]/g, "")), 0);
@@ -328,6 +333,7 @@ export const BuyerPayments = (): JSX.Element => {
   };
 
   const renderTaskCard = (task: Task) => (
+    console.log('task', task),
     <Card key={task.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow">
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">

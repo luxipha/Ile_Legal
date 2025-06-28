@@ -5,6 +5,7 @@ import { Separator } from "../../components/ui/separator";
 import { CheckCircleIcon, ClockIcon, LockIcon, ArrowRightIcon, LogOutIcon } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useEffect } from 'react';
 
 export const Home = (): JSX.Element => {
   const { user, logout } = useAuth();
@@ -33,10 +34,21 @@ export const Home = (): JSX.Element => {
     }
   };
 
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="w-full bg-[#282536] border-b border-gray-700 py-4">
+        
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
@@ -105,6 +117,7 @@ export const Home = (): JSX.Element => {
       {/* Hero Section */}
       <section className="w-full py-20 bg-[#1B1828]">
         <div className="max-w-7xl mx-auto px-6 text-center">
+          <img src="/20250628-095507.jpg" alt="Hero" width={210} height={140} className="mx-auto mb-6" />
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
             Simplifying Legal Due Diligence
             <br />
@@ -288,7 +301,11 @@ export const Home = (): JSX.Element => {
                 Connecting property developers and investors with verified legal 
                 professionals for property due diligence and compliance tasks.
               </p>
-              
+              {/* TrustBox widget - Review Collector */}
+              <div className="trustpilot-widget" data-locale="en-US" data-template-id="56278e9abfbbba0bdcd568bc" data-businessunit-id="685fa67e885e63ea1c7b9d0e" data-style-height="52px" data-style-width="100%">
+                <a href="https://www.trustpilot.com/review/ile.africa" target="_blank" rel="noopener">Trustpilot</a>
+              </div>
+              {/* End TrustBox widget */}
               {/* Social Media Links */}
               <div className="flex gap-4">
                 <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
@@ -308,7 +325,7 @@ export const Home = (): JSX.Element => {
                 </a>
                 <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.174-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.402.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.357-.629-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24.009 12.017 24c6.624 0 11.99-5.367 11.99-11.987C24.007 5.367 18.641.001 12.017.001z"/>
+                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.174-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 2.567-1.645 0-2.063-1.32-2.402-2.34-.201z"/>
                   </svg>
                 </a>
                 <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">

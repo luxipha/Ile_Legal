@@ -183,6 +183,7 @@ export const formatStatus = {
     
     switch (normalizedStatus) {
       case 'completed':
+      case 'pending_payment':
         return {
           text: 'Completed',
           className: 'bg-green-100 text-green-800'

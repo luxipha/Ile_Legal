@@ -1030,7 +1030,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                       />
                     ) : null}
                     <span className={buyerAvatar.startsWith('http') ? 'hidden' : ''}>
-                      {buyerAvatar.charAt(0).toUpperCase()}
+                      {buyerName && buyerName.length > 0 ? buyerName.charAt(0).toUpperCase() : ''}
                     </span>
                   </>
                 ) : (
