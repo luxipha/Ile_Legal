@@ -46,14 +46,6 @@ export const Home = (): JSX.Element => {
               Marketplace
             </div>
           </div>
-
-          <nav className="hidden md:flex items-center gap-8">
-            <a href="#" className="text-gray-300 hover:text-white text-sm font-medium">Home</a>
-            <a href="#" className="text-gray-300 hover:text-white text-sm font-medium">Services</a>
-            <a href="#" className="text-gray-300 hover:text-white text-sm font-medium">About</a>
-            <a href="#" className="text-gray-300 hover:text-white text-sm font-medium">Contact</a>
-          </nav>
-
           <div className="flex items-center gap-4">
             {user ? (
               <>
