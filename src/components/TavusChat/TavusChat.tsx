@@ -70,7 +70,7 @@ export const TavusChat: React.FC<TavusChatProps> = ({ className = '' }) => {
       setError(null);
 
       console.log('Initializing Tavus conversation with config:', {
-        apiKey: TAVUS_CONFIG.apiKey.substring(0, 8) + '...',
+        apiKey: TAVUS_CONFIG.apiKey ? TAVUS_CONFIG.apiKey.substring(0, 8) + '...' : 'Not configured',
         personaId: TAVUS_CONFIG.personaId,
         baseUrl: TAVUS_CONFIG.baseUrl
       });
