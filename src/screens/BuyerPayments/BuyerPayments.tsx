@@ -64,6 +64,10 @@ export const BuyerPayments = (): JSX.Element => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
+  const [totalSpent, setTotalSpent] = useState(0);
+  const [pendingAmount, setPendingAmount] = useState(0);
+  const [completedTasks, setCompletedTasks] = useState<number>(0);
+  const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
 
   // Load all data
   useEffect(() => {
@@ -119,6 +123,24 @@ export const BuyerPayments = (): JSX.Element => {
         });
         setTasks(formattedTasks);
 
+        // Calculate total spent from paid gigs
+        const paidGigs = userGigs.filter(gig => gig.status === 'paid');
+        const calculatedTotalSpent = paidGigs.reduce((sum, gig) => {
+          const acceptedBid = gig.bids_data?.find((bid: any) => bid.status === 'accepted');
+          return sum + (acceptedBid?.amount || 0);
+        }, 0);
+
+        // Calculate totals from real data
+        const calculatedCompletedTasks = paidGigs.length;
+        const calculatedPendingTasks = formattedTasks.filter(task => task.status === "Pending Payment");
+        const calculatedPendingAmount = calculatedPendingTasks.reduce((sum, task) => sum + parseInt(task.amount.replace(/[₦,]/g, "")), 0);
+
+        // Set state for totals
+        setTotalSpent(calculatedTotalSpent);
+        setPendingAmount(calculatedPendingAmount);
+        setCompletedTasks(calculatedCompletedTasks);
+        setPendingTasks(calculatedPendingTasks);
+
       } catch (error: any) {
         console.error('Error loading payment data:', error);
         setError(error.message || 'Failed to load payment data');
@@ -169,12 +191,6 @@ export const BuyerPayments = (): JSX.Element => {
         return 'bg-gray-100 text-gray-800';
     }
   };
-
-  // Calculate totals from real data
-  const completedTasks = tasks.filter(task => task.status === "Completed" || task.status === "Pending Payment");
-  const pendingTasks = tasks.filter(task => task.status === "Pending Payment");
-  const totalSpent = completedTasks.reduce((sum, task) => sum + parseInt(task.amount.replace(/[₦,]/g, "")), 0);
-  const pendingAmount = pendingTasks.reduce((sum, task) => sum + parseInt(task.amount.replace(/[₦,]/g, "")), 0);
 
   // Format transactions for display
   const formattedTransactions = transactions.map(transaction => ({
@@ -446,7 +462,7 @@ export const BuyerPayments = (): JSX.Element => {
                         <h3 className="text-white text-sm font-medium mb-2">Total Amount Spent</h3>
                         <div className="text-3xl font-bold text-white mb-4">₦{totalSpent.toLocaleString()}</div>
                         <div className="text-sm text-gray-300">
-                          {completedTasks.length} completed projects
+                          {completedTasks} completed projects
                         </div>
                       </div>
                     </CardContent>
@@ -470,9 +486,9 @@ export const BuyerPayments = (): JSX.Element => {
                     <CardContent className="p-6">
                       <div>
                         <h3 className="text-gray-600 text-sm font-medium mb-2">Completed Payments</h3>
-                        <div className="text-3xl font-bold text-gray-900 mb-4">{completedTasks.length}</div>
+                        <div className="text-3xl font-bold text-gray-900 mb-4">{completedTasks}</div>
                         <div className="text-sm text-gray-600">
-                          This month: {completedTasks.filter(task => new Date(task.date.split('/').reverse().join('-')) >= new Date(new Date().getFullYear(), new Date().getMonth(), 1)).length}
+                          This month: {completedTasks}
                         </div>
                       </div>
                     </CardContent>
