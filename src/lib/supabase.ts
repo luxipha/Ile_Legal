@@ -55,20 +55,15 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Local Supabase configuration for development
-// DEBUG: Force remote connection - no fallback to localhost
-console.log('🔍 ENV DEBUG:')
-console.log('Raw VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL)
-console.log('Raw VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Not set')
-console.log('Raw VITE_SUPABASE_SERVICE_ROLE_KEY:', import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set')
-
+// Supabase environment configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
-console.log('🌐 FINAL CONFIG:')
-console.log('Supabase URL:', supabaseUrl)
-console.log('Supabase Key:', supabaseAnonKey ? 'Set' : 'Not set')
-console.log('Service Role Key:', serviceRoleKey ? 'Set' : 'Not set')
+// Development environment logging
+if (import.meta.env.DEV) {
+  console.log('Supabase configured:', !!supabaseUrl && !!supabaseAnonKey)
+}
 
 // Create Supabase client with additional options to handle CORS  
 // Use anon key for frontend, service role only for admin operations

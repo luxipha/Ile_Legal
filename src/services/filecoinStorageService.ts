@@ -9,10 +9,10 @@ import { ipfsService, IPFSUploadResult } from './ipfsService';
 import { supabase } from '../lib/supabase';
 
 // Environment variable validation
-const WEB3_STORAGE_DID = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_WEB3_STORAGE_DID : process.env.VITE_WEB3_STORAGE_DID) || '';
-const WEB3_STORAGE_PRIVATE_KEY = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_WEB3_STORAGE_PRIVATE_KEY : process.env.VITE_WEB3_STORAGE_PRIVATE_KEY) || '';
-const WEB3_STORAGE_SPACE_DID = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_WEB3_STORAGE_SPACE_DID : process.env.VITE_WEB3_STORAGE_SPACE_DID) || '';
-const FILECOIN_ENABLED = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_FILECOIN_ENABLED : process.env.VITE_FILECOIN_ENABLED) === 'true';
+const WEB3_STORAGE_DID = import.meta.env.VITE_WEB3_STORAGE_DID || '';
+const WEB3_STORAGE_PRIVATE_KEY = import.meta.env.VITE_WEB3_STORAGE_PRIVATE_KEY || '';
+const WEB3_STORAGE_SPACE_DID = import.meta.env.VITE_WEB3_STORAGE_SPACE_DID || '';
+const FILECOIN_ENABLED = import.meta.env.VITE_FILECOIN_ENABLED === 'true';
 
 // Enhanced error types
 export class FilecoinStorageError extends Error {

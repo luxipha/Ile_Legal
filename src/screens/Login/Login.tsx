@@ -224,7 +224,7 @@ export const Login = (): JSX.Element => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left Section - Sign In Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="w-2/5 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-8">
@@ -393,8 +393,8 @@ export const Login = (): JSX.Element => {
         </div>
       </div>
 
-      {/* Right Section - Tavus AI Video Chat */}
-      <div className="w-1/2 bg-gradient-to-br from-[#1B1828] to-[#2a2438] flex items-center justify-center p-8">
+      {/* Right Section - Tavus AI Video Chat - 25% Bigger */}
+      <div className="w-3/5 bg-gradient-to-br from-[#1B1828] to-[#2a2438] flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <TavusChat className="w-full" />
         </div>
