@@ -93,18 +93,30 @@ export const BuyerPayments = (): JSX.Element => {
 
         // Load user's gigs (convert to tasks format)
         const userGigs = await api.gigs.getMyGigs(user.id);
-        const formattedTasks = userGigs.map(gig => ({
-          id: gig.id,
-          title: gig.title,
-          provider: gig.assigned_seller_name || 'Unassigned',
-          providerAvatar: gig.assigned_seller_name?.split(' ').map((n: string) => n[0]).join('') || 'U',
-          amount: `₦${gig.budget.toLocaleString()}`,
-          status: mapGigStatusToTaskStatus(gig.status),
-          statusColor: getStatusColor(gig.status),
-          date: new Date(gig.created_at).toLocaleDateString('en-GB'),
-          description: gig.description,
-          category: gig.category
-        }));
+        console.log('userGigs:', userGigs);
+        const formattedTasks = userGigs.map(gig => {
+          // Find the accepted bid to get seller information
+          const acceptedBid = gig.bids_data?.find((bid: any) => bid.status === 'accepted');
+          const sellerName = acceptedBid?.seller 
+            ? `${acceptedBid.seller.first_name} ${acceptedBid.seller.last_name}`.trim()
+            : 'Unassigned';
+          const sellerAvatar = acceptedBid?.seller?.avatar_url 
+            ? acceptedBid.seller.avatar_url 
+            : sellerName.charAt(0).toUpperCase();
+          
+          return {
+            id: gig.id,
+            title: gig.title,
+            provider: sellerName,
+            providerAvatar: sellerAvatar,
+            amount: `₦${acceptedBid?.amount?.toLocaleString() || gig.budget.toLocaleString()}`,
+            status: mapGigStatusToTaskStatus(gig.status),
+            statusColor: getStatusColor(gig.status),
+            date: new Date(gig.created_at).toLocaleDateString('en-GB'),
+            description: gig.description,
+            category: gig.categories?.[0] || 'General'
+          };
+        });
         setTasks(formattedTasks);
 
       } catch (error: any) {
@@ -360,8 +372,31 @@ export const BuyerPayments = (): JSX.Element => {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-xs font-medium">
-              {task.providerAvatar}
+            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-xs font-medium overflow-hidden">
+              {task.providerAvatar && (
+                task.providerAvatar.startsWith('http://') ||
+                task.providerAvatar.startsWith('https://') ||
+                task.providerAvatar.startsWith('data:image/')
+              ) ? (
+                <img 
+                  src={task.providerAvatar} 
+                  alt={task.provider}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to initials if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <span className={`${task.providerAvatar && (
+                task.providerAvatar.startsWith('http://') ||
+                task.providerAvatar.startsWith('https://') ||
+                task.providerAvatar.startsWith('data:image/')
+              ) ? 'hidden' : ''} w-full h-full flex items-center justify-center`}>
+                {task.providerAvatar || task.provider.charAt(0).toUpperCase()}
+              </span>
             </div>
             <span className="text-sm text-gray-700">{task.provider}</span>
           </div>
@@ -569,7 +604,30 @@ export const BuyerPayments = (): JSX.Element => {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Provider</h3>
                         <div className="flex items-center gap-4 mb-4">
                           <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium">
-                            {selectedTask.providerAvatar}
+                            {selectedTask.providerAvatar && (
+                              selectedTask.providerAvatar.startsWith('http://') ||
+                              selectedTask.providerAvatar.startsWith('https://') ||
+                              selectedTask.providerAvatar.startsWith('data:image/')
+                            ) ? (
+                              <img 
+                                src={selectedTask.providerAvatar} 
+                                alt={selectedTask.provider}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to initials if image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <span className={`${selectedTask.providerAvatar && (
+                              selectedTask.providerAvatar.startsWith('http://') ||
+                              selectedTask.providerAvatar.startsWith('https://') ||
+                              selectedTask.providerAvatar.startsWith('data:image/')
+                            ) ? 'hidden' : ''} w-full h-full flex items-center justify-center`}>
+                              {selectedTask.providerAvatar || selectedTask.provider.charAt(0).toUpperCase()}
+                            </span>
                           </div>
                           <div>
                             <h4 className="font-medium text-gray-900">{selectedTask.provider}</h4>

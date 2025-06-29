@@ -76,7 +76,7 @@ export const SellerSidebar: React.FC<SellerSidebarProps> = ({
               }`}
             >
               <GavelIcon className="w-5 h-5" />
-              Active Bids
+              My Bids
             </Link>
           </li>
           <li>

@@ -143,7 +143,7 @@ export const api = {
       return data;
     },
 
-    getActiveBids: async (userId?: string) => {
+    getBidsByStatus: async (userId?: string, statuses: string[] = ['pending', 'accepted']) => {
       // If userId is provided, use it; otherwise try to get from Supabase auth
       let sellerId = userId;
       
@@ -165,7 +165,25 @@ export const api = {
           )
         `)
         .eq('seller_id', sellerId)
-        .in('status', ['pending', 'accepted'])
+        .in('status', statuses)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    },
+
+    getAllBids: async (userId: string) => {
+      const { data, error } = await supabase
+        .from('Bids')
+        .select(`
+          *,
+          buyer:Profiles!buyer_id(*),
+          gig:Gigs!gig_id(*)
+        `)
+        .eq('seller_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -461,7 +479,24 @@ export const api = {
 
       let query = supabase
         .from("Gigs")
-        .select("*")
+        .select(`
+          *,
+          bids_data:Bids(
+            id,
+            seller_id,
+            amount,
+            description,
+            status,
+            created_at,
+            seller:Profiles!seller_id(
+              id,
+              first_name,
+              last_name,
+              avatar_url,
+              bio
+            )
+          )
+        `)
         .eq('buyer_id', userId);
 
       // Apply category filter if provided

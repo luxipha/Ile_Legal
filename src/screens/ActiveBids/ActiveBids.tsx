@@ -58,6 +58,9 @@ interface Bid {
     bio?: string;
     email?: string;
   };
+  gig?: {
+    status: string;
+  };
 }
 
 export const ActiveBids = (): JSX.Element => {
@@ -80,19 +83,20 @@ export const ActiveBids = (): JSX.Element => {
     fetchActiveBids();
   }, []);
 
+  // Fetch gig data when in view-details mode
+  useEffect(() => {
+    if (viewMode === "view-details" && selectedBid?.gig_id) {
+      fetchGigData(selectedBid.gig_id);
+      fetchGigBids(selectedBid.gig_id);
+    }
+  }, [viewMode, selectedBid?.gig_id]);
+
   // Fetch bids for specific gig when in view-details mode and bids tab is active
   useEffect(() => {
     if (viewMode === "view-details" && activeTab === "bids" && selectedBid?.gig_id) {
       fetchGigBids(selectedBid.gig_id);
     }
   }, [viewMode, activeTab, selectedBid?.gig_id]);
-
-  // Fetch gig data when in view-details mode
-  useEffect(() => {
-    if (viewMode === "view-details" && selectedBid?.gig_id) {
-      fetchGigData(selectedBid.gig_id);
-    }
-  }, [viewMode, selectedBid?.gig_id]);
 
   // Fetch buyer rating when gig data is available
   useEffect(() => {
@@ -128,31 +132,16 @@ export const ActiveBids = (): JSX.Element => {
 
     try {
       setLoading(true);
-      const bids = await api.bids.getActiveBids(user.id);
+      const bids = await api.bids.getAllBids(user.id);
       
-      // Fetch gig data for each bid to get deadlines
-      const bidsWithGigData = await Promise.all(
-        bids.map(async (bid) => {
-          try {
-            const gigData = await api.gigs.getGigById(bid.gig_id);
-            console.log('gigData:', gigData);
-            return {
-              ...bid,
-              gigDeadline: gigData?.deadline,
-              gigBudget: gigData?.budget,
-              previousBid: bid.previous_amount,
-              deliveryTime: bid.delivery_time
-            };
-          } catch (error) {
-            console.error(`Error fetching gig data for bid ${bid.id}:`, error);
-            return {
-              ...bid,
-              gigDeadline: null,
-              gigBudget: null
-            };
-          }
-        })
-      );
+      // Transform the data to match the expected format
+      const bidsWithGigData = bids.map((bid) => ({
+        ...bid,
+        gigDeadline: bid.gig?.deadline,
+        gigBudget: bid.gig?.budget,
+        previousBid: bid.previous_amount,
+        deliveryTime: bid.delivery_time
+      }));
       
       setActiveBids(bidsWithGigData);
       setError(null);
@@ -619,17 +608,7 @@ export const ActiveBids = (): JSX.Element => {
                       <h3 className="text-xl font-semibold text-gray-900 mb-4">Description</h3>
                       <p className="text-gray-600 mb-6 leading-relaxed">{selectedBid.description}</p>
                       
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">The verification should include:</h4>
-                      <ol className="list-decimal list-inside space-y-2 text-gray-600 mb-6">
-                        {selectedBid.requirements?.map((req, index) => (
-                          <li key={index}>{req}</li>
-                        ))}
-                      </ol>
                       
-                      <p className="text-gray-600">
-                        The property is a 1,000 sqm commercial plot with existing development. 
-                        All necessary documents will be provided upon assignment.
-                      </p>
                     </div>
                   )}
 
@@ -648,13 +627,26 @@ export const ActiveBids = (): JSX.Element => {
                                     Your Bid
                                   </span>
                                 )}
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${bid.statusColor || 
-                                  bid.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                  bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                  'bg-red-100 text-red-800'
-                                }`}>
-                                  {bid.status}
-                                </span>
+                                <div className="mb-4 flex gap-2">
+                                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                                    bid.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {"Bid " + bid.status.charAt(0).toUpperCase() + bid.status.slice(1)}
+                                  </span>
+                                  {bid.gig?.status && (
+                                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                                      bid.gig.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                                      bid.gig.status === 'active' ? 'bg-green-100 text-green-800' :
+                                      bid.gig.status === 'completed' ? 'bg-purple-100 text-purple-800' :
+                                      bid.gig.status === 'suspended' ? 'bg-red-100 text-red-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {"Gig " + bid.gig.status.charAt(0).toUpperCase() + bid.gig.status.slice(1)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               
                               <div className="flex items-start gap-4 mb-4">
@@ -839,14 +831,25 @@ export const ActiveBids = (): JSX.Element => {
                   <Card key={bid.id} className="bg-white border border-gray-200 shadow-sm">
                     <CardContent className="p-6">
                       {/* Status Badge */}
-                      <div className="mb-4">
+                      <div className="mb-4 flex gap-2">
                         <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
                           bid.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                           bid.status === 'accepted' ? 'bg-green-100 text-green-800' :
                           'bg-red-100 text-red-800'
                         }`}>
-                          {bid.status.charAt(0).toUpperCase() + bid.status.slice(1)}
+                          {"Bid " + bid.status.charAt(0).toUpperCase() + bid.status.slice(1)}
                         </span>
+                        {bid.gig?.status && (
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                            bid.gig.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                            bid.gig.status === 'active' ? 'bg-green-100 text-green-800' :
+                            bid.gig.status === 'completed' ? 'bg-purple-100 text-purple-800' :
+                            bid.gig.status === 'suspended' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {"Gig " + bid.gig.status.charAt(0).toUpperCase() + bid.gig.status.slice(1)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Bid Title */}

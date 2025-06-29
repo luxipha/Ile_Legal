@@ -85,7 +85,7 @@ export const SellerDashboard = (): JSX.Element => {
     const loadAvailableGigs = async () => {
       setLoadingGigs(true);
       try {
-        const gigs = await api.gigs.getAllGigs();
+        const gigs = await api.gigs.getAllGigs({status: "pending"});
         // Convert API gigs to SellerGig format
         const formattedGigs: SellerGig[] = await Promise.all(gigs.map(async (gig: any) => {
           // Get average rating for the buyer
@@ -152,11 +152,10 @@ export const SellerDashboard = (): JSX.Element => {
       
       setLoadingOngoing(true);
       try {
-        // Get the seller's active bids (pending and accepted)
-        const activeBids = await api.bids.getActiveBids(user.id);
+        // Get the seller's accepted bids
+        const acceptedBids = await api.bids.getBidsByStatus(user.id, ["accepted"]);
         
-        // Filter for accepted bids only
-        const acceptedBids = activeBids.filter((bid: any) => bid.status === 'accepted');
+        
         
         // Fetch gig data for each accepted bid
         const ongoingGigsWithData = await Promise.all(
@@ -203,7 +202,7 @@ export const SellerDashboard = (): JSX.Element => {
             try {
               const gigData = await api.gigs.getGigById(bid.gig_id);
               // Only include if the gig status is completed
-              if (["completed", "pending_payment"].includes(gigData.status?.toLowerCase())) {
+              if (["completed", "pending_payment", "paid"].includes(gigData.status?.toLowerCase())) {
                 return {
                   bid: bid,
                   gig: gigData
@@ -250,7 +249,7 @@ export const SellerDashboard = (): JSX.Element => {
       
       setLoadingActiveBids(true);
       try {
-        const bids = await api.bids.getActiveBids(user.id);
+        const bids = await api.bids.getBidsByStatus(user.id, ["pending"]);
         setActiveBids(bids);
       } catch (error) {
         console.error('Error loading active bids:', error);
@@ -917,7 +916,7 @@ export const SellerDashboard = (): JSX.Element => {
                     <GavelIcon className="w-6 h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Active Bids</div>
+                    <div className="text-sm text-gray-600">Pending Bids</div>
                     <div className="text-2xl font-bold text-gray-900">{activeBids.length}</div>
                   </div>
                 </div>
@@ -1016,7 +1015,7 @@ export const SellerDashboard = (): JSX.Element => {
               {/* Your Active Bids */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-900">Your Active Bids</h3>
+                  <h3 className="text-xl font-semibold text-gray-900">Your Pending Bids</h3>
                   {activeBids.length > 1 && (
                     <Link to="/active-bids" className="text-gray-400 hover:text-gray-600">
                       <ChevronRightIcon className="w-5 h-5" />
@@ -1031,7 +1030,7 @@ export const SellerDashboard = (): JSX.Element => {
                   </div>
                 ) : activeBids.length === 0 ? (
                   <div className="text-center py-8">
-                    <p className="text-gray-600">No active bids</p>
+                    <p className="text-gray-600">No pending bids</p>
                     <p className="text-sm text-gray-400 mt-2">Place bids on available gigs to see them here</p>
                   </div>
                 ) : (
@@ -1082,7 +1081,7 @@ export const SellerDashboard = (): JSX.Element => {
               {/* Ongoing Gigs */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-900">Ongoing Gigs</h3>
+                  <h3 className="text-xl font-semibold text-gray-900">Jobs</h3>
                   {ongoingGigs.length > 1 && (
                     <Link to="/seller-gigs?tab=ongoing" className="text-gray-400 hover:text-gray-600">
                       <ChevronRightIcon className="w-5 h-5" />
