@@ -92,7 +92,7 @@ export const BuyerPayments = (): JSX.Element => {
         setTransactions(userTransactions);
 
         // Load user's gigs (convert to tasks format)
-        const userGigs = await api.gigs.getMyGigs(user.id);
+        const userGigs = await api.gigs.getMyGigs(user.id, {status: "pending_payment"});
         console.log('userGigs:', userGigs);
         const formattedTasks = userGigs.map(gig => {
           // Find the accepted bid to get seller information
