@@ -142,7 +142,7 @@ export const BuyerDashboard = (): JSX.Element => {
               ...gig,
               status: gig.status?.toLowerCase() === "pending" ? "Open" : gig.status, // Display "Open" for pending
               statusColor: gig.status?.toLowerCase() === "pending" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800",
-              bidsReceived: gig.bidsReceived || 0,
+              bidsReceived: gig.bids_data?.length || 0,
               budget: gig.budget,
               deadline: gig.deadline,
               postedDate: gig.postedDate || "",

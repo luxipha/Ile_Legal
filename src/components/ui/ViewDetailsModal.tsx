@@ -158,17 +158,7 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({
                   <h3 className="text-xl font-semibold text-gray-900 mb-4">Description</h3>
                   <p className="text-gray-600 mb-6 leading-relaxed">{gig.description}</p>
                   
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">The verification should include:</h4>
-                  <ol className="list-decimal list-inside space-y-2 text-gray-600 mb-6">
-                    {gig.requirements.map((req, index) => (
-                      <li key={index}>{req}</li>
-                    ))}
-                  </ol>
                   
-                  <p className="text-gray-600">
-                    The property is a 1,000 sqm commercial plot with existing development. 
-                    All necessary documents will be provided upon assignment.
-                  </p>
                 </div>
               )}
 
