@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
-import { WalletIcon, CreditCardIcon, XIcon } from "lucide-react";
+import { WalletIcon, CreditCardIcon, XIcon, ArrowRightIcon } from "lucide-react";
+import { currencyConversionService, ConversionResult } from "../../services/currencyConversionService";
 
 interface PaymentMethodModalProps {
   isOpen: boolean;
@@ -25,6 +26,28 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   hasWallet
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'wallet' | 'paystack' | null>(null);
+  const [conversion, setConversion] = useState<ConversionResult | null>(null);
+  const [loadingConversion, setLoadingConversion] = useState(false);
+
+  // Calculate conversion when component loads
+  useEffect(() => {
+    if (isOpen) {
+      calculateConversion();
+    }
+  }, [isOpen, amount]);
+
+  const calculateConversion = async () => {
+    try {
+      setLoadingConversion(true);
+      const amountNum = parseFloat(amount.replace(/[₦,]/g, ''));
+      const conversionResult = await currencyConversionService.convertNgnToUsdc(amountNum);
+      setConversion(conversionResult);
+    } catch (error) {
+      console.error('Conversion calculation failed:', error);
+    } finally {
+      setLoadingConversion(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -51,7 +74,9 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
 
   const walletBalanceNum = parseFloat(walletBalance);
   const amountNum = parseFloat(amount.replace(/[₦,]/g, ''));
-  const hasEnoughBalance = walletBalanceNum >= amountNum;
+  // Check balance against converted USDC amount
+  const requiredUsdcAmount = conversion?.totalAmount || 0;
+  const hasEnoughBalance = walletBalanceNum >= requiredUsdcAmount;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -73,7 +98,30 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
           {/* Payment Details */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium text-gray-900 mb-2">{taskTitle}</h3>
-            <div className="text-2xl font-bold text-gray-900">{amount}</div>
+            <div className="text-2xl font-bold text-gray-900 mb-3">{amount}</div>
+            
+            {/* Currency Conversion Info */}
+            {conversion && (
+              <div className="border-t pt-3 mt-3">
+                <div className="text-sm text-gray-600 mb-2">Wallet Payment Conversion:</div>
+                <div className="flex items-center justify-between text-sm">
+                  <span>₦{conversion.originalAmount.toLocaleString()}</span>
+                  <ArrowRightIcon className="w-4 h-4 text-gray-400" />
+                  <span className="font-medium">${conversion.convertedAmount} USDC</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                  <span>Conversion fee: ${conversion.fee} USDC</span>
+                  <span className="font-medium">Total: ${conversion.totalAmount} USDC</span>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  Rate: 1 USDC = ₦{conversion.exchangeRate.toLocaleString()}
+                </div>
+              </div>
+            )}
+            
+            {loadingConversion && (
+              <div className="text-sm text-gray-500 mt-2">Calculating conversion...</div>
+            )}
           </div>
 
           {/* Payment Methods */}
@@ -98,8 +146,16 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                       <div className="text-sm text-gray-600">
                         <div>Balance: ${walletBalance} USDC</div>
                         <div>Address: {formatWalletAddress(walletAddress || '')}</div>
+                        {conversion && (
+                          <div className="text-xs text-blue-600 mt-1">
+                            Required: ${conversion.totalAmount} USDC (includes fee)
+                          </div>
+                        )}
                         {!hasEnoughBalance && (
-                          <div className="text-red-600 font-medium mt-1">Insufficient balance</div>
+                          <div className="text-red-600 font-medium mt-1">
+                            Insufficient balance
+                            {conversion && ` (need $${(requiredUsdcAmount - walletBalanceNum).toFixed(6)} more)`}
+                          </div>
                         )}
                       </div>
                     ) : (

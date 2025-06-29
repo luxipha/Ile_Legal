@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { getUserWalletData } from './unifiedWalletService';
 import { SettingsService } from './settingsService';
+import { currencyConversionService, ConversionResult } from './currencyConversionService';
 
 export interface PaymentRequest {
   taskId: number;
@@ -19,6 +20,7 @@ export interface PaymentResponse {
   message: string;
   useInline?: boolean; // For Paystack inline payments
   inlineConfig?: PaystackInlineConfig; // Configuration for inline payment
+  conversion?: ConversionResult; // Currency conversion details
 }
 
 export interface PaystackInlineConfig {
@@ -81,9 +83,31 @@ class PaymentIntegrationService {
         throw new Error('No wallet connected for this user');
       }
 
+      // Handle currency conversion for NGN to USDC
+      let actualAmount = paymentRequest.amount;
+      let conversion: ConversionResult | undefined;
+      let paymentCurrency = paymentRequest.currency;
+
+      if (paymentRequest.currency === 'NGN') {
+        // Convert NGN to USDC for wallet payment
+        conversion = await currencyConversionService.convertNgnToUsdc(paymentRequest.amount);
+        actualAmount = conversion.totalAmount; // Include conversion fee
+        paymentCurrency = 'USDC';
+        
+        console.log('Currency conversion:', {
+          original: `₦${paymentRequest.amount.toLocaleString()}`,
+          converted: `$${conversion.convertedAmount} USDC`,
+          fee: `$${conversion.fee} USDC`,
+          total: `$${conversion.totalAmount} USDC`,
+          rate: `1 USDC = ₦${conversion.exchangeRate.toLocaleString()}`
+        });
+      }
+
       const walletBalance = parseFloat(walletData.balance);
-      if (walletBalance < paymentRequest.amount) {
-        throw new Error('Insufficient wallet balance');
+      if (walletBalance < actualAmount) {
+        const requiredBalance = currencyConversionService.formatCurrency(actualAmount, paymentCurrency);
+        const currentBalance = currencyConversionService.formatCurrency(walletBalance, 'USDC');
+        throw new Error(`Insufficient wallet balance. Required: ${requiredBalance}, Available: ${currentBalance}`);
       }
 
       // Create payment record with real blockchain transaction
@@ -105,12 +129,15 @@ class PaymentIntegrationService {
         body: JSON.stringify({
           operation: 'transfer',
           walletId: walletData.circleWalletId,
-          amount: paymentRequest.amount.toString(),
+          amount: actualAmount.toString(), // Use converted amount
           recipientAddress: await this.getSellerWalletAddress(paymentRequest.sellerId),
-          tokenId: this.getCurrencyTokenId(paymentRequest.currency),
+          tokenId: this.getCurrencyTokenId(paymentCurrency), // Use USDC for converted payments
           metadata: {
             gigId: paymentRequest.taskId,
-            description: paymentRequest.description
+            description: paymentRequest.description,
+            originalAmount: paymentRequest.amount,
+            originalCurrency: paymentRequest.currency,
+            conversion: conversion
           }
         })
       });
@@ -130,8 +157,10 @@ class PaymentIntegrationService {
           task_id: paymentRequest.taskId,
           buyer_id: paymentRequest.buyerId,
           seller_id: paymentRequest.sellerId,
-          amount: paymentRequest.amount,
-          currency: paymentRequest.currency,
+          amount: actualAmount, // Store converted amount
+          currency: paymentCurrency, // Store actual payment currency (USDC)
+          original_amount: paymentRequest.amount, // Store original amount
+          original_currency: paymentRequest.currency, // Store original currency (NGN)
           payment_method: 'wallet',
           status: 'completed',
           description: paymentRequest.description,
@@ -151,7 +180,8 @@ class PaymentIntegrationService {
       return {
         success: true,
         transactionId,
-        message: 'Wallet payment completed successfully'
+        message: 'Wallet payment completed successfully',
+        conversion: conversion
       };
     } catch (error) {
       throw error;
@@ -229,15 +259,29 @@ class PaymentIntegrationService {
           message: 'Payment ready. Please complete payment in the popup.'
         };
       } else {
-        // Mock Paystack for testing without keys
-        const paymentUrl = `https://paystack-demo.ile-legal.com/pay?amount=${paymentRequest.amount}&ref=${transactionId}`;
-        console.log('Mock Paystack payment initialized (no keys configured)');
-        
+        // Force inline payment even without keys for testing
+        const inlineConfig: PaystackInlineConfig = {
+          publicKey: 'pk_test_your_test_key_here', // Use test key
+          email: 'buyer@ile-legal.com', // TODO: Get buyer's actual email from user profile
+          amount: paymentRequest.amount * 100, // Paystack expects amount in kobo
+          currency: paymentRequest.currency,
+          reference: transactionId,
+          metadata: {
+            task_id: paymentRequest.taskId,
+            buyer_id: paymentRequest.buyerId,
+            seller_id: paymentRequest.sellerId,
+            description: paymentRequest.description
+          }
+        };
+
+        console.log('Using test Paystack inline payment (no keys configured in admin)');
+
         return {
           success: true,
           transactionId,
-          paymentUrl,
-          message: 'Demo Paystack payment initialized (configure keys for real payments).'
+          useInline: true,
+          inlineConfig,
+          message: 'Test payment ready. Please complete payment in the popup.'
         };
       }
     } catch (error) {
