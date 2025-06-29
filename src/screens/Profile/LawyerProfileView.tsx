@@ -12,13 +12,15 @@ import {
   Users, 
   Shield, 
   Wallet,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  QrCodeIcon
 } from 'lucide-react';
 import { Header } from '../../components/Header/Header';
 import { SellerSidebar } from '../../components/SellerSidebar/SellerSidebar';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
+import { QRCodeGenerator } from '../../components/QRCodeGenerator';
 
 interface LawyerProfileViewProps {
   isOwnProfile?: boolean;
@@ -297,13 +299,23 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                     {/* Action Buttons */}
                     <div className="flex flex-col gap-3 lg:w-48">
                       {isOwnProfile && (
-                        <Button 
-                          variant="outline" 
-                          className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                          onClick={() => navigate('/profile')}
-                        >
-                          Edit Profile
-                        </Button>
+                        <>
+                          <Button 
+                            variant="outline" 
+                            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                            onClick={() => navigate('/profile')}
+                          >
+                            Edit Profile
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"
+                            onClick={() => setActiveTab('qr-code')}
+                          >
+                            <QrCodeIcon className="w-4 h-4" />
+                            Share Profile
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -315,7 +327,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                 {/* Tabs Navigation */}
                 <div className="border-b border-gray-200 mb-6">
                   <nav className="flex">
-                    {['overview', 'reviews', 'projects', 'credentials'].map((tab) => (
+                    {['overview', 'reviews', 'projects', 'credentials', 'qr-code'].map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -325,7 +337,14 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
                       >
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        {tab === 'qr-code' ? (
+                          <span className="flex items-center gap-2">
+                            <QrCodeIcon className="w-4 h-4" />
+                            QR Code
+                          </span>
+                        ) : (
+                          tab.charAt(0).toUpperCase() + tab.slice(1)
+                        )}
                       </button>
                     ))}
                   </nav>
@@ -556,6 +575,57 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                         </Card>
                       </div>
 
+                    </div>
+                  )}
+
+                  {activeTab === 'qr-code' && (
+                    <div className="space-y-6">
+                      <div className="text-center mb-6">
+                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Share Your Profile</h3>
+                        <p className="text-gray-600">Generate a QR code to easily share your legal profile with clients</p>
+                      </div>
+                      
+                      <div className="max-w-md mx-auto">
+                        <QRCodeGenerator
+                          url={`${window.location.origin}/profile/${user?.id}`}
+                          title="Legal Profile QR Code"
+                          description="Scan to view this lawyer's public profile"
+                          size={250}
+                        />
+                      </div>
+                      
+                      {/* Additional sharing options */}
+                      <div className="mt-8 p-6 bg-gray-50 rounded-lg">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Professional Sharing</h4>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-white rounded border">
+                            <span className="text-sm text-gray-700">Public Profile URL</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const url = `${window.location.origin}/profile/${user?.id}`;
+                                navigator.clipboard.writeText(url);
+                              }}
+                            >
+                              Copy Link
+                            </Button>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-white rounded border">
+                            <span className="text-sm text-gray-700">Business Card QR</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // This would trigger a download of a business card format
+                                alert('Business card download feature coming soon!');
+                              }}
+                            >
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
