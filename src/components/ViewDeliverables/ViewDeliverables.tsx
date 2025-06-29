@@ -11,6 +11,7 @@ interface Provider {
   avatar: string;
   rating: number;
   projectsPosted: number;
+  location?: string;
 }
 
 interface Deliverable {
@@ -36,6 +37,7 @@ interface ViewDeliverablesProps {
   deadline: string;
   budget: string;
   status: string;
+  description: string;
   provider: Provider;
   onBack: () => void;
   onMessage: (providerId: string) => void;
@@ -48,10 +50,12 @@ export const ViewDeliverables = ({
   deadline,
   budget,
   status,
+  description,
   provider,
   onBack,
   onMessage: _onMessage,
 }: ViewDeliverablesProps) => {
+  console.log('provider', provider);
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"details" | "bids" | "deliverables" | "messages">("messages");
   const [messageText, setMessageText] = useState("");
@@ -60,6 +64,7 @@ export const ViewDeliverables = ({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingDeliverables, setLoadingDeliverables] = useState(false);
+  const [sellerLocation, setSellerLocation] = useState<string | undefined>(provider.location);
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !conversationId || !user?.id) return;
@@ -179,6 +184,12 @@ export const ViewDeliverables = ({
             {status}
           </span>
         </div>
+        {sellerLocation ? (
+          <div>
+            <p className="text-gray-500 text-sm">Location</p>
+            <p className="font-medium">{sellerLocation}</p>
+          </div>
+        ) : null}
       </div>
 
       {/* Tabs */}
@@ -294,7 +305,7 @@ export const ViewDeliverables = ({
                       )}
                     </div>
                     <h3 className="font-bold text-lg">{provider.name}</h3>
-                    <p className="text-gray-500">Nigeria</p>
+                    <p className="text-gray-500">{provider.location}</p>
                     
                     <div className="flex items-center mt-2">
                       {[1, 2, 3, 4, 5].map((star) => (
@@ -306,7 +317,7 @@ export const ViewDeliverables = ({
                     </div>
                     
                     <p className="text-gray-600 mt-2">
-                      {provider.projectsPosted} projects posted
+                      {provider.projectsPosted} gigs completed
                     </p>
                   </div>
                 </CardContent>
@@ -361,11 +372,7 @@ export const ViewDeliverables = ({
         {activeTab === "details" && (
           <div className="border border-gray-200 rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4">Gig Details</h2>
-            <p className="text-gray-700">
-              This gig involves drafting a comprehensive property lease agreement that complies with local regulations.
-              The agreement should cover all standard lease terms including rent, security deposit, maintenance responsibilities,
-              and termination conditions.
-            </p>
+            <p className="text-gray-700">{description}</p>
           </div>
         )}
 

@@ -42,6 +42,7 @@ interface ProfileData {
   email: string;
   phone: string;
   title: string;
+  address: string;
   about: string;
   specializations: string[];
   education: Education[];
@@ -82,6 +83,7 @@ export const Profile = (): JSX.Element => {
     email: "",
     phone: "",
     title: "",
+    address: "",
     about: "",
     specializations: [],
     education: []
@@ -118,6 +120,7 @@ export const Profile = (): JSX.Element => {
           email: user.email || '',
           phone: meta.phone || '',
           title: 'Legal Professional',
+          address: (meta as any).location || '',
           about: (meta as any).about || '',
           specializations: Array.isArray((meta as any).specializations) ? (meta as any).specializations : [],
           education: Array.isArray((meta as any).education) ? (meta as any).education : []
@@ -278,6 +281,7 @@ export const Profile = (): JSX.Element => {
           lastName: editFormData.lastName,
           phone: editFormData.phone,
           title: editFormData.title,
+          address: editFormData.address,
           about: editFormData.about,
           specializations: editFormData.specializations,
           education: editFormData.education
@@ -650,6 +654,25 @@ export const Profile = (): JSX.Element => {
                       />
                     </div>
 
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Address
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+                          <MapPinIcon className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <input
+                          type="text"
+                          name="address"
+                          value={editFormData.address}
+                          onChange={handleInputChange}
+                          placeholder="Enter your address"
+                          className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -930,9 +953,6 @@ export const Profile = (): JSX.Element => {
                 </CardContent>
               </Card>
 
-
-
-
               {/* Tabs Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-0">
@@ -976,7 +996,9 @@ export const Profile = (): JSX.Element => {
                     </div>
                     <div className="flex items-center gap-3">
                       <MapPinIcon className="w-5 h-5 text-gray-400" />
-                      <span className="text-gray-700">Location not specified</span>
+                      <span className="text-gray-700">
+                        {(user?.user_metadata as any)?.address || "Location not specified"}
+                      </span>
                     </div>
                   </div>
                 </CardContent>

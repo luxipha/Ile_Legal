@@ -20,8 +20,12 @@ export const AdminSidebar = ({ viewMode, onNavigate }: AdminSidebarProps) => {
       {/* Logo */}
       <div className="p-6 border-b border-gray-700">
         <Link to="/" className="flex items-center gap-3">
-          <div className="text-[#FEC85F] text-2xl font-bold">ilé</div>
-          <div className="text-gray-300 text-sm">Legal</div>
+          <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
+          <div className="text-gray-300 text-sm">
+            Legal
+            <br />
+            Marketplace
+          </div>
         </Link>
       </div>
       

@@ -28,7 +28,7 @@ export const SellerSidebar: React.FC<SellerSidebarProps> = ({
   return (
     <div className="w-64 bg-[#1B1828] text-white flex flex-col">
       <div className="p-6 border-b border-gray-700">
-        <Link to="/seller-dashboard" className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3">
           <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
           <div className="text-gray-300 text-sm">
             Legal

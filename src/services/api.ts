@@ -1727,6 +1727,25 @@ export const api = {
           lifetimeValue: "₦0"
         };
       }
+    },
+
+    getUserProfile: async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('Profiles')
+          .select('first_name, last_name, avatar_url, email, user_type, bio, location, website, phone, verification_status, jobs_completed')
+          .eq('id', userId)
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        return data;
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        throw error;
+      }
     }
   },
 
