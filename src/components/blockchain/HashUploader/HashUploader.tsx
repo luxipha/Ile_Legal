@@ -75,31 +75,38 @@ export const HashUploader: React.FC<HashUploaderProps> = ({
     updateState({ isSubmitting: true, error: undefined });
 
     try {
-      // For demo purposes, create a mock successful submission
-      // In production, this would use a funded Algorand account
-      console.log('Demo: Simulating blockchain submission for hash:', state.hashResult.hash.substring(0, 16) + '...');
+      // Real Algorand blockchain submission
+      console.log('🔗 Submitting hash to Algorand blockchain:', state.hashResult.hash.substring(0, 16) + '...');
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Create mock successful result
-      const mockResult: HashSubmissionResult = {
+      // Use the real Algorand service
+      const txId = await AlgorandService.submitDocumentHash(
+        state.hashResult.hash, 
+        `Legal document: ${state.hashResult.fileName}`
+      );
+
+      // Create successful result with real transaction ID
+      const result: HashSubmissionResult = {
         success: true,
         transaction: {
-          txId: 'DEMO_TX_' + Math.random().toString(36).substring(2, 15).toUpperCase(),
-          confirmedRound: Math.floor(Math.random() * 1000000) + 35000000,
-          fee: 1000,
+          txId: txId,
+          confirmedRound: 0, // Will be filled by blockchain
+          fee: 1000, // Estimated fee
           timestamp: new Date().toISOString()
         },
         documentHash: state.hashResult
       };
 
+      // Save transaction to localStorage for verification
+      if (result.transaction && result.documentHash) {
+        AlgorandService.prototype.saveTransaction.call(algorandService, result.transaction, result.documentHash);
+      }
+
       updateState({ 
         isSubmitting: false, 
-        submissionResult: mockResult 
+        submissionResult: result 
       });
 
-      onSubmissionComplete?.(mockResult);
+      onSubmissionComplete?.(result);
 
     } catch (error) {
       updateState({ isSubmitting: false });

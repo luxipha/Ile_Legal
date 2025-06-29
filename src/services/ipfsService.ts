@@ -351,22 +351,13 @@ class IPFSService {
    */
   async submitToAlgorandBlockchain(cid: string, fileHash: string): Promise<string> {
     try {
-      // Import Algorand service dynamically to avoid circular dependencies
+      // Import the working Algorand service class
       const { AlgorandService } = await import('../components/blockchain/shared/algorandService');
       
-      // Create a note with IPFS CID and file hash for court admissibility
-      const note = JSON.stringify({
-        ipfsCid: cid,
-        fileHash: fileHash,
-        timestamp: new Date().toISOString(),
-        purpose: 'legal-document-verification',
-        network: ALGORAND_NETWORK
-      });
+      // Use the static method that handles account creation internally
+      const txId = await AlgorandService.submitDocumentHash(fileHash);
       
-      // Submit to Algorand blockchain
-      const txId = await AlgorandService.submitDocumentHash(fileHash, note);
       console.log(`📝 Document verified on Algorand blockchain: ${txId}`);
-      
       return txId;
     } catch (error) {
       console.error('Failed to submit to Algorand blockchain:', error);

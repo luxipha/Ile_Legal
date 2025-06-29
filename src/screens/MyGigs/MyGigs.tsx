@@ -33,7 +33,7 @@ interface Gig {
   description: string;
   budget: string;
   deadline: string;
-  status: "Active" | "Paused" | "Draft" | "Completed";
+  status: "Active" | "Paused" | "Draft" | "Completed" | "Pending";
   statusColor: string;
   orders: number;
   rating: number;
@@ -66,6 +66,10 @@ export const MyGigs = (): JSX.Element => {
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
   const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedGigs, setSelectedGigs] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editFormData, setEditFormData] = useState({
     title: "",
     categories: [] as string[],
@@ -174,7 +178,7 @@ export const MyGigs = (): JSX.Element => {
     // Handle attachments - ensure it's an array before mapping
     const attachments = Array.isArray(gig.attachments) ? gig.attachments : [];
     setAttachedFiles(attachments.map(name => ({
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       name,
       size: 0, // We don't have the original size
       type: name.split('.').pop() || '', // Try to guess the type from extension
@@ -219,37 +223,100 @@ export const MyGigs = (): JSX.Element => {
     return;
   };
 
-  // Delete functionality is implemented inline where needed
+  // Group Delete Functions
+  const toggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode);
+    setSelectedGigs(new Set());
+  };
+
+  const toggleGigSelection = (gigId: string) => {
+    const newSelected = new Set(selectedGigs);
+    if (newSelected.has(gigId)) {
+      newSelected.delete(gigId);
+    } else {
+      newSelected.add(gigId);
+    }
+    setSelectedGigs(newSelected);
+  };
+
+  const selectAllGigs = () => {
+    const deletableGigs = filteredGigs.filter(gig => 
+      gig.status === 'Pending'
+    );
+    setSelectedGigs(new Set(deletableGigs.map(gig => gig.id.toString())));
+  };
+
+  const clearSelection = () => {
+    setSelectedGigs(new Set());
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedGigs.size > 0) {
+      setShowDeleteModal(true);
+    }
+  };
+
+  const confirmDeleteSelected = async () => {
+    if (selectedGigs.size === 0) return;
+    
+    setDeleting(true);
+    try {
+      const deletePromises = Array.from(selectedGigs).map(gigId => 
+        api.gigs.deleteGig(gigId)
+      );
+      
+      const results = await Promise.all(deletePromises);
+      const hasErrors = results.some(error => error !== null);
+      
+      if (hasErrors) {
+        console.error('Some gigs could not be deleted');
+      } else {
+        // Remove deleted gigs from local state
+        setGigs(prevGigs => 
+          prevGigs.filter(gig => !selectedGigs.has(gig.id.toString()))
+        );
+        setSelectedGigs(new Set());
+        setIsSelectMode(false);
+      }
+    } catch (err) {
+      console.error('Error deleting gigs:', err);
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const cancelDeleteModal = () => {
+    setShowDeleteModal(false);
+  };
+
+  // Single delete functionality
+  const handleSingleDelete = async (gigId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this gig?');
+    if (!confirmed) return;
+    
+    try {
+      const error = await api.gigs.deleteGig(gigId);
+      if (error) {
+        console.error('Error deleting gig:', error);
+      } else {
+        setGigs(prevGigs => prevGigs.filter(gig => gig.id.toString() !== gigId));
+      }
+    } catch (err) {
+      console.error('Error deleting gig:', err);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setEditFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleRequirementChange = (index: number, value: string) => {
-    setEditFormData(prev => ({
-      ...prev,
-      requirements: prev.requirements.map((req, i) => i === index ? value : req)
-    }));
-  };
-
-  const addRequirement = () => {
-    setEditFormData(prev => ({
-      ...prev,
-      requirements: [...prev.requirements, ""]
-    }));
-  };
-
-  const removeRequirement = (index: number) => {
-    setEditFormData(prev => ({
-      ...prev,
-      requirements: prev.requirements.filter((_, i) => i !== index)
-    }));
-  };
+  // Requirement management functions removed as they're not used in this component
 
   const handleFileUpload = (files: FileList) => {
     const newFiles: AttachedFile[] = Array.from(files).map(file => ({
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       name: file.name,
       size: file.size,
       type: file.type,
@@ -377,7 +444,7 @@ export const MyGigs = (): JSX.Element => {
 
         {/* Main Content - View Gig */}
         <div className="flex-1 flex flex-col">
-          <Header title="View Gig" userName="Demo Client" userType="buyer" />
+          <Header title="View Gig" />
 
           <main className="flex-1 p-6">
             {/* Use the ViewBids component for consistent UI */}
@@ -481,7 +548,7 @@ export const MyGigs = (): JSX.Element => {
 
         {/* Main Content - Edit Gig */}
         <div className="flex-1 flex flex-col">
-          <Header title="Edit Gig" userName="Demo Client" userType="buyer" />
+          <Header title="Edit Gig" />
 
           <main className="flex-1 p-6">
             <div className="max-w-4xl mx-auto">
@@ -591,11 +658,7 @@ export const MyGigs = (): JSX.Element => {
                               const urlHash = attachmentUrl.split('?')[1]?.slice(0, 6) || attachmentUrl.slice(-6);
                               const shortDisplay = `${filename}...${urlHash}`;
                               // Extract file path for deletion (between /object/sign/documents/ and ?)
-                              let filePath = '';
-                              try {
-                                const match = attachmentUrl.match(/\/object\/sign\/documents\/([^?]+)/);
-                                if (match && match[1]) filePath = decodeURIComponent(match[1]);
-                              } catch {}
+                              // Note: filePath extraction kept for potential future use
                               // Extract filename for API
                               const filenameForApi = filename;
                               const handleDeleteAttachment = async () => {
@@ -767,7 +830,7 @@ export const MyGigs = (): JSX.Element => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header title="My Gigs" userName="Demo Client" userType="buyer" />
+        <Header title="My Gigs" />
 
         <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto">
@@ -798,9 +861,56 @@ export const MyGigs = (): JSX.Element => {
               </div>
 
               <div className="flex items-center gap-4">
-                <Button variant="outline" size="sm">
-                  <TrashIcon className="w-4 h-4" />
-                </Button>
+                {!isSelectMode ? (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={toggleSelectMode}
+                    title="Delete Gigs"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {selectedGigs.size > 0 && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearSelection}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          Clear
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDeleteSelected}
+                          disabled={deleting}
+                          className="bg-red-600 text-white hover:bg-red-700"
+                        >
+                          {deleting ? 'Deleting...' : `Delete ${selectedGigs.size} gig(s)`}
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectAllGigs}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleSelectMode}
+                      title="Cancel Selection"
+                    >
+                      <XIcon className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
                 
                 {/* View Toggle Buttons */}
                 <div className="flex items-center gap-2">
@@ -868,121 +978,190 @@ export const MyGigs = (): JSX.Element => {
               gridViewMode === "grid" ? (
                 /* Grid View */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredGigs.map((gig) => (
-                    <Card key={gig.id} className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="mb-4">
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${gig.statusColor}`}>
-                            {gig.status}
-                          </span>
-                        </div>
-                        
-                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{gig.title}</h3>
-                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">{gig.description}</p>
-                        
-                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                          <span>Deadline: {gig.deadline}</span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-lg font-bold text-green-600">{gig.budget}</span>
-                          <span className="text-sm text-gray-600">{gig.orders} orders</span>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleViewGig(gig)}
-                            size="sm"
-                            className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white flex-1"
-                          >
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleEditGig(gig)}
-                            size="sm"
-                            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                          >
-                            Edit
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {filteredGigs.map((gig) => {
+                    const isSelected = selectedGigs.has(gig.id.toString());
+                    const isDeletable = gig.status === 'Pending';
+                    
+                    return (
+                      <Card 
+                        key={gig.id} 
+                        className={`bg-white border border-gray-200 hover:shadow-lg transition-shadow ${
+                          isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+                        } ${
+                          isSelectMode && !isDeletable ? 'opacity-50' : ''
+                        }`}
+                      >
+                        <CardContent className="p-6">
+                          {isSelectMode && isDeletable && (
+                            <div className="mb-4">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleGigSelection(gig.id.toString())}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                            </div>
+                          )}
+                          <div className="mb-4">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${gig.statusColor}`}>
+                              {gig.status}
+                            </span>
+                          </div>
+                          
+                          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{gig.title}</h3>
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">{gig.description}</p>
+                          
+                          <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                            <span>Deadline: {gig.deadline}</span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-lg font-bold text-green-600">{gig.budget}</span>
+                            <span className="text-sm text-gray-600">{gig.orders} orders</span>
+                          </div>
+                          
+                          {!isSelectMode && (
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => handleViewGig(gig)}
+                                size="sm"
+                                className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white flex-1"
+                              >
+                                View
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleEditGig(gig)}
+                                size="sm"
+                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                              >
+                                Edit
+                              </Button>
+                              {gig.status === 'Pending' && (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => handleSingleDelete(gig.id.toString())}
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                  title="Delete Gig"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               ) : (
                 /* List View */
                 <div className="space-y-6">
-                  {filteredGigs.map((gig) => (
-                    <Card key={gig.id} className="border border-gray-200 hover:border-gray-300 transition-colors rounded-xl">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="text-xl font-semibold text-gray-900">{gig.title}</h3>
-                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${gig.statusColor}`}>
-                                {gig.status}
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center gap-4 mb-3">
-                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                                {gig.category}
-                              </span>
-                              <span className="text-sm text-gray-600">Posted: {gig.postedDate}</span>
-                              <span className="text-sm text-gray-600">Deadline: {gig.deadline}</span>
-                            </div>
+                  {filteredGigs.map((gig) => {
+                    const isSelected = selectedGigs.has(gig.id.toString());
+                    const isDeletable = gig.status === 'Pending';
+                    
+                    return (
+                      <Card 
+                        key={gig.id} 
+                        className={`border border-gray-200 hover:border-gray-300 transition-colors rounded-xl ${
+                          isSelected ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+                        } ${
+                          isSelectMode && !isDeletable ? 'opacity-50' : ''
+                        }`}
+                      >
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-start gap-3 flex-1">
+                              {isSelectMode && isDeletable && (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleGigSelection(gig.id.toString())}
+                                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                              )}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <h3 className="text-xl font-semibold text-gray-900">{gig.title}</h3>
+                                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${gig.statusColor}`}>
+                                    {gig.status}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-4 mb-3">
+                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                                    {gig.category}
+                                  </span>
+                                  <span className="text-sm text-gray-600">Posted: {gig.postedDate}</span>
+                                  <span className="text-sm text-gray-600">Deadline: {gig.deadline}</span>
+                                </div>
 
-                            <p className="text-gray-600 mb-4 line-clamp-2">{gig.description}</p>
+                                <p className="text-gray-600 mb-4 line-clamp-2">{gig.description}</p>
 
-                            <div className="flex items-center gap-8">
-                              <div className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">{gig.orders}</div>
-                                <div className="text-xs text-gray-600">Orders</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">{gig.rating}</div>
-                                <div className="text-xs text-gray-600">Rating</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">{gig.views}</div>
-                                <div className="text-xs text-gray-600">Views</div>
-                              </div>
-                            </div>
+                                <div className="flex items-center gap-8">
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold text-gray-900">{gig.orders}</div>
+                                    <div className="text-xs text-gray-600">Orders</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold text-gray-900">{gig.rating}</div>
+                                    <div className="text-xs text-gray-600">Rating</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold text-gray-900">{gig.views}</div>
+                                    <div className="text-xs text-gray-600">Views</div>
+                                  </div>
+                                </div>
 
-                            <div className="mt-4">
-                              <div className="text-2xl font-bold text-green-600">Starting at {gig.budget}</div>
+                                <div className="mt-4">
+                                  <div className="text-2xl font-bold text-green-600">Starting at {gig.budget}</div>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex gap-3">
-                          <Button
-                            onClick={() => handleViewGig(gig)}
-                            className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2"
-                          >
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleEditGig(gig)}
-                            className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
-                          >
-                            Edit
-                          </Button>
-                          {!(String(gig.status).toLowerCase() === "active" || String(gig.status).toLowerCase() === "completed" || String(gig.status).toLowerCase() === "suspended") && (
-                            <Button
-                              variant="outline"
-                              onClick={() => handlePauseGig(gig)}
-                              className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
-                            >
-                              {gig.status === "Paused" ? "Resume" : "Pause"}
-                            </Button>
+                          {!isSelectMode && (
+                            <div className="flex gap-3">
+                              <Button
+                                onClick={() => handleViewGig(gig)}
+                                className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2"
+                              >
+                                View
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleEditGig(gig)}
+                                className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                              >
+                                Edit
+                              </Button>
+                              {!(String(gig.status).toLowerCase() === "active" || String(gig.status).toLowerCase() === "completed" || String(gig.status).toLowerCase() === "suspended") && (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => handlePauseGig(gig)}
+                                  className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                                >
+                                  {gig.status === "Paused" ? "Resume" : "Pause"}
+                                </Button>
+                              )}
+                              {gig.status === 'Pending' && (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => handleSingleDelete(gig.id.toString())}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50 px-6 py-2"
+                                  title="Delete Gig"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )
             ) : (
@@ -1005,6 +1184,36 @@ export const MyGigs = (): JSX.Element => {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Confirm Deletion
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete {selectedGigs.size} gig(s)? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={cancelDeleteModal}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmDeleteSelected}
+                disabled={deleting}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {deleting ? 'Deleting...' : `Delete ${selectedGigs.size} gig(s)`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

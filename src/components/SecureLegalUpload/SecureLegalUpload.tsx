@@ -132,9 +132,10 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
         const documentHash = HashUtils.createDocumentHash(fileResult);
         blockchainHash = documentHash.hash;
         
-        // Submit to Algorand blockchain for enhanced verification
+        // Submit to Algorand blockchain for enhanced verification using working implementation
         try {
-          const algorandTxId = await ipfsService.submitToAlgorandBlockchain(result.ipfsCid, blockchainHash);
+          const { AlgorandService } = await import('../blockchain/shared/algorandService');
+          const algorandTxId = await AlgorandService.submitDocumentHash(blockchainHash);
           console.log(`✅ Document verified on Algorand: ${algorandTxId}`);
           // Store Algorand transaction ID as additional verification
           result.metadata.algorandTxId = algorandTxId;
@@ -294,9 +295,17 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
     <div className={`space-y-6 ${className}`}>
       {/* Security Features Banner */}
       <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
-          <h3 className="font-semibold text-blue-900">Court-Grade Security + Filecoin Storage</h3>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
+            <h3 className="font-semibold text-blue-900">Court-Grade Security + Filecoin Storage</h3>
+          </div>
+          <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-blue-200">
+            <div className="w-4 h-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs font-bold">A</span>
+            </div>
+            <span className="text-sm font-medium text-gray-700">Powered by Algorand</span>
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           <div className="flex items-center gap-2">
@@ -313,7 +322,7 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <LockIcon className="w-4 h-4 text-green-600" />
-            <span className="text-gray-700">FVM payment tracking</span>
+            <span className="text-gray-700">Blockchain verification</span>
           </div>
         </div>
       </div>
@@ -356,7 +365,7 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
                 Every document automatically receives:
               </p>
               <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-600">
-                <span>• Blockchain verification</span>
+                <span>• Algorand blockchain verification</span>
                 <span>• Filecoin permanent storage</span>
                 <span>• Tamper-proof timestamps</span>
                 <span>• FVM payment tracking</span>

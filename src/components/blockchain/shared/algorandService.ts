@@ -32,10 +32,8 @@ export class AlgorandService {
    * Get AlgoExplorer URL for a transaction
    */
   getExplorerUrl(txId: string): string {
-    const baseUrl = this.config.network === 'mainnet' 
-      ? 'https://explorer.algorand.org' 
-      : 'https://testnet.explorer.algorand.org';
-    return `${baseUrl}/tx/${txId}`;
+    // Use Pera Explorer as it's more reliable
+    return `https://testnet.explorer.perawallet.app/tx/${txId}`;
   }
 
   /**
@@ -46,7 +44,7 @@ export class AlgorandService {
       const status = await this.client.status().do();
       console.log('Algorand connection validated:', {
         network: this.config.network,
-        lastRound: status['last-round']
+        lastRound: status.lastRound
       });
       
       return { connected: true };
@@ -83,6 +81,9 @@ export class AlgorandService {
 
       // Get suggested transaction parameters
       const suggestedParams = await this.client.getTransactionParams().do();
+      console.log('🔍 Suggested params debug:', suggestedParams);
+      console.log('Genesis ID type:', typeof suggestedParams.genesisID);
+      console.log('Genesis hash type:', typeof suggestedParams.genesisHash);
 
       // Create note with document hash and metadata
       const noteString = JSON.stringify({
@@ -96,34 +97,95 @@ export class AlgorandService {
       const note = new TextEncoder().encode(noteString);
 
       // Create transaction (sending 0 ALGO to self with note containing hash)
-      const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        from: senderAccount.addr,
-        to: senderAccount.addr,
+      console.log('🔍 Transaction creation debug:');
+      console.log('senderAccount exists:', !!senderAccount);
+      console.log('senderAccount.addr exists:', !!senderAccount?.addr);
+      console.log('senderAccount.addr value:', senderAccount?.addr);
+      
+      const fromAddress = senderAccount.addr.toString();
+      const toAddress = senderAccount.addr.toString();
+      console.log('From address:', fromAddress);
+      console.log('To address:', toAddress);
+      
+      // Use correct parameter names for algosdk v3
+      const txnParams = {
+        sender: fromAddress,    // Changed from 'from' to 'sender'
+        receiver: toAddress,    // Changed from 'to' to 'receiver'
         amount: 0,
         note: note,
         suggestedParams: suggestedParams
-      });
+      };
+      
+      console.log('Transaction params:', txnParams);
+      const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject(txnParams);
 
       // Sign transaction
       const signedTxn = txn.signTxn(senderAccount.sk);
 
       // Submit transaction
-      const { txId } = await this.client.sendRawTransaction(signedTxn).do();
+      console.log('🚀 Submitting transaction to Algorand...');
+      console.log('Raw transaction size:', signedTxn.length, 'bytes');
+      
+      const submitResult = await this.client.sendRawTransaction(signedTxn).do();
+      console.log('📝 Submit result:', submitResult);
+      console.log('Submission successful:', !!submitResult.txid);
+      
+      // Extract transaction ID (correct field name is 'txid')
+      const txId = submitResult.txid;
+      console.log('Transaction ID extracted:', txId);
+      
+      // Verify transaction exists by querying it directly
+      try {
+        const txInfo = await this.client.pendingTransactionInformation(txId).do();
+        console.log('🔍 Transaction info from Algorand API:', txInfo);
+        
+        // Check if transaction has an error
+        if (txInfo.poolError && txInfo.poolError !== '') {
+          console.error('❌ Transaction pool error:', txInfo.poolError);
+          throw new Error(`Transaction failed: ${txInfo.poolError}`);
+        }
+        
+        console.log('✅ Transaction in mempool successfully');
+      } catch (verifyError) {
+        console.log('⚠️ Could not verify transaction immediately:', verifyError);
+        throw new Error(`Transaction verification failed: ${verifyError}`);
+      }
 
-      // Wait for confirmation
-      const confirmedTxn = await this.waitForConfirmation(txId);
-
+      // Wait at least 1 round for confirmation
+      console.log('⏳ Waiting for transaction confirmation...');
+      try {
+        const confirmedTxn = await this.waitForConfirmation(txId, 3); // Wait max 3 rounds
+        console.log('🎉 Transaction confirmed in round:', confirmedTxn.confirmedRound);
+        
+        const transaction: AlgorandTransaction = {
+          txId,
+          confirmedRound: confirmedTxn.confirmedRound,
+          fee: Number(txn.fee),
+          timestamp: new Date().toISOString()
+        };
+        
+        return {
+          success: true,
+          transaction,
+          documentHash
+        };
+        
+      } catch (confirmError) {
+        console.warn('⚠️ Confirmation timeout, but transaction was submitted:', confirmError);
+        // Return success even if confirmation times out
+      }
+      
       const transaction: AlgorandTransaction = {
         txId,
-        confirmedRound: confirmedTxn.confirmedRound,
-        fee: txn.fee,
+        confirmedRound: 0, // Will be confirmed later by network
+        fee: Number(txn.fee), // Convert bigint to number
         timestamp: new Date().toISOString()
       };
 
       console.log('Document hash submitted successfully:', {
         txId,
-        round: confirmedTxn.confirmedRound,
-        hash: documentHash.hash.substring(0, 16) + '...'
+        hash: documentHash.hash.substring(0, 16) + '...',
+        status: 'submitted'
       });
 
       return {
@@ -146,35 +208,44 @@ export class AlgorandService {
    * Verify if a document hash exists on the blockchain
    */
   async verifyDocumentHash(
-    documentHash: DocumentHash,
-    searchRounds: number = 1000
+    documentHash: DocumentHash
   ): Promise<HashVerificationResult> {
     try {
-      // For demo purposes, simulate verification
-      console.log('Demo: Simulating blockchain verification for hash:', documentHash.hash.substring(0, 16) + '...');
+      console.log('🔍 Searching blockchain for hash:', documentHash.hash.substring(0, 16) + '...');
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // For demo, randomly return found/not found (20% chance of finding)
-      const found = Math.random() < 0.2;
-      
-      if (found) {
-        const mockTransaction: AlgorandTransaction = {
-          txId: 'DEMO_TX_' + Math.random().toString(36).substring(2, 15).toUpperCase(),
-          confirmedRound: Math.floor(Math.random() * 1000000) + 35000000,
-          fee: 1000,
-          timestamp: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString() // Random date within last 30 days
-        };
-
-        return {
-          exists: true,
-          transaction: mockTransaction,
-          documentHash,
-          verificationTimestamp: new Date().toISOString()
-        };
+      // First check localStorage for recently submitted transactions
+      const stored = localStorage.getItem('algorand_transactions');
+      if (stored) {
+        try {
+          const transactions = JSON.parse(stored);
+          const found = transactions.find((tx: any) => tx.hash === documentHash.hash);
+          
+          if (found) {
+            console.log('✅ Document hash found in local transaction history');
+            return {
+              exists: true,
+              transaction: {
+                txId: found.txId,
+                confirmedRound: found.confirmedRound || 0,
+                fee: found.fee || 1000,
+                timestamp: found.timestamp
+              },
+              documentHash,
+              verificationTimestamp: new Date().toISOString()
+            };
+          }
+        } catch (error) {
+          console.error('Error checking localStorage:', error);
+        }
       }
 
+      // Try to search actual blockchain transactions (limited in browser)
+      console.log('🔍 Checking recent blockchain transactions...');
+      
+      // For production, you would use Algorand Indexer API to search transactions
+      // Since we don't have indexer access in this demo, we return not found
+      console.log('⚠️ Document hash not found in recent transactions');
+      
       return {
         exists: false,
         documentHash,
@@ -184,6 +255,32 @@ export class AlgorandService {
     } catch (error) {
       throw new Error(`Verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Save transaction to localStorage for verification
+   */
+  saveTransaction(transaction: AlgorandTransaction, documentHash: DocumentHash): void {
+    const stored = localStorage.getItem('algorand_transactions');
+    const transactions = stored ? JSON.parse(stored) : [];
+    
+    // Add hash to transaction object for verification
+    const txWithHash = {
+      ...transaction,
+      hash: documentHash.hash,
+      fileName: documentHash.fileName,
+      fileSize: documentHash.fileSize
+    };
+    
+    transactions.unshift(txWithHash);
+    
+    // Keep only last 50 transactions
+    if (transactions.length > 50) {
+      transactions.splice(50);
+    }
+    
+    localStorage.setItem('algorand_transactions', JSON.stringify(transactions));
+    console.log('💾 Transaction saved to localStorage for verification');
   }
 
   /**
@@ -203,15 +300,15 @@ export class AlgorandService {
    */
   private async waitForConfirmation(txId: string, maxRounds: number = 5): Promise<any> {
     const status = await this.client.status().do();
-    let lastRound = status['last-round'];
+    let lastRound = status.lastRound;
 
     for (let round = 0; round < maxRounds; round++) {
       try {
         const pendingInfo = await this.client.pendingTransactionInformation(txId).do();
         
-        if (pendingInfo['confirmed-round'] !== null && pendingInfo['confirmed-round'] > 0) {
+        if (pendingInfo.confirmedRound !== null && pendingInfo.confirmedRound !== undefined && pendingInfo.confirmedRound > 0) {
           return {
-            confirmedRound: pendingInfo['confirmed-round'],
+            confirmedRound: pendingInfo.confirmedRound,
             txId: txId
           };
         }
@@ -247,18 +344,23 @@ export class AlgorandService {
   /**
    * Static method for simple document hash submission (for IPFS integration)
    */
-  static async submitDocumentHash(fileHash: string, note: string): Promise<string> {
+  static async submitDocumentHash(fileHash: string): Promise<string> {
     try {
       // Check if we have production Algorand credentials
       const algorandMnemonic = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_ALGORAND_MNEMONIC : process.env.VITE_ALGORAND_MNEMONIC) || '';
       const algorandNetwork = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_ALGORAND_NETWORK : process.env.VITE_ALGORAND_NETWORK) || 'testnet';
       
+      console.log('🔍 ENV DEBUG:');
+      console.log('Network:', algorandNetwork);
+      console.log('Mnemonic exists:', !!algorandMnemonic);
+      console.log('Mnemonic first 10 chars:', algorandMnemonic.substring(0, 10) + '...');
+      
       if (!algorandMnemonic) {
-        console.log('🔄 Algorand credentials not configured, using development mode');
-        // Return a realistic mock transaction ID for development
-        const mockTxId = `${algorandNetwork.toUpperCase()}_DEV_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-        console.log(`📝 Mock Algorand transaction: ${mockTxId}`);
-        return mockTxId;
+        throw new Error('🔄 Algorand credentials not configured - VITE_ALGORAND_MNEMONIC is missing');
+        // COMMENTED OUT MOCK FOR DEBUGGING:
+        // const mockTxId = `${algorandNetwork.toUpperCase()}_DEV_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        // console.log(`📝 Mock Algorand transaction: ${mockTxId}`);
+        // return mockTxId;
       }
       
       // Production mode: use real Algorand account
@@ -268,11 +370,15 @@ export class AlgorandService {
       const service = new AlgorandService();
       
       // Create account from mnemonic
+      console.log('🔑 Converting mnemonic to account...');
+      console.log('Mnemonic length:', algorandMnemonic.split(' ').length, 'words');
       const account = algosdk.mnemonicToSecretKey(algorandMnemonic);
+      console.log('Account address:', account.addr.toString());
+      console.log('Account created successfully:', !!account.addr);
       
       // Validate account has funds (optional check)
       try {
-        const accountInfo = await service.getAccountInfo(account.addr);
+        const accountInfo = await service.getAccountInfo(account.addr.toString());
         if (accountInfo.amount < 100000) { // 0.1 ALGO minimum
           console.warn('⚠️ Low account balance, transaction may fail');
         }
@@ -292,18 +398,19 @@ export class AlgorandService {
       // Submit to blockchain
       const result = await service.submitDocumentHash(documentHash, account);
       
-      if (result.success && result.transactionId) {
-        console.log(`✅ Successfully submitted to Algorand: ${result.transactionId}`);
-        return result.transactionId;
+      if (result.success && result.transaction) {
+        console.log(`✅ Successfully submitted to Algorand: ${result.transaction.txId}`);
+        return result.transaction.txId;
       } else {
         throw new Error(result.error || 'Failed to submit to blockchain');
       }
     } catch (error) {
       console.error('Algorand submission error:', error);
-      // Always return a development transaction ID if real submission fails
-      const mockTxId = `DEV_FALLBACK_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      console.log(`🔄 Using fallback transaction ID: ${mockTxId}`);
-      return mockTxId;
+      // COMMENTED OUT FALLBACK FOR DEBUGGING:
+      // const mockTxId = `DEV_FALLBACK_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      // console.log(`🔄 Using fallback transaction ID: ${mockTxId}`);
+      // return mockTxId;
+      throw error; // Let the real error bubble up
     }
   }
 }
