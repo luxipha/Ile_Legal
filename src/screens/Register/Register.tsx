@@ -5,6 +5,9 @@ import { Card, CardContent } from "../../components/ui/card";
 import { EyeIcon, EyeOffIcon, UserIcon, BriefcaseIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon } from "lucide-react";
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/index';
+import { validateEmail, validatePasswordStrength, PasswordStrength } from '../../utils/validation';
+import { EmailValidationIndicator } from '../../components/ui/EmailValidationIndicator';
+import { PasswordStrengthIndicator } from '../../components/ui/PasswordStrengthIndicator';
 
 export const Register = (): JSX.Element => {
   const { register, signInWithMetaMask, signInWithGoogle, user, isLoading } = useAuth();
@@ -25,17 +28,63 @@ export const Register = (): JSX.Element => {
     subscribeNewsletter: false,
   });
 
+  // Validation states
+  const [emailValidation, setEmailValidation] = useState({ isValid: false, message: '' });
+  const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({
+    score: 0,
+    feedback: [],
+    isValid: false,
+    requirements: {
+      length: false,
+      uppercase: false,
+      lowercase: false,
+      number: false,
+      special: false,
+    }
+  });
+  const [showValidation, setShowValidation] = useState({
+    email: false,
+    password: false,
+  });
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+
+    // Real-time validation
+    if (name === 'email') {
+      const validation = validateEmail(value);
+      setEmailValidation(validation);
+      setShowValidation(prev => ({ ...prev, email: value.length > 0 }));
+    }
+
+    if (name === 'password') {
+      const strength = validatePasswordStrength(value);
+      setPasswordStrength(strength);
+      setShowValidation(prev => ({ ...prev, password: value.length > 0 }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegistrationError("");
+    
+    // Validate email
+    const emailValidationResult = validateEmail(formData.email);
+    if (!emailValidationResult.isValid) {
+      setRegistrationError(emailValidationResult.message);
+      return;
+    }
+
+    // Validate password strength
+    const passwordStrengthResult = validatePasswordStrength(formData.password);
+    if (!passwordStrengthResult.isValid) {
+      setRegistrationError("Password does not meet security requirements");
+      return;
+    }
     
     // Validate form
     if (formData.password !== formData.confirmPassword) {
@@ -191,15 +240,29 @@ export const Register = (): JSX.Element => {
                 </div>
 
                 {/* Email Field */}
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
-                  placeholder="Enter your email"
-                  required
-                />
+                <div>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                      showValidation.email
+                        ? emailValidation.isValid
+                          ? 'border-green-500'
+                          : 'border-red-500'
+                        : 'border-gray-300'
+                    }`}
+                    placeholder="Enter your email"
+                    required
+                  />
+                  <EmailValidationIndicator
+                    email={formData.email}
+                    isValid={emailValidation.isValid}
+                    message={emailValidation.message}
+                    showValidation={showValidation.email}
+                  />
+                </div>
 
                 {/* Phone Field */}
                 <input
@@ -213,27 +276,40 @@ export const Register = (): JSX.Element => {
                 />
 
                 {/* Password Field */}
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
-                    placeholder="Enter your password"
-                    required
+                <div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                        showValidation.password
+                          ? passwordStrength.isValid
+                            ? 'border-green-500'
+                            : 'border-red-500'
+                          : 'border-gray-300'
+                      }`}
+                      placeholder="Enter your password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? (
+                        <EyeOffIcon className="w-5 h-5" />
+                      ) : (
+                        <EyeIcon className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                  <PasswordStrengthIndicator
+                    password={formData.password}
+                    strength={passwordStrength}
+                    showRequirements={showValidation.password}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon className="w-5 h-5" />
-                    ) : (
-                      <EyeIcon className="w-5 h-5" />
-                    )}
-                  </button>
                 </div>
 
                 {/* Confirm Password Field */}
