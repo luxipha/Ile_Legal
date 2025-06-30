@@ -8,9 +8,10 @@ import { UserRole } from '../../types/index';
 import { validateEmail, validatePasswordStrength, PasswordStrength } from '../../utils/validation';
 import { EmailValidationIndicator } from '../../components/ui/EmailValidationIndicator';
 import { PasswordStrengthIndicator } from '../../components/ui/PasswordStrengthIndicator';
+import { RegistrationConfirmationModal } from '../../components/ui/RegistrationConfirmationModal';
 
 export const Register = (): JSX.Element => {
-  const { register, signInWithMetaMask, signInWithGoogle, user, isLoading } = useAuth();
+  const { register, signInWithMetaMask, signInWithGoogle, user, isLoading, isMetaMaskConnecting } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -46,6 +47,10 @@ export const Register = (): JSX.Element => {
     email: false,
     password: false,
   });
+
+  // Modal states for social auth validation
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [pendingAuthMethod, setPendingAuthMethod] = useState<'google' | 'metamask' | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -113,29 +118,57 @@ export const Register = (): JSX.Element => {
     }
   };
 
-  // Modified to include role selection
-  const handleMetaMaskRegister = async () => {
+  // MetaMask registration with validation
+  const handleMetaMaskRegister = () => {
+    setPendingAuthMethod('metamask');
+    setShowConfirmationModal(true);
+  };
+
+  // Google registration with validation
+  const handleGoogleRegister = () => {
+    setPendingAuthMethod('google');
+    setShowConfirmationModal(true);
+  };
+
+  // Execute the actual social auth after confirmation
+  const executeAuthMethod = async () => {
+    if (!pendingAuthMethod) return;
+
     try {
       setRegistrationError("");
+      setIsSubmitting(true);
       
       // Map userType to UserRole
       const role: UserRole = userType === "professional" ? "seller" : "buyer";
       
-      // Confirm role selection
-      if (!window.confirm(`You're registering as a ${userType}. Continue?`)) {
-        return;
+      console.log(`Initiating ${pendingAuthMethod} registration as ${userType}...`);
+      
+      if (pendingAuthMethod === 'metamask') {
+        await signInWithMetaMask(role);
+      } else if (pendingAuthMethod === 'google') {
+        await signInWithGoogle(role);
       }
       
-      console.log(`Initiating MetaMask registration as ${userType}...`);
-      await signInWithMetaMask(role);
+      console.log(`User registered with ${pendingAuthMethod} as ${userType} (${role})`);
       
-      console.log(`User registered with MetaMask as ${userType} (${role})`);
+      // Close modal and reset state
+      setShowConfirmationModal(false);
+      setPendingAuthMethod(null);
       
-      // User will be redirected based on role after successful login
     } catch (error: any) {
-      console.error('MetaMask registration error:', error);
-      setRegistrationError(error.message || 'Failed to register with MetaMask');
+      console.error(`${pendingAuthMethod} registration error:`, error);
+      setRegistrationError(error.message || `Failed to register with ${pendingAuthMethod}`);
+      setShowConfirmationModal(false);
+      setPendingAuthMethod(null);
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  // Close modal handler
+  const handleCloseModal = () => {
+    setShowConfirmationModal(false);
+    setPendingAuthMethod(null);
   };
   
   // Redirect based on user role when authenticated
@@ -383,10 +416,10 @@ export const Register = (): JSX.Element => {
                   onClick={handleMetaMaskRegister}
                   variant="outline"
                   className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 hover:border-[#FEC85F] transition-all"
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || isLoading || isMetaMaskConnecting}
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-3" />
-                  {isLoading ? 'Connecting...' : 'Continue with MetaMask'}
+                  {isMetaMaskConnecting ? 'Connecting to MetaMask...' : isLoading ? 'Loading...' : 'Continue with MetaMask'}
                 </Button>
                 <Button
                   type="button"
@@ -415,7 +448,7 @@ export const Register = (): JSX.Element => {
                       setRegistrationError('Failed to initiate Google login');
                     }
                   }}
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || isLoading || isMetaMaskConnecting}
                 >
                   <img src="/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
                   {isLoading ? 'Connecting...' : 'Continue with Google'}
@@ -485,6 +518,17 @@ export const Register = (): JSX.Element => {
           </Button>
         </div>
       </div>
+
+      {/* Registration Confirmation Modal */}
+      <RegistrationConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={handleCloseModal}
+        onConfirm={executeAuthMethod}
+        userType={userType}
+        agreeToTerms={formData.agreeToTerms}
+        authMethod={pendingAuthMethod || 'metamask'}
+        loading={isSubmitting || isMetaMaskConnecting}
+      />
     </div>
   );
 };

@@ -41,7 +41,14 @@ const LoadingSpinner = () => (
 function ProfileCompletionHandler() {
   const { pendingMetaMaskProfile, completeMetaMaskProfile, setPendingMetaMaskProfile } = useAuth();
 
-  const handleProfileCompletion = async (profileData: { firstName: string; lastName: string; email: string; phone?: string }) => {
+  const handleProfileCompletion = async (profileData: { 
+    firstName: string; 
+    lastName: string; 
+    email: string; 
+    phone?: string;
+    userType?: 'client' | 'professional';
+    agreeToTerms?: boolean;
+  }) => {
     await completeMetaMaskProfile(profileData);
   };
 
@@ -56,6 +63,10 @@ function ProfileCompletionHandler() {
       onClose={handleModalClose}
       onSubmit={handleProfileCompletion}
       walletAddress={pendingMetaMaskProfile?.address || ''}
+      authMethod="metamask"
+      requireRoleSelection={true}
+      requireTermsAcceptance={true}
+      showWalletInfo={true}
     />
   );
 }

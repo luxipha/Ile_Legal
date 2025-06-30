@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
-import { X } from 'lucide-react';
+import { X, UserIcon, BriefcaseIcon } from 'lucide-react';
 
 interface ProfileCompletionModalProps {
   isOpen: boolean;
@@ -11,20 +11,32 @@ interface ProfileCompletionModalProps {
     lastName: string;
     email: string;
     phone?: string;
+    userType?: 'client' | 'professional';
+    agreeToTerms?: boolean;
   }) => Promise<void>;
-  walletAddress: string;
+  walletAddress?: string;
+  authMethod?: 'metamask' | 'google';
+  requireRoleSelection?: boolean;
+  requireTermsAcceptance?: boolean;
+  showWalletInfo?: boolean;
 }
 
 export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  walletAddress
+  walletAddress,
+  authMethod = 'metamask',
+  requireRoleSelection = false,
+  requireTermsAcceptance = false,
+  showWalletInfo = true
 }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [userType, setUserType] = useState<'client' | 'professional'>('client');
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +60,10 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
       setError('Please enter a valid email address');
       return;
     }
+    if (requireTermsAcceptance && !agreeToTerms) {
+      setError('Please agree to the Terms of Service to continue');
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -57,7 +73,9 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
-        phone: phone.trim() || undefined
+        phone: phone.trim() || undefined,
+        userType: requireRoleSelection ? userType : undefined,
+        agreeToTerms: requireTermsAcceptance ? agreeToTerms : undefined
       });
     } catch (err) {
       setError('Failed to update profile. Please try again.');
@@ -76,18 +94,57 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
           <h2 className="text-xl font-bold text-gray-900">Complete Your Profile</h2>
         </div>
 
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-800 font-medium">
-            ✅ Wallet Connected Successfully
-          </p>
-          <p className="text-xs text-green-600 font-mono mt-1 break-all">
-            {walletAddress}
-          </p>
-        </div>
+        {showWalletInfo && walletAddress && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-800 font-medium">
+              ✅ {authMethod === 'google' ? 'Google Account' : 'Wallet'} Connected Successfully
+            </p>
+            {authMethod === 'metamask' && (
+              <p className="text-xs text-green-600 font-mono mt-1 break-all">
+                {walletAddress}
+              </p>
+            )}
+          </div>
+        )}
 
         <p className="text-gray-600 text-sm mb-6">
           Please provide your details to complete your profile. This will be used for notifications and display purposes.
         </p>
+
+        {/* Role Selection */}
+        {requireRoleSelection && (
+          <div className="mb-6">
+            <Label className="text-sm font-medium text-gray-700 mb-3 block">
+              Account Type *
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setUserType("client")}
+                className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                  userType === "client"
+                    ? "border-[#FEC85F] bg-[#FEC85F] text-[#1B1828]"
+                    : "border-gray-300 hover:border-gray-400 bg-white"
+                }`}
+              >
+                <UserIcon className={`w-6 h-6 mx-auto mb-2 ${userType === "client" ? "text-[#1B1828]" : "text-gray-400"}`} />
+                <div className="font-semibold text-sm">Client</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserType("professional")}
+                className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                  userType === "professional"
+                    ? "border-[#1B1828] bg-[#1B1828] text-white"
+                    : "border-gray-300 hover:border-gray-400 bg-white"
+                }`}
+              >
+                <BriefcaseIcon className={`w-6 h-6 mx-auto mb-2 ${userType === "professional" ? "text-[#FEC85F]" : "text-gray-400"}`} />
+                <div className="font-semibold text-sm">Legal Professional</div>
+              </button>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -148,6 +205,41 @@ export const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
               disabled={isSubmitting}
             />
           </div>
+
+          {/* Terms and Conditions */}
+          {requireTermsAcceptance && (
+            <div className="flex items-start space-x-3">
+              <input
+                type="checkbox"
+                id="agreeToTerms"
+                checked={agreeToTerms}
+                onChange={(e) => setAgreeToTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 text-[#1B1828] focus:ring-[#1B1828] border-gray-300 rounded"
+                disabled={isSubmitting}
+                required
+              />
+              <Label htmlFor="agreeToTerms" className="text-sm text-gray-700 leading-5">
+                I agree to the{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#1B1828] hover:text-[#FEC85F] underline"
+                >
+                  Terms of Service
+                </a>{" "}
+                and{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#1B1828] hover:text-[#FEC85F] underline"
+                >
+                  Privacy Policy
+                </a>
+              </Label>
+            </div>
+          )}
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-md">

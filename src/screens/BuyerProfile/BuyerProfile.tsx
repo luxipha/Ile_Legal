@@ -17,11 +17,12 @@ import {
   BuildingIcon,
   PlusIcon,
   BriefcaseIcon,
-  EyeIcon
+  BadgeCheckIcon,
+  Badge,
+  CreditCardIcon
 } from "lucide-react";
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import ClientProfileView from './ClientProfileView';
 import { formatUser } from '../../utils/formatters';
 
 interface Education {
@@ -70,7 +71,7 @@ interface Feedback {
   created_at: string;
 }
 
-type ViewMode = "profile" | "edit-profile" | "public-view";
+type ViewMode = "profile" | "edit-profile";
 
 export const BuyerProfile = (): JSX.Element => {
   const { user, updateProfile, getUser, isLoading: authLoading } = useAuth();
@@ -498,10 +499,6 @@ export const BuyerProfile = (): JSX.Element => {
     );
   }
 
-  // Render public profile view
-  if (viewMode === 'public-view') {
-    return <ClientProfileView isOwnProfile={true} onBack={() => setViewMode('profile')} />;
-  }
 
   if (viewMode === "edit-profile") {
     return (
@@ -896,9 +893,24 @@ export const BuyerProfile = (): JSX.Element => {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
-                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                          🔵 Verified Client
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {/* Identity Verification Badge */}
+                          <div title={(user?.user_metadata as any)?.verification_status === 'verified' ? "Verified Client" : "Pending Verification"}>
+                            {(user?.user_metadata as any)?.verification_status === 'verified' ? (
+                              <BadgeCheckIcon className="w-6 h-6 text-green-500" />
+                            ) : (
+                              <Badge className="w-6 h-6 text-gray-400" />
+                            )}
+                          </div>
+                          {/* Payment Verification Badge */}
+                          <div title={(user?.user_metadata as any)?.payment_verified === true ? "Payment Method Verified" : "Payment Method Not Verified"}>
+                            <CreditCardIcon className={`w-6 h-6 ${
+                              (user?.user_metadata as any)?.payment_verified === true 
+                                ? 'text-blue-500' 
+                                : 'text-gray-400'
+                            }`} />
+                          </div>
+                        </div>
                       </div>
                       
                       <p className="text-xl text-gray-600 mb-2">{profileData.company}</p>
@@ -940,14 +952,6 @@ export const BuyerProfile = (): JSX.Element => {
                       >
                         <EditIcon className="w-4 h-4 mr-2" />
                         Edit Profile
-                      </Button>
-                      <Button
-                        onClick={() => setViewMode('public-view')}
-                        variant="outline"
-                        className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                      >
-                        <EyeIcon className="w-4 h-4 mr-2" />
-                        View Public Profile
                       </Button>
                     </div>
                   </div>

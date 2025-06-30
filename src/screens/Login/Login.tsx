@@ -9,7 +9,7 @@ import { validateEmail } from "../../utils/validation";
 import { EmailValidationIndicator } from "../../components/ui/EmailValidationIndicator";
 
 export const Login = (): JSX.Element => {
-  const { login, user, isLoading, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
+  const { login, user, isLoading, isMetaMaskConnecting, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
@@ -367,10 +367,10 @@ export const Login = (): JSX.Element => {
                       setLoginError(error.message || 'Failed to connect with MetaMask');
                     }
                   }}
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || isLoading || isMetaMaskConnecting}
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-3" />
-                  {isLoading ? 'Connecting...' : 'Continue with MetaMask'}
+                  {isMetaMaskConnecting ? 'Connecting to MetaMask...' : isLoading ? 'Loading...' : 'Continue with MetaMask'}
                 </Button>
                 
                 <Button
