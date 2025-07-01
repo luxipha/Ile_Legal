@@ -59,6 +59,7 @@ interface ProfileData {
   education: Education[];
   experience: Experience[];
   projects: Project[];
+  avatar_url?: string;
 }
 
 interface Feedback {
@@ -89,30 +90,64 @@ export const BuyerProfile = (): JSX.Element => {
   const [myGigsCount, setMyGigsCount] = useState<number>(0);
   const [loadingGigsRating, setLoadingGigsRating] = useState(false);
 
-  // Map user/user_metadata to ProfileData
-  const mapUserToProfileData = (userObj: any): ProfileData => {
-    const meta = userObj?.user_metadata || {};
-    // Try to get first/last name from user_metadata, else split user.name
-    let firstName = meta.firstName || '';
-    let lastName = meta.lastName || '';
-    if ((!firstName || !lastName) && userObj?.name) {
-      const parts = userObj.name.split(' ');
-      firstName = firstName || parts[0] || '';
-      lastName = lastName || parts.slice(1).join(' ') || '';
+  // Map profile data from Profiles table to ProfileData
+  const mapProfileToProfileData = (profileObj: any, userObj: any): ProfileData => {
+    // Parse education from JSON if it exists (same as Profile.tsx)
+    let education: Education[] = [];
+    if (profileObj?.education) {
+      try {
+        // Parse JSON education data from Profiles table
+        const educationData = typeof profileObj.education === 'string' 
+          ? JSON.parse(profileObj.education) 
+          : profileObj.education;
+        education = Array.isArray(educationData) ? educationData : [];
+      } catch (error) {
+        console.error('Error parsing education data from Profiles table:', error);
+        education = [];
+      }
     }
+
+    // Parse areas_of_interest from JSON if it exists (same as Profile.tsx specializations)
+    let interests: string[] = [];
+    if (profileObj?.areas_of_interest) {
+      try {
+        // Parse JSON areas_of_interest data from Profiles table
+        const interestsData = typeof profileObj.areas_of_interest === 'string' 
+          ? JSON.parse(profileObj.areas_of_interest) 
+          : profileObj.areas_of_interest;
+        interests = Array.isArray(interestsData) ? interestsData : [];
+      } catch (error) {
+        console.error('Error parsing areas_of_interest data from Profiles table:', error);
+        interests = [];
+      }
+    }
+    
+    // Fallback to specializations if areas_of_interest is not available
+    if (interests.length === 0 && profileObj?.specializations) {
+      try {
+        interests = typeof profileObj.specializations === 'string' 
+          ? JSON.parse(profileObj.specializations) 
+          : profileObj.specializations;
+      } catch (error) {
+        console.error('Error parsing specializations data:', error);
+        interests = [];
+      }
+    }
+
     return {
-      firstName,
-      lastName,
-      email: userObj.email || '',
-      phone: meta.phone || '',
-      company: meta.company || '',
-      industry: meta.industry || '',
-      location: meta.location || '',
-      about: meta.about || '',
-      interests: Array.isArray(meta.interests) ? meta.interests : [],
-      education: Array.isArray(meta.education) ? meta.education : [],
-      experience: Array.isArray(meta.experience) ? meta.experience : [],
-      projects: Array.isArray(meta.projects) ? meta.projects : [],
+      firstName: profileObj?.first_name || '',
+      lastName: profileObj?.last_name || '',
+      email: userObj?.email || '',
+      phone: profileObj?.phone || '',
+      company: profileObj?.professional_title || '', // Use professional_title as company
+      industry: profileObj?.industry || '',
+      location: profileObj?.location || '',
+      about: profileObj?.bio || '',
+      interests: interests,
+      education: education,
+      experience: [], // Not available in Profiles table
+      projects: [], // Not available in Profiles table
+      avatar_url: profileObj?.avatar_url || '',
     };
   };
 
@@ -120,16 +155,30 @@ export const BuyerProfile = (): JSX.Element => {
   useEffect(() => {
     const loadProfile = async () => {
       setLoadingProfile(true);
-      let freshUser = user;
-      if (!user) {
-        freshUser = await getUser();
+      try {
+        let freshUser = user;
+        if (!user) {
+          freshUser = await getUser();
+        }
+        
+        if (freshUser?.id) {
+          // Load profile data from Profiles table
+          const profileData = await api.metrics.getUserProfile(freshUser.id);
+          const pd = mapProfileToProfileData(profileData, freshUser);
+          setProfileData(pd);
+          setEditFormData(pd);
+        }
+      } catch (error) {
+        console.error('Error loading profile data:', error);
+        // Fallback to user metadata if profile data fails to load
+        if (user) {
+          const pd = mapProfileToProfileData(null, user);
+          setProfileData(pd);
+          setEditFormData(pd);
+        }
+      } finally {
+        setLoadingProfile(false);
       }
-      if (freshUser) {
-        const pd = mapUserToProfileData(freshUser);
-        setProfileData(pd);
-        setEditFormData(pd);
-      }
-      setLoadingProfile(false);
     };
     loadProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -191,26 +240,26 @@ export const BuyerProfile = (): JSX.Element => {
   };
 
   const handleEducationChange = (index: number, field: keyof Education, value: string) => {
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => prev ? ({
       ...prev,
-      education: prev.education.map((edu, i) =>
+      education: prev.education.map((edu, i) => 
         i === index ? { ...edu, [field]: value } : edu
       )
-    } : prev);
+    }) : prev);
   };
 
   const addEducation = () => {
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => prev ? ({
       ...prev,
       education: [...prev.education, { degree: "", institution: "", period: "" }]
-    } : prev);
+    }) : prev);
   };
 
   const removeEducation = (index: number) => {
-    setEditFormData(prev => prev ? {
+    setEditFormData(prev => prev ? ({
       ...prev,
       education: prev.education.filter((_, i) => i !== index)
-    } : prev);
+    }) : prev);
   };
 
   const addInterest = () => {
@@ -232,39 +281,39 @@ export const BuyerProfile = (): JSX.Element => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editFormData) return;
+    if (!editFormData || !user?.id) return;
     setSaving(true);
     try {
       console.log('Starting profile update...');
-      // Compose user_metadata update
-      const user_metadata: any = {
-        firstName: editFormData.firstName,
-        lastName: editFormData.lastName,
+      console.log('Edit form data:', editFormData);
+      
+      // Prepare profile data for updateProfile function
+      const profileUpdateData = {
+        first_name: editFormData.firstName,
+        last_name: editFormData.lastName,
         phone: editFormData.phone,
-        company: editFormData.company,
+        professional_title: editFormData.company,
         industry: editFormData.industry,
         location: editFormData.location,
-        about: editFormData.about,
-        interests: editFormData.interests,
-        education: editFormData.education,
-        experience: editFormData.experience,
-        projects: editFormData.projects,
+        bio: editFormData.about,
+        areas_of_interest: editFormData.interests, // Save to areas_of_interest field in Profiles table
+        education: editFormData.education, // This will be saved to Profiles table JSON column
       };
       
-      console.log('Calling updateProfile with data:', user_metadata);
-      await updateProfile({ user_metadata });
+      console.log('Calling updateProfile with data:', profileUpdateData);
+      
+      // Use updateProfile from AuthContext
+      await updateProfile(profileUpdateData);
+      
       console.log('Profile updated successfully');
       
-      // Refresh user/profileData
-      console.log('Refreshing user data...');
-      const freshUser = await getUser();
-      console.log('Fresh user data:', freshUser);
+      // Refresh profile data
+      console.log('Refreshing profile data...');
+      const freshProfileData = await api.metrics.getUserProfile(user.id);
+      const pd = mapProfileToProfileData(freshProfileData, user);
+      setProfileData(pd);
+      setEditFormData(pd);
       
-      if (freshUser) {
-        const pd = mapUserToProfileData(freshUser);
-        setProfileData(pd);
-        setEditFormData(pd);
-      }
       setViewMode("profile");
       console.log('Profile save completed');
     } catch (err: any) {
@@ -277,17 +326,18 @@ export const BuyerProfile = (): JSX.Element => {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && user?.id) {
       try {
         setSaving(true);
-        await updateProfile({ profile_picture: file });
-        // Refresh user/profileData
-        const freshUser = await getUser();
-        if (freshUser) {
-          const pd = mapUserToProfileData(freshUser);
-          setProfileData(pd);
-          setEditFormData(pd);
-        }
+        
+        // Use updateProfile from AuthContext with file upload
+        await updateProfile({ profile_picture_file: file });
+        
+        // Refresh profile data
+        const freshProfileData = await api.metrics.getUserProfile(user.id);
+        const pd = mapProfileToProfileData(freshProfileData, user);
+        setProfileData(pd);
+        setEditFormData(pd);
       } catch (err) {
         // TODO: show error toast
         console.error('Error uploading profile picture:', err);
@@ -527,9 +577,9 @@ export const BuyerProfile = (): JSX.Element => {
                     <div className="flex items-center gap-6">
                       <div className="relative">
                         <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                          {user?.user_metadata?.profile_picture ? (
+                          {profileData?.avatar_url ? (
                             <img 
-                              src={user.user_metadata.profile_picture} 
+                              src={profileData.avatar_url} 
                               alt={`${profileData.firstName} ${profileData.lastName}`}
                               className="w-full h-full object-cover"
                               onError={(e) => {
@@ -539,7 +589,7 @@ export const BuyerProfile = (): JSX.Element => {
                               }}
                             />
                           ) : null}
-                          <UserIcon className={`w-12 h-12 text-gray-600 ${user?.user_metadata?.profile_picture ? 'hidden' : ''}`} />
+                          <UserIcon className={`w-12 h-12 text-gray-600 ${profileData?.avatar_url ? 'hidden' : ''}`} />
                         </div>
                         <input
                           type="file"
@@ -814,7 +864,7 @@ export const BuyerProfile = (): JSX.Element => {
                                 type="text"
                                 value={edu.period}
                                 onChange={(e) => handleEducationChange(index, 'period', e.target.value)}
-                                placeholder="Period (e.g., 2015 - 2017)"
+                                placeholder="Period (e.g., 2013 - 2017)"
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
                               />
                             </div>
@@ -871,9 +921,9 @@ export const BuyerProfile = (): JSX.Element => {
                   <div className="flex items-start gap-6">
                     <div className="relative">
                       <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                        {user?.user_metadata?.profile_picture ? (
+                        {profileData?.avatar_url ? (
                           <img 
-                            src={user.user_metadata.profile_picture} 
+                            src={profileData.avatar_url} 
                             alt={`${profileData.firstName} ${profileData.lastName}`}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -883,7 +933,7 @@ export const BuyerProfile = (): JSX.Element => {
                             }}
                           />
                         ) : null}
-                        <UserIcon className={`w-12 h-12 text-gray-600 ${user?.user_metadata?.profile_picture ? 'hidden' : ''}`} />
+                        <UserIcon className={`w-12 h-12 text-gray-600 ${profileData?.avatar_url ? 'hidden' : ''}`} />
                       </div>
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                         <CheckCircleIcon className="w-4 h-4 text-white" />

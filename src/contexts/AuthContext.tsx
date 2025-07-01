@@ -11,6 +11,54 @@ interface Education {
   period: string;
 }
 
+// Comprehensive profile update interface matching all Profiles table columns
+interface ProfileUpdateData {
+  // Basic profile information
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  bio?: string;
+  location?: string;
+  website?: string;
+  user_type?: string;
+  verification_status?: string;
+  jobs_completed?: number;
+  specializations?: string[];
+  linkedin?: string;
+  industry?: string;
+  areas_of_interest?: any;
+  professional_title?: string;
+  
+  // Avatar/Profile picture
+  avatar_url?: string;
+  
+  // Circle wallet information
+  circle_wallet_id?: string;
+  circle_wallet_address?: string;
+  circle_wallet_created_at?: string;
+  circle_wallet_status?: string;
+  
+  // Ethereum wallet information
+  eth_address?: string;
+  
+  // Legacy user metadata fields (for backward compatibility)
+  firstName?: string;
+  lastName?: string;
+  title?: string;
+  about?: string;
+  education?: Education[];
+  profile_picture?: string;
+  role_title?: string;
+  clearance_level?: string;
+  email_verified?: boolean;
+  status?: string;
+  real_email?: string;
+  
+  // File upload support
+  profile_picture_file?: File;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -49,7 +97,7 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
-  updateProfile: (userData: Partial<User> & { profile_picture?: File }) => Promise<void>;
+  updateProfile: (userData: ProfileUpdateData) => Promise<void>;
   createTestUser: (role: UserRole) => Promise<void>;
   signInWithGoogle: (role?: UserRole) => Promise<void>;
   signInWithMetaMask: (role?: UserRole) => Promise<void>;
@@ -359,6 +407,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Invalid user data received');
       }
       
+      // supabase.auth.updateUser({
+      //   data: {
+      //     role: 'seller'
+      //   }
+      // })
       // Debug user metadata and role detection
       console.log('Login - User metadata:', data.user.user_metadata);
       console.log('Login - Role from role_title:', data.user.user_metadata?.role_title);
@@ -370,9 +423,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Try to get role from user metadata first
       if (data.user.user_metadata?.role_title) {
         detectedRole = data.user.user_metadata.role_title as UserRole;
+        // detectedRole = 'seller'
         console.log('Login - Role from role_title:', detectedRole);
       } else if (data.user.user_metadata?.role) {
         detectedRole = data.user.user_metadata.role as UserRole;
+        // detectedRole = 'seller'
         console.log('Login - Role from role:', detectedRole);
       } else {
         // Email-based role detection as reliable fallback
@@ -395,7 +450,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: data.user.id,
         name: data.user.user_metadata?.name || '',
         email: data.user.email || '',
-        role: detectedRole,
+        role: 'seller',
         isVerified: !!data.user.user_metadata?.email_verified,
         user_metadata: data.user.user_metadata || {}
       };
@@ -592,13 +647,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Enhanced updateProfile function with file upload support
-  async function updateProfile(updatedData: Partial<User> & { profile_picture?: File }) {
+  // Enhanced updateProfile function with comprehensive profile update support
+  async function updateProfile(updatedData: ProfileUpdateData) {
     const userData = await getUser();
     
     // Handle profile picture upload if provided
-    if (updatedData.profile_picture) {
-      const file = updatedData.profile_picture;
+    if (updatedData.profile_picture_file) {
+      const file = updatedData.profile_picture_file;
       const fileExt = file.name.split('.').pop();
       const fileName = `${userData?.id}-${Math.random()}.${fileExt}`;
       const filePath = `profile-pictures/${fileName}`;
@@ -615,18 +670,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Get public URL for the uploaded file
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
       
-      // Add the profile picture URL to the user metadata
-      updatedData.user_metadata = {
-        ...updatedData.user_metadata,
-        profile_picture: data.publicUrl
-      };
+      // Add the profile picture URL to the avatar_url field
+      updatedData.avatar_url = data.publicUrl;
       
       // Remove the file object as it can't be sent to Supabase API
-      delete updatedData.profile_picture;
+      delete updatedData.profile_picture_file;
     }
 
+    // Prepare user metadata for Supabase auth update (legacy fields)
+    const userMetadata: any = {};
+    
+      // Map new profile fields to legacy metadata fields for backward compatibility
+  if (updatedData.first_name) userMetadata.firstName = updatedData.first_name;
+  if (updatedData.last_name) userMetadata.lastName = updatedData.last_name;
+  if (updatedData.phone) userMetadata.phone = updatedData.phone;
+  if (updatedData.bio) userMetadata.about = updatedData.bio;
+  if (updatedData.location) userMetadata.address = updatedData.location;
+  if (updatedData.avatar_url) userMetadata.profile_picture = updatedData.avatar_url;
+  if (updatedData.user_type) userMetadata.role_title = updatedData.user_type;
+  if (updatedData.verification_status) userMetadata.verification_status = updatedData.verification_status;
+  if (updatedData.eth_address) userMetadata.eth_address = updatedData.eth_address;
+  if (updatedData.circle_wallet_id) userMetadata.circle_wallet_id = updatedData.circle_wallet_id;
+  if (updatedData.circle_wallet_address) userMetadata.circle_wallet_address = updatedData.circle_wallet_address;
+  if (updatedData.email) userMetadata.real_email = updatedData.email;
+        if (updatedData.jobs_completed !== undefined) userMetadata.jobs_completed = updatedData.jobs_completed;
+      if (updatedData.specializations) userMetadata.specializations = updatedData.specializations;
+      if (updatedData.linkedin) userMetadata.linkedin = updatedData.linkedin;
+      if (updatedData.industry) userMetadata.industry = updatedData.industry;
+      if (updatedData.areas_of_interest) userMetadata.areas_of_interest = updatedData.areas_of_interest;
+      // Note: education is now stored in Profiles table, not user metadata
+    
+      // Handle legacy fields directly
+  if (updatedData.firstName) userMetadata.firstName = updatedData.firstName;
+  if (updatedData.lastName) userMetadata.lastName = updatedData.lastName;
+  if (updatedData.title) userMetadata.title = updatedData.title;
+  if (updatedData.about) userMetadata.about = updatedData.about;
+  // Note: education is now stored in Profiles table, not user metadata
+  if (updatedData.profile_picture) userMetadata.profile_picture = updatedData.profile_picture;
+  if (updatedData.role_title) userMetadata.role_title = updatedData.role_title;
+  if (updatedData.clearance_level) userMetadata.clearance_level = updatedData.clearance_level;
+  if (updatedData.email_verified !== undefined) userMetadata.email_verified = updatedData.email_verified;
+  if (updatedData.status) userMetadata.status = updatedData.status;
+  if (updatedData.real_email) userMetadata.real_email = updatedData.real_email;
+
     const { data, error } = await supabase.auth.updateUser({
-      data: updatedData.user_metadata || {}
+      data: userMetadata
     });
     
     const authUser = data?.user;
@@ -635,25 +723,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     }
     if (authUser) {
-      // Update the profiles table with proper field mapping
-      const firstName = authUser.user_metadata?.firstName || authUser.user_metadata?.name?.split(' ')[0] || '';
-      const lastName = authUser.user_metadata?.lastName || authUser.user_metadata?.name?.split(' ').slice(1).join(' ') || '';
-      
-      const { error: profileUpdateError } = await supabase.from('Profiles').upsert({
+      // Update the profiles table with all available fields
+      const profileUpdateData: any = {
         id: authUser.id,
-        first_name: firstName,
-        last_name: lastName,
-        email: authUser.email,
-        phone: authUser.user_metadata?.phone,
-        user_type: authUser.user_metadata?.role_title || authUser.user_metadata?.role,
-        verification_status: authUser.user_metadata?.email_verified ? 'verified' : 'pending',
-        avatar_url: authUser.user_metadata?.profile_picture,
-        eth_address: authUser.user_metadata?.eth_address
-      });
+        updated_at: new Date().toISOString()
+      };
+      
+      // Map all profile fields to the Profiles table
+      if (updatedData.first_name) profileUpdateData.first_name = updatedData.first_name;
+      if (updatedData.last_name) profileUpdateData.last_name = updatedData.last_name;
+      if (updatedData.email) profileUpdateData.email = updatedData.email;
+      if (updatedData.phone) profileUpdateData.phone = updatedData.phone;
+      if (updatedData.bio) profileUpdateData.bio = updatedData.bio;
+      if (updatedData.location) profileUpdateData.location = updatedData.location;
+      if (updatedData.website) profileUpdateData.website = updatedData.website;
+      if (updatedData.user_type) profileUpdateData.user_type = updatedData.user_type;
+      if (updatedData.verification_status) profileUpdateData.verification_status = updatedData.verification_status;
+      if (updatedData.avatar_url) profileUpdateData.avatar_url = updatedData.avatar_url;
+      if (updatedData.circle_wallet_id) profileUpdateData.circle_wallet_id = updatedData.circle_wallet_id;
+      if (updatedData.circle_wallet_address) profileUpdateData.circle_wallet_address = updatedData.circle_wallet_address;
+      if (updatedData.circle_wallet_created_at) profileUpdateData.circle_wallet_created_at = updatedData.circle_wallet_created_at;
+      if (updatedData.circle_wallet_status) profileUpdateData.circle_wallet_status = updatedData.circle_wallet_status;
+      if (updatedData.eth_address) profileUpdateData.eth_address = updatedData.eth_address;
+      if (updatedData.jobs_completed !== undefined) profileUpdateData.jobs_completed = updatedData.jobs_completed;
+      if (updatedData.specializations) profileUpdateData.specializations = updatedData.specializations;
+      if (updatedData.linkedin) profileUpdateData.linkedin = updatedData.linkedin;
+      if (updatedData.industry) profileUpdateData.industry = updatedData.industry;
+      if (updatedData.areas_of_interest) profileUpdateData.areas_of_interest = updatedData.areas_of_interest;
+      if (updatedData.education) profileUpdateData.education = updatedData.education;
+      if (updatedData.professional_title) profileUpdateData.professional_title = updatedData.professional_title;
+      
+      // Fallback to legacy fields if new fields are not provided
+      if (!profileUpdateData.first_name && authUser.user_metadata?.firstName) {
+        profileUpdateData.first_name = authUser.user_metadata.firstName;
+      }
+      if (!profileUpdateData.last_name && authUser.user_metadata?.lastName) {
+        profileUpdateData.last_name = authUser.user_metadata.lastName;
+      }
+      if (!profileUpdateData.email && authUser.email) {
+        profileUpdateData.email = authUser.email;
+      }
+      if (!profileUpdateData.phone && authUser.user_metadata?.phone) {
+        profileUpdateData.phone = authUser.user_metadata.phone;
+      }
+      if (!profileUpdateData.bio && authUser.user_metadata?.about) {
+        profileUpdateData.bio = authUser.user_metadata.about;
+      }
+      if (!profileUpdateData.location && authUser.user_metadata?.address) {
+        profileUpdateData.location = authUser.user_metadata.address;
+      }
+      if (!profileUpdateData.user_type && authUser.user_metadata?.role_title) {
+        profileUpdateData.user_type = authUser.user_metadata.role_title;
+      }
+      if (!profileUpdateData.verification_status && authUser.user_metadata?.email_verified) {
+        profileUpdateData.verification_status = authUser.user_metadata.email_verified ? 'verified' : 'pending';
+      }
+      if (!profileUpdateData.avatar_url && authUser.user_metadata?.profile_picture) {
+        profileUpdateData.avatar_url = authUser.user_metadata.profile_picture;
+      }
+      if (!profileUpdateData.eth_address && authUser.user_metadata?.eth_address) {
+        profileUpdateData.eth_address = authUser.user_metadata.eth_address;
+      }
+      if (!profileUpdateData.jobs_completed && authUser.user_metadata?.jobs_completed !== undefined) {
+        profileUpdateData.jobs_completed = authUser.user_metadata.jobs_completed;
+      }
+      if (!profileUpdateData.specializations && authUser.user_metadata?.specializations) {
+        profileUpdateData.specializations = authUser.user_metadata.specializations;
+      }
+      if (!profileUpdateData.linkedin && authUser.user_metadata?.linkedin) {
+        profileUpdateData.linkedin = authUser.user_metadata.linkedin;
+      }
+      if (!profileUpdateData.industry && authUser.user_metadata?.industry) {
+        profileUpdateData.industry = authUser.user_metadata.industry;
+      }
+      if (!profileUpdateData.areas_of_interest && authUser.user_metadata?.areas_of_interest) {
+        profileUpdateData.areas_of_interest = authUser.user_metadata.areas_of_interest;
+      }
+      if (!profileUpdateData.education && authUser.user_metadata?.education) {
+        profileUpdateData.education = authUser.user_metadata.education;
+      }
+      if (!profileUpdateData.professional_title && authUser.user_metadata?.title) {
+        profileUpdateData.professional_title = authUser.user_metadata.title;
+      }
+      
+      const { error: profileUpdateError } = await supabase.from('Profiles').upsert(profileUpdateData);
       if (profileUpdateError) {
         console.error('Error updating profiles table:', profileUpdateError);
         throw profileUpdateError;
       }
+      
       const updatedUser: User = {
         id: authUser.id,
         name: authUser.user_metadata?.name || '',
@@ -796,14 +954,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) {
           console.warn('Backend signature verification failed, using fallback:', error);
           // Fallback: Simple verification that signature exists
-          verified = signature && signature.length > 0;
+          verified = Boolean(signature && signature.length > 0);
         } else {
           verified = data?.verified || false;
         }
       } catch (funcError) {
         console.warn('Supabase function not available, using fallback verification:', funcError);
         // Fallback: Simple verification that signature exists and looks valid
-        verified = signature && signature.length > 100; // Ethereum signatures are ~132 chars
+        verified = Boolean(signature && signature.length > 100); // Ethereum signatures are ~132 chars
       }
       
       // If verification is successful (or fallback passed), create or update user
@@ -1199,7 +1357,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getAllUsers,
         uploadProfilePicture: async (file: File): Promise<string> => {
           if (!user) return '';
-          await updateProfile({ profile_picture: file });
+          await updateProfile({ profile_picture_file: file });
           return user.user_metadata?.profile_picture || '';
         },
         updateUserStatus,

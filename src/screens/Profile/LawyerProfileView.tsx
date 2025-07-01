@@ -300,13 +300,13 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                     <div className="flex flex-col gap-3 lg:w-48">
                       {isOwnProfile && (
                         <>
-                          <Button 
+                          {/* <Button 
                             variant="outline" 
                             className="border-purple-300 text-purple-700 hover:bg-purple-50"
                             onClick={() => navigate('/profile')}
                           >
                             Edit Profile
-                          </Button>
+                          </Button> */}
                           <Button 
                             variant="outline" 
                             className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"

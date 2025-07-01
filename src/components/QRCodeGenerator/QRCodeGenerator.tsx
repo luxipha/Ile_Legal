@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import QRCode from 'qrcode';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -17,20 +17,20 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
   title = "QR Code",
   description = "Scan to view profile"
 }) => {
+  console.log('QRCodeGenerator component rendered with url:', url, 'size:', size);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    generateQRCode();
-  }, [url, size]);
-
-  const generateQRCode = async () => {
+  const generateQRCode = useCallback(async () => {
+    console.log('generateQRCode called with url:', url, 'size:', size);
     try {
       setLoading(true);
       const canvas = canvasRef.current;
+      console.log('Canvas ref:', canvas);
       if (canvas) {
+        console.log('Generating QR code on canvas with dimensions:', canvas.width, 'x', canvas.height);
         await QRCode.toCanvas(canvas, url, {
           width: size,
           margin: 2,
@@ -40,16 +40,46 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
           }
         });
         
+        console.log('QR Code drawn to canvas successfully');
+        
         // Convert canvas to data URL for download
         const dataUrl = canvas.toDataURL('image/png');
+        console.log("QR Code generated successfully, dataUrl length:", dataUrl.length);
         setQrDataUrl(dataUrl);
+      } else {
+        console.log('Canvas ref is null');
       }
     } catch (error) {
       console.error('Error generating QR code:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [url, size]);
+
+  useEffect(() => {
+    console.log('QRCodeGenerator useEffect triggered, url:', url, 'size:', size);
+    console.log('Canvas ref current:', canvasRef.current);
+    console.log('Loading state:', loading);
+    
+    // Check if canvas is available and generate QR code
+    if (canvasRef.current) {
+      console.log('Canvas is available, generating QR code');
+      generateQRCode();
+    } else {
+      console.log('Canvas not available yet, will retry');
+      // Retry after a short delay
+      const timer = setTimeout(() => {
+        console.log('Retry - Canvas ref current:', canvasRef.current);
+        if (canvasRef.current) {
+          console.log('Canvas now available, generating QR code');
+          generateQRCode();
+        } else {
+          console.log('Canvas still not available after retry');
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [generateQRCode]);
 
   const handleDownload = () => {
     if (!qrDataUrl) return;
@@ -102,20 +132,21 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
           
           {/* QR Code Canvas */}
           <div className="mb-4 flex justify-center">
-            <div className="p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm">
-              {loading ? (
+            <div className="p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm relative">
+              <canvas 
+                ref={canvasRef}
+                className="block"
+                width={size}
+                height={size}
+                style={{ width: size, height: size }}
+              />
+              {loading && (
                 <div 
-                  className="bg-gray-100 flex items-center justify-center animate-pulse"
+                  className="absolute inset-0 bg-gray-100 bg-opacity-75 flex items-center justify-center animate-pulse"
                   style={{ width: size, height: size }}
                 >
                   <QrCodeIcon className="w-16 h-16 text-gray-400" />
                 </div>
-              ) : (
-                <canvas 
-                  ref={canvasRef} 
-                  className="block"
-                  style={{ width: size, height: size }}
-                />
               )}
             </div>
           </div>

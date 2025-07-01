@@ -1768,7 +1768,7 @@ export const api = {
       try {
         const { data, error } = await supabase
           .from('Profiles')
-          .select('first_name, last_name, avatar_url, email, user_type, bio, location, website, phone, verification_status, jobs_completed')
+          .select('id, created_at, updated_at, first_name, last_name, avatar_url, email, user_type, bio, location, website, phone, verification_status, jobs_completed, specializations, linkedin, education, professional_title, industry, areas_of_interest')
           .eq('id', userId)
           .single();
 

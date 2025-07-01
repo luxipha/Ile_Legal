@@ -110,27 +110,104 @@ export const Profile = (): JSX.Element => {
       try {
         setIsLoading(true);
         
-        // Get data from user metadata like buyer profile
+        // First try to get data from Profiles table
+        let profileFromTable = null;
+        try {
+          profileFromTable = await api.metrics.getUserProfile(user.id);
+        } catch (error) {
+          console.log('Could not fetch from Profiles table, falling back to user metadata:', error);
+        }
+        
+        // Get data from user metadata as fallback
         const meta = user.user_metadata || {};
-        let firstName = (meta as any).firstName || '';
-        let lastName = (meta as any).lastName || '';
+        let firstName = '';
+        let lastName = '';
+        let phone = '';
+        let location = '';
+        let about = '';
+        let specializations: string[] = [];
+        let education: Education[] = [];
+        
+        if (profileFromTable) {
+          // Use data from Profiles table
+          firstName = profileFromTable.first_name || '';
+          lastName = profileFromTable.last_name || '';
+          phone = profileFromTable.phone || '';
+          location = profileFromTable.location || '';
+          about = profileFromTable.bio || '';
+          // Load specializations and education from Profiles table or fallback to metadata
+          specializations = Array.isArray((profileFromTable as any).specializations) ? (profileFromTable as any).specializations : 
+                          Array.isArray((meta as any).specializations) ? (meta as any).specializations : [];
+          // Load education from Profiles table (JSON column) or fallback to metadata
+          if ((profileFromTable as any).education) {
+            try {
+              // Parse JSON education data from Profiles table
+              const educationData = typeof (profileFromTable as any).education === 'string' 
+                ? JSON.parse((profileFromTable as any).education) 
+                : (profileFromTable as any).education;
+              education = Array.isArray(educationData) ? educationData : [];
+            } catch (error) {
+              console.error('Error parsing education data from Profiles table:', error);
+              education = Array.isArray((meta as any).education) ? (meta as any).education : [];
+            }
+          } else {
+            education = Array.isArray((meta as any).education) ? (meta as any).education : [];
+          }
+          // Load LinkedIn URL from Profiles table
+          const linkedinUrl = (profileFromTable as any).linkedin || (profileFromTable as any).website || '';
+          setEnhancedFormData(prev => ({ ...prev, linkedinUrl }));
+        } else {
+          // Fallback to user metadata
+          firstName = (meta as any).firstName || '';
+          lastName = (meta as any).lastName || '';
+          phone = meta.phone || '';
+          location = (meta as any).location || '';
+          about = (meta as any).about || '';
+          specializations = Array.isArray((meta as any).specializations) ? (meta as any).specializations : [];
+          education = Array.isArray((meta as any).education) ? (meta as any).education : [];
+          // Load LinkedIn URL from metadata
+          const linkedinUrl = (meta as any).linkedin || (meta as any).website || '';
+          setEnhancedFormData(prev => ({ ...prev, linkedinUrl }));
+        }
+        
+        // If still no names, try to get from user.name
         if ((!firstName || !lastName) && user.name) {
           const parts = user.name.split(' ');
           firstName = firstName || parts[0] || 'User';
           lastName = lastName || parts.slice(1).join(' ') || '';
         }
 
-        setProfileData({
+        // Get professional title from Profiles table or fallback to default
+        let professionalTitle = 'Legal Professional'; // Default fallback
+        console.log("profileFromTable", profileFromTable)
+        if (profileFromTable) {
+          professionalTitle = (profileFromTable as any).professional_title ;
+        } else {
+          professionalTitle = (meta as any).professional_title || (meta as any).title || 'Legal Professional';
+        }
+
+        const profileDataObj = {
           firstName,
           lastName,
           email: user.email || '',
-          phone: meta.phone || '',
-          title: 'Legal Professional',
-          address: (meta as any).location || '',
-          about: (meta as any).about || '',
-          specializations: Array.isArray((meta as any).specializations) ? (meta as any).specializations : [],
-          education: Array.isArray((meta as any).education) ? (meta as any).education : []
+          phone,
+          title: professionalTitle,
+          address: location,
+          about,
+          specializations,
+          education
+        };
+
+        console.log('Profile data loaded:', {
+          profileFromTable: !!profileFromTable,
+          specializations,
+          education,
+          profileDataObj
         });
+
+        setProfileData(profileDataObj);
+        // Also update editFormData to use the same data
+        setEditFormData(profileDataObj);
       } catch (error) {
         console.error('Error loading profile data:', error);
       } finally {
@@ -243,6 +320,7 @@ export const Profile = (): JSX.Element => {
       case 1:
         return !!(editFormData.firstName && editFormData.lastName && editFormData.email && editFormData.phone);
       case 2:
+        // console.log("editFormData", editFormData);
         return !!(editFormData.title && editFormData.specializations.length > 0);
       case 3:
         return editFormData.education.length > 0;
@@ -294,14 +372,43 @@ export const Profile = (): JSX.Element => {
     if (validateStep(currentStep)) {
       // Save current step data
       try {
-        // In a real implementation, you would save step data to backend
         console.log(`Saving step ${currentStep} data`);
+        
+        // Always save all current form data to prevent overwriting other fields
+        const profileUpdateData: any = {
+          // Basic profile information (always included)
+          first_name: editFormData.firstName,
+          last_name: editFormData.lastName,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          location: editFormData.address,
+          bio: editFormData.about,
+          professional_title: editFormData.title, // Save to professional_title field
+          specializations: editFormData.specializations,
+          education: editFormData.education,
+          
+          // Legacy fields for backward compatibility
+          firstName: editFormData.firstName,
+          lastName: editFormData.lastName,
+          about: editFormData.about,
+          
+          
+          // Enhanced form data
+          ...(enhancedFormData.linkedinUrl && { 
+            website: enhancedFormData.linkedinUrl,
+            linkedin: enhancedFormData.linkedinUrl 
+          }),
+          ...(enhancedFormData.barLicenseNumber && { role_title: enhancedFormData.barLicenseNumber }),
+          ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType })
+        };
+        
+        await updateProfile(profileUpdateData);
         
         if (!completedSteps.includes(currentStep)) {
           setCompletedSteps(prev => [...prev, currentStep]);
         }
         
-        // Show success message or move to next step based on UX preference
+        // Show success message
         alert(`Step ${currentStep} saved successfully!`);
       } catch (error) {
         console.error('Error saving step:', error);
@@ -356,11 +463,21 @@ export const Profile = (): JSX.Element => {
   };
 
   const addSpecialization = () => {
+    console.log("addSpecialization called");
+    console.log("editformdata before:", editFormData);
+    console.log("newSpecialization:", newSpecialization);
     if (newSpecialization.trim()) {
-      setEditFormData(prev => ({
-        ...prev,
-        specializations: [...prev.specializations, newSpecialization.trim()]
-      }));
+      const updatedSpecializations = [...editFormData.specializations, newSpecialization.trim()];
+      console.log("updatedSpecializations:", updatedSpecializations);
+      
+      setEditFormData(prev => {
+        const newState = {
+          ...prev,
+          specializations: updatedSpecializations
+        };
+        console.log("new editFormData state:", newState);
+        return newState;
+      });
       setNewSpecialization("");
     }
   };
@@ -377,22 +494,29 @@ export const Profile = (): JSX.Element => {
     if (!editFormData) return;
     
     try {
-      // Update profile using AuthContext API with both basic and enhanced data
+      // Update profile using the comprehensive AuthContext API
       await updateProfile({
-        user_metadata: {
-          firstName: editFormData.firstName,
-          lastName: editFormData.lastName,
-          phone: editFormData.phone,
-          title: editFormData.title,
-          address: editFormData.address,
-          about: editFormData.about,
-          specializations: editFormData.specializations,
-          education: editFormData.education,
-          // Store enhanced verification data in existing fields
-          ...(enhancedFormData.linkedinUrl && { location: enhancedFormData.linkedinUrl }),
-          ...(enhancedFormData.barLicenseNumber && { role_title: enhancedFormData.barLicenseNumber }),
-          ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType })
-        }
+        // Basic profile information
+        first_name: editFormData.firstName,
+        last_name: editFormData.lastName,
+        phone: editFormData.phone,
+        bio: editFormData.about,
+        location: editFormData.address,
+        professional_title: editFormData.title, // Save to professional_title field
+        
+        // Legacy fields for backward compatibility
+        firstName: editFormData.firstName,
+        lastName: editFormData.lastName,
+        title: editFormData.title, // Keep legacy field for backward compatibility
+        about: editFormData.about,
+        specializations: editFormData.specializations,
+        // Education is now saved to Profiles table (JSON column)
+        education: editFormData.education,
+        
+        // Enhanced verification data
+        ...(enhancedFormData.linkedinUrl && { website: enhancedFormData.linkedinUrl }),
+        ...(enhancedFormData.barLicenseNumber && { role_title: enhancedFormData.barLicenseNumber }),
+        ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType })
       });
       
       // Update local state and return to profile view
@@ -419,7 +543,7 @@ export const Profile = (): JSX.Element => {
     if (file) {
       try {
         // Update profile picture using AuthContext API
-        await updateProfile({ profile_picture: file });
+        await updateProfile({ profile_picture_file: file });
         console.log("Profile picture uploaded successfully");
         // TODO: Show success toast
       } catch (error) {
@@ -762,8 +886,20 @@ export const Profile = (): JSX.Element => {
                       <div className="mb-8">
                         <div className="flex items-center gap-6">
                           <div className="relative">
-                            <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                              <UserIcon className="w-12 h-12 text-gray-600" />
+                            <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                              {user && (user.user_metadata as any)?.profile_picture ? (
+                                <img
+                                  src={(user.user_metadata as any).profile_picture}
+                                  alt="Profile"
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    // Fallback to UserIcon if image fails to load
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : null}
+                              <UserIcon className={`w-12 h-12 text-gray-600 ${user && (user.user_metadata as any)?.profile_picture ? 'hidden' : ''}`} />
                             </div>
                             <input
                               type="file"
@@ -945,6 +1081,7 @@ export const Profile = (): JSX.Element => {
                                 value={spec}
                                 onChange={(e) => {
                                   const newSpecs = [...editFormData.specializations];
+                                 
                                   newSpecs[index] = e.target.value;
                                   setEditFormData(prev => ({ ...prev, specializations: newSpecs }));
                                 }}
@@ -965,10 +1102,15 @@ export const Profile = (): JSX.Element => {
                             <input
                               type="text"
                               value={newSpecialization}
-                              onChange={(e) => setNewSpecialization(e.target.value)}
+                              onChange={(e) => {
+                                console.log("e", e.target.value)
+                                setNewSpecialization(e.target.value)
+                              }}
                               placeholder="Add new specialization"
                               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialization())}
+                              onKeyDown={(e) => {
+                                e.key === 'Enter' && (e.preventDefault(), addSpecialization())
+                              }}
                             />
                             <Button
                               type="button"
@@ -1339,10 +1481,6 @@ export const Profile = (): JSX.Element => {
     );
   }
 
-  if (viewMode === "public-view") {
-    return <LawyerProfileView isOwnProfile={true} onBack={() => setViewMode("profile")} />;
-  }
-
   // Default profile view
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -1362,8 +1500,20 @@ export const Profile = (): JSX.Element => {
                 <CardContent className="p-8">
                   <div className="flex items-start gap-6">
                     <div className="relative">
-                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                        <UserIcon className="w-12 h-12 text-gray-600" />
+                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                        {user && (user.user_metadata as any)?.profile_picture ? (
+                          <img
+                            src={(user.user_metadata as any).profile_picture}
+                            alt="Profile"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to UserIcon if image fails to load
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <UserIcon className={`w-12 h-12 text-gray-600 ${user && (user.user_metadata as any)?.profile_picture ? 'hidden' : ''}`} />
                       </div>
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                         <CheckCircleIcon className="w-4 h-4 text-white" />
@@ -1476,7 +1626,7 @@ export const Profile = (): JSX.Element => {
                   <div className="flex items-center gap-3">
                     <MapPinIcon className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-700">
-                      {(user?.user_metadata as any)?.address || "Location not specified"}
+                      {profileData.address || "Location not specified"}
                     </span>
                   </div>
                 </div>
