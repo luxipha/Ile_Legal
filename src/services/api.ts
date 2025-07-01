@@ -863,17 +863,67 @@ export const api = {
       // Get user's verification documents
       getUserDocuments: async (userId: string) => {
         try {
-          const { data, error } = await supabase
-            .from('user_documents')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-
-          if (error) throw error;
-
-          return data || [];
+          // List all files in the user's profile_documents folder
+          const { data: files, error } = await supabase.storage
+            .from('documents')
+            .list(`${userId}/profile_documents/`);
+            
+          if (error) {
+            console.error('Error listing user documents:', error);
+            throw error;
+          }
+          
+          const documents: Array<{
+            id: string;
+            name: string;
+            url: string;
+            type: string;
+            created_at: string;
+          }> = [];
+          
+          if (files && files.length > 0) {
+            for (const file of files) {
+              const filepath = `${userId}/profile_documents/${file.name}`;
+              
+              // Get signed URL for each file (more secure than public URL)
+              const { data: signedUrl, error: urlError } = await supabase.storage
+                .from('documents')
+                .createSignedUrl(filepath, 3600); // 1 hour expiry
+              
+              if (urlError) {
+                console.error('Error creating signed URL for', filepath, urlError);
+                continue; // Skip this file if we can't get a URL
+              }
+              
+              // Determine document type based on filename
+              let documentType = 'other';
+              if (file.name.startsWith('government_id.')) {
+                documentType = 'government_id';
+              } else if (file.name.startsWith('selfie_with_id.')) {
+                documentType = 'selfie_with_id';
+              } else if (file.name.endsWith('.pdf')) {
+                documentType = 'pdf';
+              } else if (file.name.match(/\.(jpg|jpeg|png)$/i)) {
+                documentType = 'image';
+              }
+              
+              documents.push({
+                id: file.id || file.name,
+                name: file.name,
+                url: signedUrl.signedUrl,
+                type: documentType,
+                created_at: file.created_at || new Date().toISOString()
+              });
+            }
+          }
+          
+          // Sort by creation date (newest first)
+          documents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          
+          console.log('User documents retrieved successfully:', documents);
+          return documents;
         } catch (error) {
-          console.error('Error fetching user documents:', error);
+          console.error('Error in getUserDocuments:', error);
           throw error;
         }
       },

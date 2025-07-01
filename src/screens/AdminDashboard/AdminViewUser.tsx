@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
 import { ArrowLeft, Mail, Eye, CheckCircle, XCircle } from "lucide-react";
+import { api } from "../../services/api";
 
 type Document = {
+  id: string;
   name: string;
-  status: "verified" | "pending" | "rejected";
+  url: string;
+  type: string;
+  created_at: string;
 };
 
 type User = {
@@ -39,10 +43,33 @@ export const AdminViewUser = ({
   onReject,
   onRequestInfo
 }: AdminViewUserProps): JSX.Element => {
+  console.log("user", user);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRequestInfoModal, setShowRequestInfoModal] = useState(false);
   const [infoRequest, setInfoRequest] = useState("");
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+
+  // Load user documents when user changes
+  useEffect(() => {
+    const loadUserDocuments = async () => {
+      if (!user) return;
+      
+      setLoadingDocuments(true);
+      try {
+        const userDocuments = await api.admin.users.getUserDocuments(user.id.toString());
+        setDocuments(userDocuments);
+      } catch (error) {
+        console.error('Error loading user documents:', error);
+        setDocuments([]);
+      } finally {
+        setLoadingDocuments(false);
+      }
+    };
+
+    loadUserDocuments();
+  }, [user?.id]);
 
   const handleSubmitRejection = () => {
     if (!user || !rejectionReason.trim()) return;
@@ -90,11 +117,19 @@ export const AdminViewUser = ({
           <div className="md:col-span-2">
             <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
               <div className="flex items-start gap-6">
-                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
+                {user.avatar_url ? (
+                  <img 
+                    src={user.avatar_url} 
+                    alt={`${user.name}'s profile picture`}
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
+                    <svg className="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h2 className="text-xl font-semibold">{user.name}</h2>
@@ -104,7 +139,7 @@ export const AdminViewUser = ({
                       <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Pending</span>
                     )}
                   </div>
-                  <p className="text-gray-600 mb-4">Legal Professional • Joined {user.joinedDate || user.submittedDate}</p>
+                  <p className="text-gray-600 mb-4">{user.professional_title || 'Legal Professional'} • Joined {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}</p>
                   
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -160,16 +195,29 @@ export const AdminViewUser = ({
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h3 className="text-lg font-semibold mb-4">Submitted Documents</h3>
               <div className="space-y-4">
-                {user.documents && user.documents.length > 0 ? (
-                  user.documents.map((doc, index) => (
-                    <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+                {loadingDocuments ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p>Loading documents...</p>
+                  </div>
+                ) : documents && documents.length > 0 ? (
+                  documents.map((doc, index) => (
+                    <div key={doc.id || index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                       <div className="flex items-center gap-3">
                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <span>{doc.name}</span>
+                        <div>
+                          <span className="font-medium">{doc.name}</span>
+                          <div className="text-xs text-gray-500 capitalize">{doc.type.replace('_', ' ')}</div>
+                        </div>
                       </div>
-                      <Button variant="outline" size="sm" className="flex items-center gap-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center gap-1"
+                        onClick={() => window.open(doc.url, '_blank')}
+                      >
                         <Eye className="w-4 h-4" />
                         <span>View</span>
                       </Button>

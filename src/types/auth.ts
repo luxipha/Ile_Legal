@@ -7,6 +7,9 @@ export interface User {
   email: string;
   role: UserRole;
   isVerified: boolean;
+  created_at?: string;
+  professional_title?: string;
+  avatar_url?: string;
   user_metadata: {
     phone?: string;
     address?: string;

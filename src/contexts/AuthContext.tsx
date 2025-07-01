@@ -1160,13 +1160,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log("data", data);
 
     return data.map((userData: any) => ({
+      // Core user information
       id: userData.id,
       name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
       email: userData.email,
       role: userData.user_type as UserRole,
       isVerified: userData.verification_status === 'verified',
-      user_metadata: userData.user_metadata || {},
-      status: userData.status || userData.verification_status || 'pending'
+      status: userData.status || userData.verification_status || 'pending',
+      
+      // All Profiles table columns
+      created_at: userData.created_at,
+      updated_at: userData.updated_at,
+      first_name: userData.first_name,
+      last_name: userData.last_name,
+      avatar_url: userData.avatar_url,
+      user_type: userData.user_type,
+      bio: userData.bio,
+      location: userData.location,
+      website: userData.website,
+      phone: userData.phone,
+      circle_wallet_id: userData.circle_wallet_id,
+      circle_wallet_address: userData.circle_wallet_address,
+      circle_wallet_created_at: userData.circle_wallet_created_at,
+      circle_wallet_status: userData.circle_wallet_status,
+      verification_status: userData.verification_status,
+      jobs_completed: userData.jobs_completed,
+      eth_address: userData.eth_address,
+      specializations: userData.specializations,
+      linkedin: userData.linkedin,
+      education: userData.education,
+      professional_title: userData.professional_title,
+      industry: userData.industry,
+      areas_of_interest: userData.areas_of_interest,
+      bar_license_number: userData.bar_license_number,
+      
+      // Legacy user_metadata for backward compatibility
+      user_metadata: userData.user_metadata || {}
     }));
   };
 

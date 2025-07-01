@@ -24,6 +24,7 @@ interface User {
   status: "pending" | "verified" | "rejected";
   submittedDate: string;
   documents: Document[];
+  avatar_url?: string;
 }
 
 interface AdminVerifyUserProps {
@@ -90,9 +91,17 @@ export const AdminVerifyUser = ({
           <Card key={user.id} className="bg-white border border-gray-200">
             <CardContent className="p-8">
               <div className="flex items-start gap-6">
-                <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center">
-                  <UserIcon className="w-8 h-8 text-gray-600" />
-                </div>
+                {user.avatar_url ? (
+                  <img 
+                    src={user.avatar_url} 
+                    alt={`${user.name}'s profile picture`}
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center">
+                    <UserIcon className="w-8 h-8 text-gray-600" />
+                  </div>
+                )}
                 
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-4">
