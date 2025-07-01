@@ -30,6 +30,7 @@ const AuthCallback = lazy(() => import("./screens/AuthCallback/AuthCallback").th
 const TestAccounts = lazy(() => import("./screens/TestAccounts").then(m => ({ default: m.TestAccounts })));
 const BlockchainDemo = lazy(() => import("./screens/BlockchainDemo").then(m => ({ default: m.BlockchainDemo })));
 const WalletIndex = lazy(() => import("./screens/Wallet"));
+const PublicLawyerProfile = lazy(() => import("./components/PublicLawyerProfile").then(m => ({ default: m.PublicLawyerProfile })));
 
 // Loading component for Suspense fallback
 const LoadingSpinner = () => (
@@ -82,6 +83,13 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/profile/:id" element={<PublicLawyerProfile />} />
+      <Route path="/profile-demo" element={<PublicLawyerProfile />} />
+      <Route path="/profile-test" element={
+        <Suspense fallback={<LoadingSpinner />}>
+          {React.createElement(React.lazy(() => import("./components/PublicLawyerProfile/PublicLawyerProfileTest").then(m => ({ default: m.PublicLawyerProfileTest }))))}
+        </Suspense>
+      } />
       
       {/* Protected Routes with role-based access */}
       <Route path="/seller-dashboard" element={

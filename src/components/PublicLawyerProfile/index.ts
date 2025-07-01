@@ -1,0 +1,1 @@
+export { PublicLawyerProfile } from './PublicLawyerProfile';
