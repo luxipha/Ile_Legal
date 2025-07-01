@@ -16,13 +16,16 @@ import {
   FileText,
   Shield,
   ExternalLink,
-  QrCode
+  QrCode,
+  X
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 // import { BadgeCollection, EarnedBadge } from '../badges';
 // import { reputationService } from '../../services/reputationService';
 import { api } from '../../services/api';
+import { QRCodeGenerator } from '../QRCodeGenerator';
 
 interface Education {
   degree: string;
@@ -82,6 +85,7 @@ export const PublicLawyerProfile: React.FC = () => {
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
   const [currentTierBadge, setCurrentTierBadge] = useState<EarnedBadge | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [showQRPopup, setShowQRPopup] = useState(false);
 
   useEffect(() => {
     loadLawyerProfile(lawyerId);
@@ -107,49 +111,35 @@ export const PublicLawyerProfile: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Load lawyer profile data
+      // Load lawyer profile data from API
       let profileData;
       try {
         profileData = await api.metrics.getUserProfile(lawyerId);
+        console.log('Profile data loaded from API:', profileData);
+        console.log('linkedin', profileData.linkedin);
       } catch (error) {
-        console.log('API error, using mock data for demo');
-        profileData = null;
+        console.error('Error loading profile from API:', error);
+        setError('Failed to load lawyer profile');
+        setLoading(false);
+        return;
       }
       
-      // If no real data found, use mock data for demonstration
+      // If no real data found, show error
       if (!profileData) {
-        profileData = {
-          id: lawyerId,
-          email: 'demo.lawyer@ilelegal.com',
-          first_name: 'Sarah',
-          last_name: 'Johnson',
-          professional_title: 'Senior Legal Counsel',
-          bio: 'Experienced legal professional specializing in corporate law, contract negotiation, and business compliance. With over 8 years of practice, I help businesses navigate complex legal challenges while ensuring regulatory compliance and protecting their interests.',
-          phone: '+234 803 456 7890',
-          location: 'Lagos, Nigeria',
-          avatar_url: null,
-          specializations: ['Corporate Law', 'Contract Law', 'Business Compliance', 'Intellectual Property'],
-          education: [
-            {
-              degree: 'LLB (Bachelor of Laws)',
-              institution: 'University of Lagos',
-              period: '2012-2016'
-            },
-            {
-              degree: 'BL (Barrister at Law)',
-              institution: 'Nigerian Law School',
-              period: '2016-2017'
-            },
-            {
-              degree: 'LLM Corporate Law',
-              institution: 'London School of Economics',
-              period: '2018-2019'
-            }
-          ],
-          linkedin: 'https://linkedin.com/in/sarah-johnson-legal',
-          verification_status: 'verified',
-          created_at: '2021-03-15T00:00:00Z'
-        };
+        setError('Lawyer profile not found');
+        setLoading(false);
+        return;
+      }
+
+      // Load feedback/reviews for the lawyer
+      let feedbackData = [];
+      try {
+        feedbackData = await api.feedback.getFeedbackByUserId(lawyerId);
+        console.log('Feedback data loaded from API:', feedbackData);
+      } catch (feedbackError) {
+        console.error('Error loading feedback from API:', feedbackError);
+        // Don't fail the entire profile load if feedback fails
+        feedbackData = [];
       }
 
       // Transform profile data
@@ -172,10 +162,12 @@ export const PublicLawyerProfile: React.FC = () => {
         verification_status: profileData.verification_status,
         years_experience: calculateYearsExperience(profileData.created_at),
         joined_date: profileData.created_at,
-        // Mock calculated stats - in real app, these would come from aggregated data
-        average_rating: 4.8,
-        total_reviews: 47,
-        completed_cases: 156,
+        // Real calculated stats from API data
+        average_rating: feedbackData.length > 0 
+          ? feedbackData.reduce((sum, review) => sum + review.rating, 0) / feedbackData.length 
+          : 0,
+        total_reviews: feedbackData.length,
+        completed_cases: profileData.jobs_completed || 0,
         response_time: '< 2 hours'
       };
 
@@ -253,33 +245,19 @@ export const PublicLawyerProfile: React.FC = () => {
         setCurrentTierBadge(mockBadges[0]); // Set Proficient as current tier
       // }
 
-      // Load reviews (mock data for now)
-      setReviews([
-        {
-          id: '1',
-          rating: 5,
-          comment: 'Excellent legal advice on property matters. Very professional and responsive.',
-          client_name: 'Sarah M.',
-          date: '2024-06-15',
-          case_type: 'Property Law'
-        },
-        {
-          id: '2', 
-          rating: 5,
-          comment: 'Helped me with contract review. Clear explanations and fair pricing.',
-          client_name: 'Michael R.',
-          date: '2024-06-10',
-          case_type: 'Contract Review'
-        },
-        {
-          id: '3',
-          rating: 4,
-          comment: 'Great experience. Would recommend for business legal matters.',
-          client_name: 'Jennifer L.',
-          date: '2024-06-05',
-          case_type: 'Business Law'
-        }
-      ]);
+      // Transform feedback data to reviews format
+      const transformedReviews = feedbackData.map((feedback, index) => ({
+        id: feedback.id || `review-${index}`,
+        rating: feedback.rating,
+        comment: feedback.free_response,
+        client_name: feedback.creator_profile?.first_name 
+          ? `${feedback.creator_profile.first_name} ${feedback.creator_profile.last_name || ''}`.trim()
+          : 'Anonymous Client',
+        date: new Date(feedback.created_at).toLocaleDateString(),
+        case_type: 'Legal Service' // Could be enhanced to get actual case type from gig
+      }));
+      
+      setReviews(transformedReviews);
 
     } catch (err) {
       console.error('Error loading lawyer profile:', err);
@@ -313,10 +291,14 @@ export const PublicLawyerProfile: React.FC = () => {
     }
   };
 
+  const handleRequestQuote = () => {
+    if (lawyer?.email) {
+      window.location.href = `mailto:${lawyer.email}?subject=Quote Request&body=Hello ${lawyer.name}, I would like to request a quote for legal services. Please provide details about your rates and availability.`;
+    }
+  };
 
   const generateQRCode = () => {
-    // QR code would be generated here - placeholder for now
-    alert('QR code generation would be implemented here');
+    setShowQRPopup(true);
   };
 
   if (loading) {
@@ -418,7 +400,7 @@ export const PublicLawyerProfile: React.FC = () => {
                 <Button 
                   onClick={generateQRCode}
                   variant="outline"
-                  className="border-white text-white hover:bg-white/10 font-semibold px-6 py-3"
+                  className="border-white text-white hover:bg-white/20 font-semibold px-6 py-3 bg-white/10"
                 >
                   <QrCode className="w-4 h-4 mr-2" />
                   QR Code
@@ -452,7 +434,7 @@ export const PublicLawyerProfile: React.FC = () => {
                       <span>{lawyer.location}</span>
                     </div>
                   )}
-                  {lawyer.years_experience > 0 && (
+                  { (
                     <div className="flex items-center gap-2 text-gray-600">
                       <Calendar className="w-4 h-4" />
                       <span>{lawyer.years_experience}+ years on platform</span>
@@ -708,6 +690,61 @@ export const PublicLawyerProfile: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* QR Code Popup */}
+      <Dialog open={showQRPopup} onOpenChange={setShowQRPopup}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Share Your Profile</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="text-center">
+              <p className="text-gray-600 mb-4">
+                Generate a QR code to easily share your legal profile with clients
+              </p>
+            </div>
+            
+            <div className="flex justify-center">
+              <QRCodeGenerator
+                url={window.location.href}
+                title="Legal Profile QR Code"
+                description="Scan to view this lawyer's public profile"
+                size={200}
+              />
+            </div>
+            
+            {/* Additional sharing options */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                <span className="text-sm text-gray-700">Public Profile URL</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                  }}
+                >
+                  Copy Link
+                </Button>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                <span className="text-sm text-gray-700">Business Card QR</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // This would trigger a download of a business card format
+                    alert('Business card download feature coming soon!');
+                  }}
+                >
+                  Download
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

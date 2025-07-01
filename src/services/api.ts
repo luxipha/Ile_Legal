@@ -1468,6 +1468,23 @@ export const api = {
 
       return data || [];
     },
+
+    getFeedbackByUserId: async (userId: string) => {
+      const { data, error } = await supabase
+        .from('Feedback')
+        .select(`
+          *,
+          creator_profile:Profiles!creator(*)
+        `)
+        .eq('recipient', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
+    },
   },
 
   submissions: {

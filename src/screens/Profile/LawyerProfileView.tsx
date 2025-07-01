@@ -677,7 +677,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                const url = `${window.location.origin}/public-profile?id=${user?.id}`;
+                                const url = `${window.location.origin}/profile?id=${user?.id}`;
                                 navigator.clipboard.writeText(url);
                               }}
                             >
