@@ -21,6 +21,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { QRCodeGenerator } from '../../components/QRCodeGenerator';
+import { BadgeCollection } from '../../components/badges';
+import { reputationService } from '../../services/reputationService';
+import { EarnedBadge } from '../../components/badges';
 
 interface LawyerProfileViewProps {
   isOwnProfile?: boolean;
@@ -38,6 +41,9 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [completedGigs, setCompletedGigs] = useState(0);
   const [projectsData, setProjectsData] = useState<any[]>([]);
+  const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
+  const [currentTierBadge, setCurrentTierBadge] = useState<EarnedBadge | null>(null);
+  const [loadingBadges, setLoadingBadges] = useState(true);
 
   // Extract real user data from auth context and user metadata
   const userMetadata = user?.user_metadata as Record<string, any> || {};
@@ -94,6 +100,20 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
           setUserStats(stats);
         } catch (statsError) {
           console.log('Could not load stats:', statsError);
+        }
+
+        // Load user badges
+        try {
+          setLoadingBadges(true);
+          const badgeData = await reputationService.getUserBadges(user.id);
+          setEarnedBadges(badgeData.earned);
+          setCurrentTierBadge(badgeData.currentTier);
+        } catch (badgeError) {
+          console.log('Could not load badges:', badgeError);
+          setEarnedBadges([]);
+          setCurrentTierBadge(null);
+        } finally {
+          setLoadingBadges(false);
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -257,20 +277,56 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                         </div>
                       </div>
 
-                      {/* Badges */}
-                      <div className="flex flex-wrap gap-2">
-                        {dynamicBadges.map((badge: any, index: number) => {
-                          const IconComponent = badge.icon;
-                          return (
-                            <span
-                              key={index}
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color}`}
-                            >
-                              <IconComponent className="w-3 h-3 mr-1" />
-                              {badge.name}
-                            </span>
-                          );
-                        })}
+                      {/* Professional Reputation */}
+                      <div className="flex flex-col gap-3">
+                        {/* Current Tier Badge - Prominently displayed */}
+                        {!loadingBadges && currentTierBadge && (
+                          <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                            <div className="flex-shrink-0">
+                              <BadgeCollection 
+                                badges={[currentTierBadge]} 
+                                maxVisible={1} 
+                                size="md" 
+                                showTooltip={false}
+                              />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900">{currentTierBadge.name}</div>
+                              <div className="text-sm text-gray-600">{currentTierBadge.description}</div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Achievement & Quality Badges */}
+                        {!loadingBadges && earnedBadges.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-700">Achievements & Credentials</h4>
+                            <BadgeCollection 
+                              badges={earnedBadges.filter(badge => badge.type !== 'reputation')} 
+                              maxVisible={5} 
+                              size="sm" 
+                              className="justify-start"
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Legacy badges for fallback */}
+                        {(loadingBadges || earnedBadges.length === 0) && (
+                          <div className="flex flex-wrap gap-2">
+                            {dynamicBadges.map((badge: any, index: number) => {
+                              const IconComponent = badge.icon;
+                              return (
+                                <span
+                                  key={index}
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color}`}
+                                >
+                                  <IconComponent className="w-3 h-3 mr-1" />
+                                  {badge.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Quick Stats */}

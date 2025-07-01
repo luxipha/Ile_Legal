@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { ipfsService } from './ipfsService';
 import { AlgorandService } from '../components/blockchain/shared/algorandService';
+import algosdk from 'algosdk';
+import { EarnedBadge } from '../components/badges';
 
 export interface ReputationScore {
   overall: number;
@@ -63,6 +65,296 @@ export class ReputationService {
   }
 
   /**
+   * Get user's earned badges from persistent storage
+   */
+  async getUserBadges(userId: string): Promise<{
+    earned: EarnedBadge[];
+    currentTier: EarnedBadge | null;
+  }> {
+    try {
+      // First check if badges need to be updated
+      await this.updateUserBadges(userId);
+
+      // Get stored badges from database
+      const { data: storedBadges, error } = await supabase
+        .rpc('get_user_badges', { p_user_id: userId });
+
+      if (error) {
+        console.error('Error fetching stored badges:', error);
+        return { earned: [], currentTier: null };
+      }
+
+      const earnedBadges: EarnedBadge[] = [];
+      let currentTier: EarnedBadge | null = null;
+
+      // Convert stored badges to EarnedBadge format
+      for (const badge of storedBadges || []) {
+        const earnedBadge: EarnedBadge = {
+          id: badge.badge_id,
+          type: badge.type as 'reputation' | 'achievement' | 'quality' | 'verification',
+          name: badge.name,
+          description: badge.description,
+          earnedDate: badge.earned_date,
+          tier: badge.tier as 'novice' | 'competent' | 'proficient' | 'expert' | 'master',
+          rarity: badge.rarity as 'common' | 'rare' | 'epic' | 'legendary'
+        };
+
+        earnedBadges.push(earnedBadge);
+
+        // Set current tier badge (highest reputation badge)
+        if (badge.type === 'reputation') {
+          currentTier = earnedBadge;
+        }
+      }
+
+      return {
+        earned: earnedBadges,
+        currentTier
+      };
+    } catch (error) {
+      console.error('Error getting user badges:', error);
+      return { earned: [], currentTier: null };
+    }
+  }
+
+  /**
+   * Update user badges by checking current achievements and awarding new badges
+   */
+  async updateUserBadges(userId: string): Promise<void> {
+    try {
+      const reputationScore = await this.calculateReputationScore(userId);
+
+      // Check and award tier badge
+      await this.checkAndAwardTierBadge(userId, reputationScore);
+
+      // Check and award achievement badges
+      await this.checkAndAwardAchievementBadges(userId, reputationScore);
+
+      // Check and award quality badges
+      await this.checkAndAwardQualityBadges(userId, reputationScore);
+
+      // Check and award verification badges
+      await this.checkAndAwardVerificationBadges(userId);
+
+    } catch (error) {
+      console.error('Error updating user badges:', error);
+    }
+  }
+
+  /**
+   * Award a badge to a user (persistent storage)
+   */
+  async awardBadge(
+    userId: string, 
+    badgeId: string, 
+    tier?: string, 
+    metadata: any = {}, 
+    blockchainTxId?: string
+  ): Promise<string | null> {
+    try {
+      const { data, error } = await supabase
+        .rpc('award_badge', {
+          p_user_id: userId,
+          p_badge_id: badgeId,
+          p_tier: tier || null,
+          p_metadata: metadata,
+          p_blockchain_tx_id: blockchainTxId || null
+        });
+
+      if (error) {
+        console.error('Error awarding badge:', error);
+        return null;
+      }
+
+      console.log(`Badge ${badgeId} awarded to user ${userId}`);
+      return data;
+    } catch (error) {
+      console.error('Error awarding badge:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check and award appropriate tier badge based on reputation score
+   */
+  private async checkAndAwardTierBadge(userId: string, reputationScore: ReputationScore): Promise<void> {
+    const { overall } = reputationScore;
+    let badgeId: string;
+    let tier: string;
+
+    if (overall >= 90) {
+      badgeId = 'tier_master';
+      tier = 'master';
+    } else if (overall >= 75) {
+      badgeId = 'tier_expert';
+      tier = 'expert';
+    } else if (overall >= 50) {
+      badgeId = 'tier_proficient';
+      tier = 'proficient';
+    } else if (overall >= 25) {
+      badgeId = 'tier_competent';
+      tier = 'competent';
+    } else {
+      badgeId = 'tier_novice';
+      tier = 'novice';
+    }
+
+    // Check if user already has this exact tier badge
+    const { data: hasBadge } = await supabase
+      .rpc('user_has_badge', { p_user_id: userId, p_badge_id: badgeId });
+
+    if (!hasBadge) {
+      await this.awardBadge(userId, badgeId, tier, { score: overall });
+    }
+  }
+
+  /**
+   * Check and award achievement badges based on completion milestones
+   */
+  private async checkAndAwardAchievementBadges(userId: string, reputationScore: ReputationScore): Promise<void> {
+    const { total_completions } = reputationScore;
+
+    const achievementMilestones = [
+      { threshold: 1, id: 'first_gig' },
+      { threshold: 5, id: 'five_gigs' },
+      { threshold: 10, id: 'ten_gigs' },
+      { threshold: 25, id: 'twenty_five_gigs' },
+      { threshold: 50, id: 'fifty_gigs' },
+      { threshold: 100, id: 'hundred_gigs' }
+    ];
+
+    for (const milestone of achievementMilestones) {
+      if (total_completions >= milestone.threshold) {
+        // Check if user already has this badge
+        const { data: hasBadge } = await supabase
+          .rpc('user_has_badge', { p_user_id: userId, p_badge_id: milestone.id });
+
+        if (!hasBadge) {
+          await this.awardBadge(userId, milestone.id, undefined, { 
+            completions: total_completions,
+            milestone: milestone.threshold 
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Check and award quality badges based on performance metrics
+   */
+  private async checkAndAwardQualityBadges(userId: string, reputationScore: ReputationScore): Promise<void> {
+    const { average_rating, total_completions } = reputationScore;
+
+    // Client Favorite Badge (4.8+ rating with 10+ reviews)
+    if (average_rating >= 4.8 && total_completions >= 10) {
+      const { data: hasBadge } = await supabase
+        .rpc('user_has_badge', { p_user_id: userId, p_badge_id: 'client_favorite' });
+
+      if (!hasBadge) {
+        await this.awardBadge(userId, 'client_favorite', undefined, { 
+          rating: average_rating,
+          completions: total_completions 
+        });
+      }
+    }
+
+    // Quick Responder Badge (mock - would need real response time data)
+    if (total_completions >= 5) {
+      const { data: hasBadge } = await supabase
+        .rpc('user_has_badge', { p_user_id: userId, p_badge_id: 'quick_responder' });
+
+      if (!hasBadge) {
+        await this.awardBadge(userId, 'quick_responder', undefined, { 
+          completions: total_completions 
+        });
+      }
+    }
+
+    // Perfectionist Badge (mock - would need consecutive 5-star tracking)
+    if (average_rating >= 4.9 && total_completions >= 10) {
+      const { data: hasBadge } = await supabase
+        .rpc('user_has_badge', { p_user_id: userId, p_badge_id: 'perfectionist' });
+
+      if (!hasBadge) {
+        await this.awardBadge(userId, 'perfectionist', undefined, { 
+          rating: average_rating,
+          completions: total_completions 
+        });
+      }
+    }
+
+    // 5-Star Streak Badge (mock - would need streak tracking)
+    if (average_rating >= 5.0 && total_completions >= 5) {
+      const { data: hasBadge } = await supabase
+        .rpc('user_has_badge', { p_user_id: userId, p_badge_id: 'five_star_streak' });
+
+      if (!hasBadge) {
+        await this.awardBadge(userId, 'five_star_streak', undefined, { 
+          rating: average_rating,
+          completions: total_completions 
+        });
+      }
+    }
+  }
+
+  /**
+   * Check and award verification badges based on user verification status
+   */
+  private async checkAndAwardVerificationBadges(userId: string): Promise<void> {
+    try {
+      // Get user profile data
+      const { data: profile } = await supabase
+        .from('Profiles')
+        .select('verification_status')
+        .eq('id', userId)
+        .single();
+
+      // Identity Verified Badge
+      if (profile?.verification_status === 'verified') {
+        const { data: hasBadge } = await supabase
+          .rpc('user_has_badge', { p_user_id: userId, p_badge_id: 'identity_verified' });
+
+        if (!hasBadge) {
+          await this.awardBadge(userId, 'identity_verified', undefined, { 
+            verification_status: profile.verification_status 
+          });
+        }
+      }
+
+      // Check for credentials
+      const credentials = await this.getUserCredentials(userId);
+      if (credentials.length > 0) {
+        // Professional Credentials Badge
+        const { data: hasCredBadge } = await supabase
+          .rpc('user_has_badge', { p_user_id: userId, p_badge_id: 'professional_credentials' });
+
+        if (!hasCredBadge) {
+          await this.awardBadge(userId, 'professional_credentials', undefined, { 
+            credentials_count: credentials.length 
+          });
+        }
+
+        // Bar License Verified Badge
+        const hasBarLicense = credentials.some(cred => 
+          cred.credential_type === 'bar_license' && cred.verification_status === 'verified'
+        );
+        if (hasBarLicense) {
+          const { data: hasBarBadge } = await supabase
+            .rpc('user_has_badge', { p_user_id: userId, p_badge_id: 'bar_license_verified' });
+
+          if (!hasBarBadge) {
+            await this.awardBadge(userId, 'bar_license_verified', undefined, { 
+              bar_license_verified: true 
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking verification badges:', error);
+    }
+  }
+
+  /**
    * Calculate comprehensive reputation score for a user
    */
   async calculateReputationScore(userId: string): Promise<ReputationScore> {
@@ -114,10 +406,7 @@ export class ReputationService {
       // Upload evidence to IPFS if provided
       let evidenceIpfsCid = '';
       if (evidenceFiles.length > 0) {
-        const uploadResults = await ipfsService.uploadFiles(evidenceFiles, {
-          category: `reputation-evidence-${Date.now()}`,
-          legalDocumentType: 'reputation_evidence'
-        });
+        const uploadResults = await ipfsService.uploadFiles(evidenceFiles, `reputation-evidence-${Date.now()}`);
         evidenceIpfsCid = uploadResults[0].cid;
       }
 
@@ -169,6 +458,15 @@ export class ReputationService {
       if (error) throw error;
 
       console.log(`Reputation event recorded: ${eventType} for user ${userId}, blockchain TX: ${blockchainTxId}`);
+      
+      // Trigger badge update after reputation event
+      try {
+        await this.updateUserBadges(userId);
+      } catch (badgeError) {
+        console.error('Error updating badges after reputation event:', badgeError);
+        // Don't fail the reputation event if badge update fails
+      }
+
       return reputationEvent.id;
 
     } catch (error) {
@@ -194,8 +492,7 @@ export class ReputationService {
       // Upload credential document to IPFS
       const uploadResult = await ipfsService.uploadFile(credentialFile, {
         legalDocumentType: 'legal_credential',
-        blockchainIntegrated: true,
-        courtAdmissible: true
+        blockchainIntegrated: true
       });
 
       // Get user's wallet address
@@ -254,6 +551,14 @@ export class ReputationService {
       );
 
       console.log(`Legal credential verified: ${credentialName} for user ${userId}`);
+      
+      // Trigger badge update after credential verification
+      try {
+        await this.updateUserBadges(userId);
+      } catch (badgeError) {
+        console.error('Error updating badges after credential verification:', badgeError);
+      }
+
       return credential.id;
 
     } catch (error) {
@@ -279,15 +584,10 @@ export class ReputationService {
   ): Promise<string> {
     try {
       // Upload all documents to IPFS
-      const documentUploads = await ipfsService.uploadFiles(documents, {
-        category: `case-${gigId}-documents`,
-        legalDocumentType: 'case_documentation',
-        courtAdmissible: true
-      });
+      const documentUploads = await ipfsService.uploadFiles(documents, `case-${gigId}-documents`);
 
       const deliverableUpload = await ipfsService.uploadFile(finalDeliverable, {
         legalDocumentType: 'case_completion',
-        courtAdmissible: true,
         blockchainIntegrated: true
       });
 
@@ -358,6 +658,14 @@ export class ReputationService {
       }
 
       console.log(`Case completion recorded: ${caseTitle} for lawyer ${lawyerId}`);
+      
+      // Trigger badge update after case completion
+      try {
+        await this.updateUserBadges(lawyerId);
+      } catch (badgeError) {
+        console.error('Error updating badges after case completion:', badgeError);
+      }
+
       return completion.id;
 
     } catch (error) {
@@ -495,7 +803,6 @@ export class ReputationService {
       if (error) throw error;
 
       // Record as reputation event
-      const scoreChange = score * weight * 0.5; // Attestations have moderate impact
       await this.recordReputationEvent(
         subjectUserId,
         'peer_attestation_received',
@@ -561,13 +868,16 @@ export class ReputationService {
       version: '1.0'
     };
 
-    return await this.algorandService.submitDocumentHash(
-      JSON.stringify(noteData),
-      'SHA-256',
-      `reputation-event-${eventType}`,
-      0, // No file size for reputation events
-      noteData
-    );
+    const mockAccount = algosdk.generateAccount(); // Mock account for blockchain submission
+    const documentHash = {
+      hash: JSON.stringify(noteData),
+      fileName: `reputation-event-${eventType}`,
+      fileSize: 0,
+      algorithm: 'SHA-256' as const,
+      timestamp: new Date().toISOString()
+    };
+    const result = await this.algorandService.submitDocumentHash(documentHash, mockAccount);
+    return result.transaction?.txId || '';
   }
 
   private async recordCredentialOnBlockchain(
@@ -586,13 +896,16 @@ export class ReputationService {
       version: '1.0'
     };
 
-    return await this.algorandService.submitDocumentHash(
-      JSON.stringify(noteData),
-      'SHA-256',
-      `credential-${credentialType}`,
-      0,
-      noteData
-    );
+    const mockAccount = algosdk.generateAccount(); // Mock account for blockchain submission
+    const documentHash = {
+      hash: JSON.stringify(noteData),
+      fileName: `credential-${credentialType}`,
+      fileSize: 0,
+      algorithm: 'SHA-256' as const,
+      timestamp: new Date().toISOString()
+    };
+    const result = await this.algorandService.submitDocumentHash(documentHash, mockAccount);
+    return result.transaction?.txId || '';
   }
 
   private async recordCaseCompletionOnBlockchain(
@@ -614,13 +927,16 @@ export class ReputationService {
       version: '1.0'
     };
 
-    return await this.algorandService.submitDocumentHash(
-      JSON.stringify(noteData),
-      'SHA-256',
-      `case-${caseType}`,
-      0,
-      noteData
-    );
+    const mockAccount = algosdk.generateAccount(); // Mock account for blockchain submission
+    const documentHash = {
+      hash: JSON.stringify(noteData),
+      fileName: `case-${caseType}`,
+      fileSize: 0,
+      algorithm: 'SHA-256' as const,
+      timestamp: new Date().toISOString()
+    };
+    const result = await this.algorandService.submitDocumentHash(documentHash, mockAccount);
+    return result.transaction?.txId || '';
   }
 
   private async recordAttestationOnBlockchain(
@@ -641,13 +957,16 @@ export class ReputationService {
       version: '1.0'
     };
 
-    return await this.algorandService.submitDocumentHash(
-      JSON.stringify(noteData),
-      'SHA-256',
-      `attestation-${attestationType}`,
-      0,
-      noteData
-    );
+    const mockAccount = algosdk.generateAccount(); // Mock account for blockchain submission
+    const documentHash = {
+      hash: JSON.stringify(noteData),
+      fileName: `attestation-${attestationType}`,
+      fileSize: 0,
+      algorithm: 'SHA-256' as const,
+      timestamp: new Date().toISOString()
+    };
+    const result = await this.algorandService.submitDocumentHash(documentHash, mockAccount);
+    return result.transaction?.txId || '';
   }
 }
 

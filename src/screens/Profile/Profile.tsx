@@ -32,6 +32,9 @@ import {
 } from "lucide-react";
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
+import { BadgeCollection } from '../../components/badges';
+import { reputationService } from '../../services/reputationService';
+import { EarnedBadge } from '../../components/badges';
 
 import LawyerProfileView from './LawyerProfileView';
 
@@ -100,6 +103,9 @@ export const Profile = (): JSX.Element => {
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [cases, setCases] = useState<any[]>([]);
   const [loadingCases, setLoadingCases] = useState(false);
+  const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
+  const [currentTierBadge, setCurrentTierBadge] = useState<EarnedBadge | null>(null);
+  const [loadingBadges, setLoadingBadges] = useState(true);
 
 
   // Load real profile data from Supabase
@@ -208,6 +214,20 @@ export const Profile = (): JSX.Element => {
         setProfileData(profileDataObj);
         // Also update editFormData to use the same data
         setEditFormData(profileDataObj);
+
+        // Load user badges
+        try {
+          setLoadingBadges(true);
+          const badgeData = await reputationService.getUserBadges(user.id);
+          setEarnedBadges(badgeData.earned);
+          setCurrentTierBadge(badgeData.currentTier);
+        } catch (badgeError) {
+          console.log('Could not load badges:', badgeError);
+          setEarnedBadges([]);
+          setCurrentTierBadge(null);
+        } finally {
+          setLoadingBadges(false);
+        }
       } catch (error) {
         console.error('Error loading profile data:', error);
       } finally {
@@ -1523,16 +1543,42 @@ export const Profile = (): JSX.Element => {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
-                        <div title={(user?.user_metadata as any)?.verification_status === 'verified' ? "Verified Professional" : "Pending Verification"}>
-                          {(user?.user_metadata as any)?.verification_status === 'verified' ? (
-                            <BadgeCheckIcon className="w-6 h-6 text-yellow-500" />
-                          ) : (
-                            <Badge className="w-6 h-6 text-gray-400" />
-                          )}
-                        </div>
+                        {/* Current Tier Badge */}
+                        {!loadingBadges && currentTierBadge && (
+                          <div className="flex-shrink-0">
+                            <BadgeCollection 
+                              badges={[currentTierBadge]} 
+                              maxVisible={1} 
+                              size="sm" 
+                              showTooltip={true}
+                            />
+                          </div>
+                        )}
+                        {/* Fallback verification badge */}
+                        {(loadingBadges || !currentTierBadge) && (
+                          <div title={(user?.user_metadata as any)?.verification_status === 'verified' ? "Verified Professional" : "Pending Verification"}>
+                            {(user?.user_metadata as any)?.verification_status === 'verified' ? (
+                              <BadgeCheckIcon className="w-6 h-6 text-yellow-500" />
+                            ) : (
+                              <Badge className="w-6 h-6 text-gray-400" />
+                            )}
+                          </div>
+                        )}
                       </div>
                       
                       <p className="text-xl text-gray-600 mb-4">{profileData.title}</p>
+                      
+                      {/* Professional Badges */}
+                      {!loadingBadges && earnedBadges.length > 0 && (
+                        <div className="mb-4">
+                          <BadgeCollection 
+                            badges={earnedBadges.filter(badge => badge.type !== 'reputation')} 
+                            maxVisible={4} 
+                            size="sm" 
+                            className="justify-start"
+                          />
+                        </div>
+                      )}
                       
                       <div className="flex items-center gap-6 mb-4">
                         <div className="flex items-center gap-1">
