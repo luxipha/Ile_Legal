@@ -29,6 +29,7 @@ interface ProfileUpdateData {
   industry?: string;
   areas_of_interest?: any;
   professional_title?: string;
+  bar_license_number?: string;
   
   // Avatar/Profile picture
   avatar_url?: string;
@@ -102,6 +103,8 @@ export interface AuthContextType {
   signInWithGoogle: (role?: UserRole) => Promise<void>;
   signInWithMetaMask: (role?: UserRole) => Promise<void>;
   uploadProfilePicture: (file: File) => Promise<string>;
+  storeProfileDocuments: (file: File, filepath: string) => Promise<string>;
+  getProfileDocuments: (userId?: string) => Promise<{ governmentId?: string; selfieWithId?: string; otherDocuments: string[] }>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   getUser: () => Promise<User | null>;
   resetPassword: (email: string) => Promise<void>;
@@ -752,6 +755,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (updatedData.areas_of_interest) profileUpdateData.areas_of_interest = updatedData.areas_of_interest;
       if (updatedData.education) profileUpdateData.education = updatedData.education;
       if (updatedData.professional_title) profileUpdateData.professional_title = updatedData.professional_title;
+      if (updatedData.bar_license_number) profileUpdateData.bar_license_number = updatedData.bar_license_number;
       
       // Fallback to legacy fields if new fields are not provided
       if (!profileUpdateData.first_name && authUser.user_metadata?.firstName) {
@@ -1359,6 +1363,103 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!user) return '';
           await updateProfile({ profile_picture_file: file });
           return user.user_metadata?.profile_picture || '';
+        },
+        storeProfileDocuments: async (file: File, filepath: string): Promise<string> => {
+          if (!user) {
+            throw new Error('User must be authenticated to store documents');
+          }
+          
+          // Validate file type
+          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+          if (!allowedTypes.includes(file.type)) {
+            throw new Error('Invalid file type. Only JPG, PNG, and PDF files are allowed.');
+          }
+          
+          // Validate filepath parameter
+          if (!filepath || typeof filepath !== 'string') {
+            throw new Error('Filepath is required and must be a string');
+          }
+          
+          try {
+            // Upload file to documents bucket
+            const { data, error } = await supabase.storage
+              .from('documents')
+              .upload(filepath, file, {
+                cacheControl: '3600',
+                upsert: true // Replace existing files
+              });
+              
+            if (error) {
+              console.error('Error uploading document:', error);
+              throw error;
+            }
+            
+            // Get public URL for the uploaded file
+            const { data: urlData } = supabase.storage
+              .from('documents')
+              .getPublicUrl(filepath);
+              
+            console.log('Document stored successfully:', urlData.publicUrl);
+            return urlData.publicUrl;
+          } catch (error) {
+            console.error('Error in storeProfileDocuments:', error);
+            throw error;
+          }
+        },
+        getProfileDocuments: async (userId?: string): Promise<{ governmentId?: string; selfieWithId?: string; otherDocuments: string[] }> => {
+          const targetUserId = userId || user?.id;
+          if (!targetUserId) {
+            throw new Error('User ID is required to retrieve profile documents');
+          }
+          
+          try {
+            // List all files in the user's profile_documents folder
+            const { data: files, error } = await supabase.storage
+              .from('documents')
+              .list(`${targetUserId}/profile_documents/`);
+              
+            if (error) {
+              console.error('Error listing profile documents:', error);
+              throw error;
+            }
+            
+            const result = {
+              governmentId: undefined as string | undefined,
+              selfieWithId: undefined as string | undefined,
+              otherDocuments: [] as string[]
+            };
+            
+            if (files && files.length > 0) {
+              for (const file of files) {
+                const filepath = `${targetUserId}/profile_documents/${file.name}`;
+                
+                // Get signed URL for each file (more secure than public URL)
+                const { data: signedUrl, error: urlError } = await supabase.storage
+                  .from('documents')
+                  .createSignedUrl(filepath, 3600); // 1 hour expiry
+                
+                if (urlError) {
+                  console.error('Error creating signed URL for', filepath, urlError);
+                  continue; // Skip this file if we can't get a URL
+                }
+                
+                // Categorize files based on their names
+                if (file.name.startsWith('government_id.')) {
+                  result.governmentId = signedUrl.signedUrl;
+                } else if (file.name.startsWith('selfie_with_id.')) {
+                  result.selfieWithId = signedUrl.signedUrl;
+                } else {
+                  result.otherDocuments.push(signedUrl.signedUrl);
+                }
+              }
+            }
+            
+            console.log('Profile documents retrieved successfully:', result);
+            return result;
+          } catch (error) {
+            console.error('Error in getProfileDocuments:', error);
+            throw error;
+          }
         },
         updateUserStatus,
         getUserStats,

@@ -81,7 +81,8 @@ interface Feedback {
 type ViewMode = "profile" | "edit-profile" | "public-view";
 
 export const Profile = (): JSX.Element => {
-  const { user, updateProfile } = useAuth();
+  // Get auth functions including storeProfileDocuments and getProfileDocuments for file uploads
+  const { user, updateProfile, storeProfileDocuments, getProfileDocuments } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("profile");
   const [activeTab, setActiveTab] = useState<"overview" | "experience" | "reviews" | "cases">("overview");
   const [newSpecialization, setNewSpecialization] = useState("");
@@ -107,6 +108,20 @@ export const Profile = (): JSX.Element => {
   const [currentTierBadge, setCurrentTierBadge] = useState<EarnedBadge | null>(null);
   const [loadingBadges, setLoadingBadges] = useState(true);
 
+
+  // Function to load profile documents
+  const loadProfileDocuments = async () => {
+    if (!user) return;
+    
+    try {
+      const documents = await getProfileDocuments();
+      setLoadedDocuments(documents);
+      console.log('Profile documents loaded:', documents);
+    } catch (error) {
+      console.error('Error loading profile documents:', error);
+      // Don't throw error, just log it - documents might not exist yet
+    }
+  };
 
   // Load real profile data from Supabase
   useEffect(() => {
@@ -310,6 +325,13 @@ export const Profile = (): JSX.Element => {
     }
   }, [user?.id]);
 
+  // Load profile documents when entering edit mode or when user changes
+  useEffect(() => {
+    if (user?.id && viewMode === "edit-profile") {
+      loadProfileDocuments();
+    }
+  }, [user?.id, viewMode]);
+
   const [editFormData, setEditFormData] = useState<ProfileData>(profileData);
   
   // Multi-step form state
@@ -325,6 +347,13 @@ export const Profile = (): JSX.Element => {
     selfieWithIdFile: null as File | null,
     professionalDocuments: [] as File[]
   });
+
+  // State for loaded document URLs
+  const [loadedDocuments, setLoadedDocuments] = useState<{
+    governmentId?: string;
+    selfieWithId?: string;
+    otherDocuments: string[];
+  }>({ otherDocuments: [] });
 
   const profileSteps = [
     { id: 1, title: 'Basic Information', description: 'Personal details and contact info' },
@@ -345,7 +374,10 @@ export const Profile = (): JSX.Element => {
       case 3:
         return editFormData.education.length > 0;
       case 4:
-        return !!(enhancedFormData.governmentIdFile && enhancedFormData.selfieWithIdFile);
+        // Check if files are uploaded OR if documents already exist
+        const hasGovernmentId = enhancedFormData.governmentIdFile || loadedDocuments.governmentId;
+        const hasSelfieWithId = enhancedFormData.selfieWithIdFile || loadedDocuments.selfieWithId;
+        return !!(hasGovernmentId && hasSelfieWithId);
       case 5:
         return !!enhancedFormData.barLicenseNumber;
       default:
@@ -356,6 +388,141 @@ export const Profile = (): JSX.Element => {
   // Handle step navigation
   const handleNextStep = async () => {
     if (validateStep(currentStep)) {
+      // Handle file uploads for step 4 (Identity Verification) when clicking Next
+      if (currentStep === 4 && user) {
+        const uploadedFiles: string[] = [];
+        
+        // Upload government ID file
+        if (enhancedFormData.governmentIdFile) {
+          try {
+            const fileExt = enhancedFormData.governmentIdFile.name.split('.').pop();
+            const filename = `government_id.${fileExt}`;
+            const filepath = `${user.id}/profile_documents/${filename}`;
+            
+            const governmentIdUrl = await storeProfileDocuments(enhancedFormData.governmentIdFile, filepath);
+            uploadedFiles.push(governmentIdUrl);
+            console.log('Government ID uploaded:', governmentIdUrl);
+          } catch (error) {
+            console.error('Error uploading government ID:', error);
+            alert('Error uploading government ID file. Please try again.');
+            return;
+          }
+        }
+        
+        // Upload selfie with ID file
+        if (enhancedFormData.selfieWithIdFile) {
+          try {
+            const fileExt = enhancedFormData.selfieWithIdFile.name.split('.').pop();
+            const filename = `selfie_with_id.${fileExt}`;
+            const filepath = `${user.id}/profile_documents/${filename}`;
+            
+            const selfieUrl = await storeProfileDocuments(enhancedFormData.selfieWithIdFile, filepath);
+            uploadedFiles.push(selfieUrl);
+            console.log('Selfie with ID uploaded:', selfieUrl);
+          } catch (error) {
+            console.error('Error uploading selfie with ID:', error);
+            alert('Error uploading selfie with ID file. Please try again.');
+            return;
+          }
+        }
+        
+        // Store the uploaded file URLs in profile data
+        const profileUpdateData: any = {
+          // Basic profile information (always included)
+          first_name: editFormData.firstName,
+          last_name: editFormData.lastName,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          location: editFormData.address,
+          bio: editFormData.about,
+          professional_title: editFormData.title,
+          specializations: editFormData.specializations,
+          education: editFormData.education,
+          
+          // Legacy fields for backward compatibility
+          firstName: editFormData.firstName,
+          lastName: editFormData.lastName,
+          about: editFormData.about,
+          
+          // Enhanced form data
+          ...(enhancedFormData.linkedinUrl && { 
+            website: enhancedFormData.linkedinUrl,
+            linkedin: enhancedFormData.linkedinUrl 
+          }),
+          ...(enhancedFormData.barLicenseNumber && { 
+            bar_license_number: enhancedFormData.barLicenseNumber,
+            role_title: enhancedFormData.barLicenseNumber 
+          }),
+          ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType }),
+          
+          // Store uploaded document URLs
+          ...(uploadedFiles.length > 0 && { 
+            verification_documents: uploadedFiles,
+            government_id_url: uploadedFiles[0] || null,
+            selfie_with_id_url: uploadedFiles[1] || null
+          })
+        };
+        
+        await updateProfile(profileUpdateData);
+      } else if (currentStep === 5 && user) {
+        // Handle file uploads for step 5 (Professional Licensing) when clicking Next
+        const uploadedFiles: string[] = [];
+        
+        // Upload professional documents (multiple files)
+        if (enhancedFormData.professionalDocuments.length > 0) {
+          for (const file of enhancedFormData.professionalDocuments) {
+            try {
+              const filepath = `${user.id}/profile_documents/${file.name}`;
+              
+              const documentUrl = await storeProfileDocuments(file, filepath);
+              uploadedFiles.push(documentUrl);
+              console.log('Professional document uploaded:', documentUrl);
+            } catch (error) {
+              console.error('Error uploading professional document:', error);
+              alert(`Error uploading ${file.name}. Please try again.`);
+              return;
+            }
+          }
+        }
+        
+        // Store the uploaded file URLs in profile data
+        const profileUpdateData: any = {
+          // Basic profile information (always included)
+          first_name: editFormData.firstName,
+          last_name: editFormData.lastName,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          location: editFormData.address,
+          bio: editFormData.about,
+          professional_title: editFormData.title,
+          specializations: editFormData.specializations,
+          education: editFormData.education,
+          
+          // Legacy fields for backward compatibility
+          firstName: editFormData.firstName,
+          lastName: editFormData.lastName,
+          about: editFormData.about,
+          
+          // Enhanced form data
+          ...(enhancedFormData.linkedinUrl && { 
+            website: enhancedFormData.linkedinUrl,
+            linkedin: enhancedFormData.linkedinUrl 
+          }),
+          ...(enhancedFormData.barLicenseNumber && { 
+            bar_license_number: enhancedFormData.barLicenseNumber,
+            role_title: enhancedFormData.barLicenseNumber 
+          }),
+          ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType }),
+          
+          // Store uploaded professional document URLs
+          ...(uploadedFiles.length > 0 && { 
+            professional_documents: uploadedFiles
+          })
+        };
+        
+        await updateProfile(profileUpdateData);
+      }
+      
       if (!completedSteps.includes(currentStep)) {
         setCompletedSteps(prev => [...prev, currentStep]);
       }
@@ -394,7 +561,141 @@ export const Profile = (): JSX.Element => {
       try {
         console.log(`Saving step ${currentStep} data`);
         
-        // Always save all current form data to prevent overwriting other fields
+        // Handle file uploads for step 4 (Identity Verification)
+        if (currentStep === 4 && user) {
+          const uploadedFiles: string[] = [];
+          
+          // Upload government ID file
+          if (enhancedFormData.governmentIdFile) {
+            try {
+              const fileExt = enhancedFormData.governmentIdFile.name.split('.').pop();
+              const filename = `government_id.${fileExt}`;
+              const filepath = `${user.id}/profile_documents/${filename}`;
+              
+              const governmentIdUrl = await storeProfileDocuments(enhancedFormData.governmentIdFile, filepath);
+              uploadedFiles.push(governmentIdUrl);
+              console.log('Government ID uploaded:', governmentIdUrl);
+            } catch (error) {
+              console.error('Error uploading government ID:', error);
+              alert('Error uploading government ID file. Please try again.');
+              return;
+            }
+          }
+          
+          // Upload selfie with ID file
+          if (enhancedFormData.selfieWithIdFile) {
+            try {
+              const fileExt = enhancedFormData.selfieWithIdFile.name.split('.').pop();
+              const filename = `selfie_with_id.${fileExt}`;
+              const filepath = `${user.id}/profile_documents/${filename}`;
+              
+              const selfieUrl = await storeProfileDocuments(enhancedFormData.selfieWithIdFile, filepath);
+              uploadedFiles.push(selfieUrl);
+              console.log('Selfie with ID uploaded:', selfieUrl);
+            } catch (error) {
+              console.error('Error uploading selfie with ID:', error);
+              alert('Error uploading selfie with ID file. Please try again.');
+              return;
+            }
+          }
+          
+          // Store the uploaded file URLs in profile data
+          const profileUpdateData: any = {
+            // Basic profile information (always included)
+            first_name: editFormData.firstName,
+            last_name: editFormData.lastName,
+            email: editFormData.email,
+            phone: editFormData.phone,
+            location: editFormData.address,
+            bio: editFormData.about,
+            professional_title: editFormData.title,
+            specializations: editFormData.specializations,
+            education: editFormData.education,
+            
+            // Legacy fields for backward compatibility
+            firstName: editFormData.firstName,
+            lastName: editFormData.lastName,
+            about: editFormData.about,
+            
+            // Enhanced form data
+            ...(enhancedFormData.linkedinUrl && { 
+              website: enhancedFormData.linkedinUrl,
+              linkedin: enhancedFormData.linkedinUrl 
+            }),
+            ...(enhancedFormData.barLicenseNumber && { 
+              bar_license_number: enhancedFormData.barLicenseNumber,
+              role_title: enhancedFormData.barLicenseNumber 
+            }),
+            ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType }),
+            
+            // Store uploaded document URLs
+            ...(uploadedFiles.length > 0 && { 
+              verification_documents: uploadedFiles,
+              government_id_url: uploadedFiles[0] || null,
+              selfie_with_id_url: uploadedFiles[1] || null
+            })
+          };
+          
+                  await updateProfile(profileUpdateData);
+      } else if (currentStep === 5 && user) {
+        // Handle file uploads for step 5 (Professional Licensing) when clicking Save Step
+        const uploadedFiles: string[] = [];
+        
+        // Upload professional documents (multiple files)
+        if (enhancedFormData.professionalDocuments.length > 0) {
+          for (const file of enhancedFormData.professionalDocuments) {
+            try {
+              const filepath = `${user.id}/profile_documents/${file.name}`;
+              
+              const documentUrl = await storeProfileDocuments(file, filepath);
+              uploadedFiles.push(documentUrl);
+              console.log('Professional document uploaded:', documentUrl);
+            } catch (error) {
+              console.error('Error uploading professional document:', error);
+              alert(`Error uploading ${file.name}. Please try again.`);
+              return;
+            }
+          }
+        }
+        
+        // Store the uploaded file URLs in profile data
+        const profileUpdateData: any = {
+          // Basic profile information (always included)
+          first_name: editFormData.firstName,
+          last_name: editFormData.lastName,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          location: editFormData.address,
+          bio: editFormData.about,
+          professional_title: editFormData.title,
+          specializations: editFormData.specializations,
+          education: editFormData.education,
+          
+          // Legacy fields for backward compatibility
+          firstName: editFormData.firstName,
+          lastName: editFormData.lastName,
+          about: editFormData.about,
+          
+          // Enhanced form data
+          ...(enhancedFormData.linkedinUrl && { 
+            website: enhancedFormData.linkedinUrl,
+            linkedin: enhancedFormData.linkedinUrl 
+          }),
+          ...(enhancedFormData.barLicenseNumber && { 
+            bar_license_number: enhancedFormData.barLicenseNumber,
+            role_title: enhancedFormData.barLicenseNumber 
+          }),
+          ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType }),
+          
+          // Store uploaded professional document URLs
+          ...(uploadedFiles.length > 0 && { 
+            professional_documents: uploadedFiles
+          })
+        };
+        
+        await updateProfile(profileUpdateData);
+      } else {
+        // For other steps, save without file uploads
         const profileUpdateData: any = {
           // Basic profile information (always included)
           first_name: editFormData.firstName,
@@ -412,24 +713,31 @@ export const Profile = (): JSX.Element => {
           lastName: editFormData.lastName,
           about: editFormData.about,
           
-          
           // Enhanced form data
           ...(enhancedFormData.linkedinUrl && { 
             website: enhancedFormData.linkedinUrl,
             linkedin: enhancedFormData.linkedinUrl 
           }),
-          ...(enhancedFormData.barLicenseNumber && { role_title: enhancedFormData.barLicenseNumber }),
+          ...(enhancedFormData.barLicenseNumber && { 
+            bar_license_number: enhancedFormData.barLicenseNumber,
+            role_title: enhancedFormData.barLicenseNumber 
+          }),
           ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType })
         };
         
         await updateProfile(profileUpdateData);
+      }
         
         if (!completedSteps.includes(currentStep)) {
           setCompletedSteps(prev => [...prev, currentStep]);
         }
         
         // Show success message
-        alert(`Step ${currentStep} saved successfully!`);
+        if (currentStep === 4) {
+          alert(`Step ${currentStep} saved successfully! Identity verification documents have been uploaded.`);
+        } else {
+          alert(`Step ${currentStep} saved successfully!`);
+        }
       } catch (error) {
         console.error('Error saving step:', error);
         alert('Error saving step data');
@@ -514,6 +822,26 @@ export const Profile = (): JSX.Element => {
     if (!editFormData) return;
     
     try {
+      // Handle file uploads for step 5 (Professional Licensing) when completing profile
+      let uploadedFiles: string[] = [];
+      
+      if (currentStep === 5 && user && enhancedFormData.professionalDocuments.length > 0) {
+        // Upload professional documents (multiple files)
+        for (const file of enhancedFormData.professionalDocuments) {
+          try {
+            const filepath = `${user.id}/profile_documents/${file.name}`;
+            
+            const documentUrl = await storeProfileDocuments(file, filepath);
+            uploadedFiles.push(documentUrl);
+            console.log('Professional document uploaded:', documentUrl);
+          } catch (error) {
+            console.error('Error uploading professional document:', error);
+            alert(`Error uploading ${file.name}. Please try again.`);
+            return;
+          }
+        }
+      }
+      
       // Update profile using the comprehensive AuthContext API
       await updateProfile({
         // Basic profile information
@@ -535,8 +863,16 @@ export const Profile = (): JSX.Element => {
         
         // Enhanced verification data
         ...(enhancedFormData.linkedinUrl && { website: enhancedFormData.linkedinUrl }),
-        ...(enhancedFormData.barLicenseNumber && { role_title: enhancedFormData.barLicenseNumber }),
-        ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType })
+        ...(enhancedFormData.barLicenseNumber && { 
+          bar_license_number: enhancedFormData.barLicenseNumber,
+          role_title: enhancedFormData.barLicenseNumber 
+        }),
+        ...(enhancedFormData.governmentIdType && { clearance_level: enhancedFormData.governmentIdType }),
+        
+        // Store uploaded professional document URLs
+        ...(uploadedFiles.length > 0 && { 
+          professional_documents: uploadedFiles
+        })
       });
       
       // Update local state and return to profile view
@@ -1283,6 +1619,19 @@ export const Profile = (): JSX.Element => {
                                 ✓ {enhancedFormData.governmentIdFile.name}
                               </p>
                             )}
+                            {!enhancedFormData.governmentIdFile && loadedDocuments.governmentId && (
+                              <div className="mt-2">
+                                <p className="text-sm text-blue-600 mb-2">✓ Previously uploaded document</p>
+                                <a 
+                                  href={loadedDocuments.governmentId} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-purple-600 hover:text-purple-800 underline"
+                                >
+                                  View Document
+                                </a>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1313,6 +1662,19 @@ export const Profile = (): JSX.Element => {
                               <p className="text-sm text-green-600 mt-2">
                                 ✓ {enhancedFormData.selfieWithIdFile.name}
                               </p>
+                            )}
+                            {!enhancedFormData.selfieWithIdFile && loadedDocuments.selfieWithId && (
+                              <div className="mt-2">
+                                <p className="text-sm text-blue-600 mb-2">✓ Previously uploaded document</p>
+                                <a 
+                                  href={loadedDocuments.selfieWithId} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-purple-600 hover:text-purple-800 underline"
+                                >
+                                  View Document
+                                </a>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1400,6 +1762,32 @@ export const Profile = (): JSX.Element => {
                               <div className="space-y-1">
                                 {enhancedFormData.professionalDocuments.map((file, index) => (
                                   <p key={index} className="text-xs text-gray-600">{file.name}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Show previously uploaded professional documents */}
+                          {enhancedFormData.professionalDocuments.length === 0 && loadedDocuments.otherDocuments.length > 0 && (
+                            <div className="mt-4">
+                              <p className="text-sm text-blue-600 mb-2">
+                                ✓ {loadedDocuments.otherDocuments.length} previously uploaded document(s)
+                              </p>
+                              <div className="space-y-2">
+                                {loadedDocuments.otherDocuments.map((docUrl, index) => (
+                                  <div key={index} className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">
+                                      Document {index + 1}
+                                    </span>
+                                    <a 
+                                      href={docUrl} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-purple-600 hover:text-purple-800 underline"
+                                    >
+                                      View
+                                    </a>
+                                  </div>
                                 ))}
                               </div>
                             </div>
