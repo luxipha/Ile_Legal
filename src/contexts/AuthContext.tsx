@@ -412,7 +412,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // supabase.auth.updateUser({
       //   data: {
-      //     role: 'seller'
+      //     role_title: 'seller'
       //   }
       // })
       // Debug user metadata and role detection
@@ -690,7 +690,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   if (updatedData.bio) userMetadata.about = updatedData.bio;
   if (updatedData.location) userMetadata.address = updatedData.location;
   if (updatedData.avatar_url) userMetadata.profile_picture = updatedData.avatar_url;
-  if (updatedData.user_type) userMetadata.role_title = updatedData.user_type;
+  // if (updatedData.user_type) userMetadata.role_title = updatedData.user_type;
   if (updatedData.verification_status) userMetadata.verification_status = updatedData.verification_status;
   if (updatedData.eth_address) userMetadata.eth_address = updatedData.eth_address;
   if (updatedData.circle_wallet_id) userMetadata.circle_wallet_id = updatedData.circle_wallet_id;
@@ -710,7 +710,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   if (updatedData.about) userMetadata.about = updatedData.about;
   // Note: education is now stored in Profiles table, not user metadata
   if (updatedData.profile_picture) userMetadata.profile_picture = updatedData.profile_picture;
-  if (updatedData.role_title) userMetadata.role_title = updatedData.role_title;
+  // if (updatedData.role_title) userMetadata.role_title = updatedData.role_title;
   if (updatedData.clearance_level) userMetadata.clearance_level = updatedData.clearance_level;
   if (updatedData.email_verified !== undefined) userMetadata.email_verified = updatedData.email_verified;
   if (updatedData.status) userMetadata.status = updatedData.status;
