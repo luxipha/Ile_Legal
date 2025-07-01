@@ -47,7 +47,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
 
   // Extract real user data from auth context and user metadata
   const userMetadata = user?.user_metadata as Record<string, any> || {};
-  const profileData = userMetadata.profile_data ? JSON.parse(userMetadata.profile_data as string) : {};
+  console.log('userMetadata', userMetadata);
 
   // Load user statistics and reviews from API
   useEffect(() => {
@@ -138,20 +138,20 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
   
   const lawyerData = {
     name: formatUser.displayName(user, "Legal Professional"),
-    title: profileData?.title || (userMetadata.user_type === 'seller' ? 'Legal Professional' : 'Legal Practitioner'),
-    location: profileData?.location || userMetadata?.location || "Location not specified",
+    title: userMetadata?.title || (userMetadata.user_type === 'seller' ? 'Legal Professional' : 'Legal Practitioner'),
+    location: userMetadata?.location || "Location not specified",
     rating: averageRating,
     totalReviews: reviews.length,
     completedTasks: completedGigs,
-    yearsExperience: profileData?.yearsExperience || 5,
+    yearsExperience: userMetadata?.yearsExperience || 5,
     specializations: userMetadata?.specializations || [],
     verificationAccuracy: userStats?.verificationAccuracy || "N/A",
     avgCompletionTime: userStats?.averageCompletionTime || "N/A",
     responseTime: userStats?.averageResponseTime || "N/A",
     avatar: formatUser.avatar(user, 128),
-    walletAddress: profileData?.walletAddress || "Not connected",
-    verified: profileData?.verified || false,
-    bio: profileData?.bio || userMetadata?.about || "",
+    walletAddress: userMetadata?.circle_wallet_address || "Not connected",
+    verified: userMetadata?.verified || false,
+    bio: userMetadata?.bio || userMetadata?.about || "",
     education: userMetadata?.education || [],
     certifications: userMetadata?.certifications || []
   };
@@ -232,7 +232,24 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                       
                       <div className="flex items-center gap-2 text-purple-600">
                         <Wallet className="w-4 h-4" />
-                        <span className="text-sm font-mono">{lawyerData.walletAddress}</span>
+                        <span className="text-sm font-mono">
+                          {lawyerData.walletAddress !== "Not connected" 
+                            ? `${lawyerData.walletAddress.slice(0, 4)}...${lawyerData.walletAddress.slice(-2)}`
+                            : lawyerData.walletAddress
+                          }
+                        </span>
+                        {lawyerData.walletAddress !== "Not connected" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                            onClick={() => {
+                              navigator.clipboard.writeText(lawyerData.walletAddress);
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        )}
                       </div>
                     </div>
 
