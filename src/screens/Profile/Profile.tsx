@@ -34,6 +34,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 import { BadgeCollection } from '../../components/badges';
 import { reputationService } from '../../services/reputationService';
+import { loyaltyService, LoyaltyStats } from '../../services/loyaltyService';
 import { EarnedBadge } from '../../components/badges';
 
 import LawyerProfileView from './LawyerProfileView';
@@ -107,6 +108,8 @@ export const Profile = (): JSX.Element => {
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
   const [currentTierBadge, setCurrentTierBadge] = useState<EarnedBadge | null>(null);
   const [loadingBadges, setLoadingBadges] = useState(true);
+  const [loyaltyStats, setLoyaltyStats] = useState<LoyaltyStats | null>(null);
+  const [loadingLoyaltyStats, setLoadingLoyaltyStats] = useState(true);
 
 
   // Function to load profile documents
@@ -242,6 +245,21 @@ export const Profile = (): JSX.Element => {
           setCurrentTierBadge(null);
         } finally {
           setLoadingBadges(false);
+        }
+
+        // Load user loyalty stats
+        try {
+          setLoadingLoyaltyStats(true);
+          const loyaltyData = await loyaltyService.getUserLoyaltyStats(user.id);
+          setLoyaltyStats(loyaltyData);
+          
+          // Update login streak
+          await loyaltyService.updateLoginStreak(user.id);
+        } catch (loyaltyError) {
+          console.log('Could not load loyalty stats:', loyaltyError);
+          setLoyaltyStats(null);
+        } finally {
+          setLoadingLoyaltyStats(false);
         }
       } catch (error) {
         console.error('Error loading profile data:', error);
@@ -1955,6 +1973,33 @@ export const Profile = (): JSX.Element => {
                       </div>
                       
                       <p className="text-xl text-gray-600 mb-4">{profileData.title}</p>
+                      
+                      {/* Loyalty Stats */}
+                      {!loadingLoyaltyStats && loyaltyStats && (
+                        <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="text-center">
+                                <p className="text-2xl font-bold text-blue-600">{loyaltyStats.total_bricks}</p>
+                                <p className="text-xs text-gray-600">Bricks</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-lg font-semibold text-purple-600">{loyaltyStats.loyalty_level}</p>
+                                <p className="text-xs text-gray-600">Level</p>
+                              </div>
+                              {loyaltyStats.streak_days > 0 && (
+                                <div className="text-center">
+                                  <p className="text-lg font-semibold text-orange-600">{loyaltyStats.streak_days}</p>
+                                  <p className="text-xs text-gray-600">Day Streak</p>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Loyalty Member
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Professional Badges */}
                       {!loadingBadges && earnedBadges.length > 0 && (

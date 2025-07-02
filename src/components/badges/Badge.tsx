@@ -25,10 +25,16 @@ import {
   ProfessionalCredentialsBadge,
   BarLicenseVerifiedBadge
 } from './icons/VerificationBadges';
+import {
+  LoyaltyActiveBadge,
+  LoyaltyMilestoneBadge,
+  LoyaltyStreakBadge,
+  LoyaltyEngagementBadge
+} from './icons/LoyaltyBadges';
 
 export interface EarnedBadge {
   id: string;
-  type: 'reputation' | 'achievement' | 'quality' | 'verification';
+  type: 'reputation' | 'achievement' | 'quality' | 'verification' | 'loyalty';
   name: string;
   description: string;
   earnedDate: string;
@@ -49,6 +55,8 @@ const Badge: React.FC<BadgeProps> = ({
   showTooltip = true,
   className = ""
 }) => {
+  console.log('Badge render:', badge.id, badge.type, badge.name);
+  
   const getBadgeComponent = () => {
     // Reputation Tier Badges
     if (badge.type === 'reputation' && badge.tier) {
@@ -89,6 +97,16 @@ const Badge: React.FC<BadgeProps> = ({
         case 'identity_verified': return <IdentityVerifiedBadge size={size} className={className} />;
         case 'professional_credentials': return <ProfessionalCredentialsBadge size={size} className={className} />;
         case 'bar_license_verified': return <BarLicenseVerifiedBadge size={size} className={className} />;
+      }
+    }
+    
+    // Loyalty Badges
+    if (badge.type === 'loyalty') {
+      switch (badge.id) {
+        case 'loyalty_active': return <LoyaltyActiveBadge size={size} className={className} />;
+        case 'loyalty_milestone': return <LoyaltyMilestoneBadge size={size} className={className} />;
+        case 'loyalty_streak': return <LoyaltyStreakBadge size={size} className={className} />;
+        case 'loyalty_engagement': return <LoyaltyEngagementBadge size={size} className={className} />;
       }
     }
     
