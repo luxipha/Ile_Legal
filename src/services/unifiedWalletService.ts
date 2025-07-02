@@ -18,41 +18,54 @@ export interface UnifiedWalletData {
  */
 export const getUserWalletData = async (userId: string): Promise<UnifiedWalletData> => {
   try {
-    // Get profile data including both ETH and Circle wallet info
+    // Get profile data for ETH address
     const { data: profile, error: profileError } = await supabase
       .from('Profiles')
-      .select('eth_address, circle_wallet_id, circle_wallet_address, circle_wallet_status')
+      .select('eth_address')
       .eq('id', userId)
       .single();
 
-    if (profileError) {
-      console.error('Error fetching profile wallet data:', profileError);
-      throw profileError;
+    // Get Circle wallet data from correct table
+    const { data: walletData, error: walletError } = await supabase
+      .from('user_wallets')
+      .select('circle_wallet_id, wallet_address, balance_usdc')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error('Error fetching profile data:', profileError);
     }
 
-    // Get Circle wallet balance if available
-    let circleBalance = '0.00';
-    if (profile?.circle_wallet_id) {
+    if (walletError && walletError.code !== 'PGRST116') {
+      console.error('Error fetching wallet data:', walletError);
+    }
+
+    // Use stored balance as fallback if API fails
+    let circleBalance = walletData?.balance_usdc?.toString() || '0.00';
+    
+    if (walletData?.circle_wallet_id) {
       try {
-        // Get real-time balance from Circle API
-        const balanceData = await frontendWalletService.getWalletBalance(profile.circle_wallet_id);
+        // Try to get real-time balance from Circle API
+        const balanceData = await frontendWalletService.getWalletBalance(walletData.circle_wallet_id);
         if (balanceData?.tokenBalances?.length > 0) {
           const usdcBalance = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'USDC');
-          circleBalance = usdcBalance?.amount || '0.00';
+          circleBalance = usdcBalance?.amount || circleBalance; // Fallback to stored balance
         }
       } catch (error) {
-        console.log('Could not fetch Circle wallet balance:', error);
+        console.log('Could not fetch Circle wallet balance, using stored balance:', error);
+        // Keep using stored balance from database
       }
     }
 
     return {
       ethAddress: profile?.eth_address || undefined,
-      circleWalletId: profile?.circle_wallet_id || undefined,
-      circleWalletAddress: profile?.circle_wallet_address || undefined,
+      circleWalletId: walletData?.circle_wallet_id || undefined,
+      circleWalletAddress: walletData?.wallet_address || undefined,
       balance: circleBalance,
       currency: 'USDC',
       hasEthWallet: !!profile?.eth_address,
-      hasCircleWallet: !!profile?.circle_wallet_id
+      hasCircleWallet: !!walletData?.circle_wallet_id
     };
   } catch (error) {
     console.error('Error in getUserWalletData:', error);
