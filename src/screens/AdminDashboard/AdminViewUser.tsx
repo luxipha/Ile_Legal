@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
 import { ArrowLeft, Mail, Eye, CheckCircle, XCircle, Phone, MapPin, GraduationCap, Briefcase, FileText, Shield, Award, User } from "lucide-react";
 import { User as AuthUser } from "../../contexts/AuthContext";
+import { api } from "../../services/api";
 
 type Document = {
   name: string;
@@ -12,6 +13,7 @@ type Document = {
   type?: "government_id" | "selfie_with_id" | "bar_license" | "professional_certificate" | "other";
   uploadDate?: string;
   size?: string;
+  url?: string;
 };
 
 type Education = {
@@ -47,9 +49,9 @@ type User = AuthUser & {
 type AdminViewUserProps = {
   user: User | null;
   onBack: () => void;
-  onVerify: (userId: number) => void;
-  onReject: (userId: number, reason: string) => void;
-  onRequestInfo: (userId: number, request: string) => void;
+  onVerify: (userId: string) => void;
+  onReject: (userId: string, reason: string) => void;
+  onRequestInfo: (userId: string, request: string) => void;
 };
 
 export const AdminViewUser = ({
@@ -59,6 +61,7 @@ export const AdminViewUser = ({
   onReject,
   onRequestInfo
 }: AdminViewUserProps): JSX.Element => {
+  console.log('user', user);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRequestInfoModal, setShowRequestInfoModal] = useState(false);
@@ -66,61 +69,137 @@ export const AdminViewUser = ({
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentVerificationNotes, setDocumentVerificationNotes] = useState("");
+  const [localUser, setLocalUser] = useState<User | null>(user);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  // Generate mock documents for demonstration if none exist
-  const getUserDocuments = (): Document[] => {
-    if (user.documents && user.documents.length > 0) {
-      return user.documents;
+  // Update local user state when prop changes
+  useEffect(() => {
+    if (user) {
+      setLocalUser(user);
     }
-    // Return mock documents to show UI structure
-    return [
-      {
-        name: "Government ID",
-        status: "pending",
-        type: "government_id",
-        uploadDate: "2024-01-15",
-        size: "2.1 MB"
-      },
-      {
-        name: "Selfie with ID",
-        status: "pending", 
-        type: "selfie_with_id",
-        uploadDate: "2024-01-15",
-        size: "1.8 MB"
-      },
-      {
-        name: "Bar License Certificate",
-        status: "pending",
-        type: "bar_license",
-        uploadDate: "2024-01-16",
-        size: "3.2 MB"
+  }, [user]);
+
+  // Fetch real documents from storage
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      if (!localUser?.id) return;
+      
+      setLoadingDocuments(true);
+      try {
+        const userDocuments = await api.admin.users.getUserDocuments(localUser.id);
+        
+        // Transform the API response to match our Document type
+        const transformedDocuments: Document[] = userDocuments.map((doc: any) => ({
+          name: doc.name,
+          status: "pending", // Default status since API doesn't provide verification status
+          type: doc.type as any,
+          uploadDate: doc.created_at,
+          size: "Unknown", // API doesn't provide file size
+          url: doc.url // Add URL for viewing
+        }));
+        
+        setDocuments(transformedDocuments);
+      } catch (error) {
+        console.error('Error fetching user documents:', error);
+        setDocuments([]);
+      } finally {
+        setLoadingDocuments(false);
       }
-    ];
+    };
+
+    fetchDocuments();
+  }, [localUser?.id]);
+
+  // Get documents with proper ordering
+  const getUserDocuments = (): Document[] => {
+    if (loadingDocuments) {
+      return [];
+    }
+    
+    // Sort documents to prioritize specific types
+    const sortedDocuments = [...documents].sort((a, b) => {
+      const priorityOrder = ['government_id', 'selfie_with_id', 'bar_license_certificate'];
+      const aIndex = priorityOrder.indexOf(a.name.toLowerCase().replace(/\s+/g, '_'));
+      const bIndex = priorityOrder.indexOf(b.name.toLowerCase().replace(/\s+/g, '_'));
+      
+      // If both are in priority list, sort by priority
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      // If only one is in priority list, prioritize it
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      // Otherwise, sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
+    
+    return sortedDocuments;
   };
 
-  const handleSubmitRejection = () => {
-    if (!user || !rejectionReason.trim()) return;
+  const handleSubmitRejection = async () => {
+    if (!localUser || !rejectionReason.trim()) return;
     
-    // Call the reject handler
-    onReject(parseInt(user.id) || 0, rejectionReason);
-    
-    // Reset and close modal
-    setRejectionReason("");
-    setShowRejectModal(false);
+    try {
+      // Call the reject handler
+      await onReject(localUser.id, rejectionReason);
+      
+      // Update local state to reflect the rejection
+      setLocalUser(prev => prev ? {
+        ...prev,
+        status: 'rejected',
+        user_metadata: {
+          ...prev.user_metadata,
+          verification_status: 'rejected'
+        }
+      } : null);
+      
+      // Reset and close modal
+      setRejectionReason("");
+      setShowRejectModal(false);
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+    }
   };
 
   const handleSubmitInfoRequest = () => {
-    if (!user || !infoRequest.trim()) return;
+    if (!localUser || !infoRequest.trim()) return;
     
     // Call the request info handler
-    onRequestInfo(parseInt(user.id) || 0, infoRequest);
+    onRequestInfo(localUser.id, infoRequest);
     
     // Reset and close modal
     setInfoRequest("");
     setShowRequestInfoModal(false);
   };
 
-  if (!user) {
+  const handleVerifyUser = async () => {
+    if (!localUser) return;
+    
+    setIsVerifying(true);
+    try {
+      // Call the verify handler
+      await onVerify(localUser.id);
+      
+      // Update local state to reflect the verification
+      setLocalUser(prev => prev ? {
+        ...prev,
+        status: 'verified',
+        user_metadata: {
+          ...prev.user_metadata,
+          verification_status: 'verified'
+        }
+      } : null);
+    } catch (error) {
+      console.error('Error verifying user:', error);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  if (!localUser) {
     return <div className="p-8">No user details available</div>;
   }
 
@@ -150,8 +229,8 @@ export const AdminViewUser = ({
               </div>
               <div className="flex items-start gap-6">
                 <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                  {localUser.avatar_url ? (
+                    <img src={localUser.avatar_url} alt={localUser.name} className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-10 h-10 text-gray-500" />
                   )}
@@ -159,52 +238,52 @@ export const AdminViewUser = ({
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h2 className="text-xl font-semibold">
-                      {user.user_metadata?.firstName && user.user_metadata?.lastName 
-                        ? `${user.user_metadata.firstName} ${user.user_metadata.lastName}` 
-                        : user.name}
+                      {localUser.user_metadata?.firstName && localUser.user_metadata?.lastName 
+                        ? `${localUser.user_metadata.firstName} ${localUser.user_metadata.lastName}` 
+                        : localUser.name}
                     </h2>
-                    {(user.status?.toLowerCase() === "verified" || user.user_metadata?.verification_status === "verified") ? (
+                    {(localUser.status?.toLowerCase() === "verified" || localUser.user_metadata?.verification_status === "verified") ? (
                       <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : (user.status?.toLowerCase() === "rejected" || user.user_metadata?.status === "rejected") ? (
+                    ) : (localUser.status?.toLowerCase() === "rejected" || localUser.user_metadata?.status === "rejected") ? (
                       <XCircle className="w-5 h-5 text-red-500" />
                     ) : (
                       <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Pending</span>
                     )}
                   </div>
                   <p className="text-blue-600 font-medium mb-1">
-                    {user.user_metadata?.title || user.user_metadata?.role_title || "Legal Professional"}
+                    {localUser.user_metadata?.title || localUser.user_metadata?.role_title || "Legal Professional"}
                   </p>
-                  <p className="text-gray-600 mb-4">Joined {user.joinedDate || user.submittedDate || 'Recently'}</p>
+                  <p className="text-gray-600 mb-4">Joined {localUser.joinedDate || localUser.submittedDate || 'Recently'}</p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="flex items-center gap-2">
                       <Mail className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm">{user.email}</span>
+                      <span className="text-sm">{localUser.email}</span>
                     </div>
-                    {user.user_metadata?.phone && (
+                    {localUser.user_metadata?.phone && (
                       <div className="flex items-center gap-2">
                         <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">{user.user_metadata.phone}</span>
+                        <span className="text-sm">{localUser.user_metadata.phone}</span>
                       </div>
                     )}
-                    {user.user_metadata?.address && (
+                    {localUser.user_metadata?.address && (
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">{user.user_metadata.address}</span>
+                        <span className="text-sm">{localUser.user_metadata.address}</span>
                       </div>
                     )}
-                    {user.role && (
+                    {localUser.role && (
                       <div className="flex items-center gap-2">
                         <Briefcase className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm capitalize">{user.role}</span>
+                        <span className="text-sm capitalize">{localUser.role}</span>
                       </div>
                     )}
                   </div>
                   
-                  {user.user_metadata?.about && (
+                  {localUser.user_metadata?.about && (
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Bio/About</h4>
-                      <p className="text-sm text-gray-600">{user.user_metadata.about}</p>
+                      <p className="text-sm text-gray-600">{localUser.user_metadata.about}</p>
                     </div>
                   )}
                 </div>
@@ -212,14 +291,14 @@ export const AdminViewUser = ({
             </div>
             
             {/* 🎓 Education & Experience Section */}
-            {user.user_metadata?.education && user.user_metadata.education.length > 0 && (
+            {localUser.user_metadata?.education && localUser.user_metadata.education.length > 0 && (
               <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
                 <div className="flex items-center gap-2 mb-4">
                   <GraduationCap className="w-5 h-5 text-green-600" />
                   <h3 className="text-lg font-semibold">Education & Experience</h3>
                 </div>
                 <div className="space-y-4">
-                  {user.user_metadata.education.map((edu, index) => (
+                  {localUser.user_metadata.education.map((edu, index) => (
                     <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                       <GraduationCap className="w-5 h-5 text-gray-400 mt-0.5" />
                       <div className="flex-1">
@@ -240,8 +319,8 @@ export const AdminViewUser = ({
                 <h3 className="text-lg font-semibold">Specializations</h3>
               </div>
               <div className="flex flex-wrap gap-2">
-                {user.user_metadata?.specializations && user.user_metadata.specializations.length > 0 ? (
-                  user.user_metadata.specializations.map((spec, index) => (
+                {localUser.specializations && localUser.specializations.length > 0 ? (
+                  localUser.specializations.map((spec, index) => (
                     <span key={index} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
                       {spec}
                     </span>
@@ -263,30 +342,36 @@ export const AdminViewUser = ({
               
               {/* Verification Metadata */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-blue-50 rounded-lg">
-                {user.government_id_type && (
+                {localUser.government_id_type && (
                   <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-blue-600" />
                     <span className="text-sm">
-                      <span className="font-medium">ID Type:</span> {user.government_id_type}
+                      <span className="font-medium">ID Type:</span> {localUser.government_id_type}
                     </span>
                   </div>
                 )}
-                {user.bar_license_number && (
+                {localUser.bar_license_number && (
                   <div className="flex items-center gap-2">
                     <Award className="w-4 h-4 text-blue-600" />
                     <span className="text-sm">
-                      <span className="font-medium">Bar License:</span> {user.bar_license_number}
+                      <span className="font-medium">Bar License:</span> {localUser.bar_license_number}
                     </span>
                   </div>
                 )}
               </div>
 
               <div className="space-y-4">
-                {(() => {
+                {loadingDocuments ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p>Loading documents...</p>
+                  </div>
+                ) : (() => {
                   const documents = getUserDocuments();
                   return documents.length > 0 ? (
                     documents.map((doc, index) => {
                     const getDocumentIcon = (type?: string) => {
+                      console.log('type', type);
                       switch (type) {
                         case 'government_id':
                           return <Shield className="w-5 h-5 text-blue-500" />;
@@ -312,15 +397,31 @@ export const AdminViewUser = ({
                       }
                     };
 
+                    // Determine document type based on filename for better icon display
+                    const getDocumentType = (filename: string) => {
+                      console.log('filename', filename);
+                      const lowerName = filename.toLowerCase();
+                      if (lowerName.includes('government_id')) {
+                        return 'government_id';
+                      } else if (lowerName.includes('selfie') || lowerName.includes('photo')) {
+                        return 'selfie_with_id';
+                      } else if (lowerName.includes('bar_license') || lowerName.includes('license') || lowerName.includes('certificate')) {
+                        return 'bar_license';
+                      } else if (lowerName.includes('certificate') || lowerName.includes('professional')) {
+                        return 'professional_certificate';
+                      }
+                      return 'other';
+                    };
+
                     return (
                       <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
                         <div className="flex items-center gap-3">
-                          {getDocumentIcon(doc.type)}
+                          {getDocumentIcon(getDocumentType(doc.name))}
                           <div>
                             <h4 className="font-medium text-gray-900">{doc.name}</h4>
                             <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
-                              {doc.uploadDate && <span>Uploaded: {doc.uploadDate}</span>}
-                              {doc.size && <span>Size: {doc.size}</span>}
+                              {doc.uploadDate && <span>Uploaded: {new Date(doc.uploadDate).toLocaleDateString()}</span>}
+                              {doc.size && doc.size !== "Unknown" && <span>Size: {doc.size}</span>}
                             </div>
                           </div>
                         </div>
@@ -369,10 +470,10 @@ export const AdminViewUser = ({
                   <div className="flex justify-between mb-1">
                     <span className="text-gray-600">Verification Status:</span>
                     <span className={`font-medium ${
-                      user.status === 'verified' ? 'text-green-600' : 
-                      user.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'
+                      localUser.status === 'verified' ? 'text-green-600' : 
+                      localUser.status === 'rejected' ? 'text-red-600' : 'text-yellow-600'
                     }`}>
-                      {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                      {localUser.status ? localUser.status.charAt(0).toUpperCase() + localUser.status.slice(1) : 'Pending'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -414,18 +515,19 @@ export const AdminViewUser = ({
                 })()}
 
                 {/* Main Actions */}
-                {(user.status?.toLowerCase() !== "verified" && user.user_metadata?.verification_status !== "verified") && 
-                 (user.status?.toLowerCase() !== "rejected" && user.user_metadata?.status !== "rejected") && (
+                {(localUser.status?.toLowerCase() !== "verified" && localUser.user_metadata?.verification_status !== "verified") && 
+                 (localUser.status?.toLowerCase() !== "rejected" && localUser.user_metadata?.status !== "rejected") && (
                   <Button 
-                    onClick={() => onVerify(parseInt(user.id) || 0)}
+                    onClick={handleVerifyUser}
+                    disabled={isVerifying}
                     className="bg-green-600 hover:bg-green-700 text-white w-full"
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Approve Seller
+                    {isVerifying ? 'Verifying...' : 'Approve Seller'}
                   </Button>
                 )}
                 
-                {(user.status?.toLowerCase() !== "rejected" && user.user_metadata?.status !== "rejected") && (
+                {(localUser.status?.toLowerCase() !== "rejected" && localUser.user_metadata?.status !== "rejected") && (
                   <Button 
                     onClick={() => setShowRejectModal(true)}
                     variant="outline"
@@ -455,24 +557,24 @@ export const AdminViewUser = ({
                   <span className="text-gray-600">Profile Completeness:</span>
                   <span className="font-medium">
                     {Math.round(
-                      ((user.user_metadata?.firstName ? 1 : 0) +
-                       (user.user_metadata?.title ? 1 : 0) +
-                       (user.user_metadata?.about ? 1 : 0) +
-                       (user.user_metadata?.specializations?.length ? 1 : 0) +
-                       (user.user_metadata?.education?.length ? 1 : 0)) / 5 * 100
+                      ((localUser.user_metadata?.firstName ? 1 : 0) +
+                       (localUser.user_metadata?.title ? 1 : 0) +
+                       (localUser.user_metadata?.about ? 1 : 0) +
+                       (localUser.user_metadata?.specializations?.length ? 1 : 0) +
+                       (localUser.user_metadata?.education?.length ? 1 : 0)) / 5 * 100
                     )}%
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Contact Info:</span>
-                  <span className={`font-medium ${user.user_metadata?.phone ? 'text-green-600' : 'text-red-600'}`}>
-                    {user.user_metadata?.phone ? '✓ Complete' : '✗ Missing Phone'}
+                  <span className={`font-medium ${localUser.phone ? 'text-green-600' : 'text-red-600'}`}>
+                    {localUser.phone ? '✓ Complete' : '✗ Missing Phone'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Role:</span>
-                  <span className={`font-medium ${user.role ? 'text-green-600' : 'text-yellow-600'}`}>
-                    {user.role ? `✓ ${user.role}` : '⚠ No Role Set'}
+                  <span className={`font-medium ${localUser.role ? 'text-green-600' : 'text-yellow-600'}`}>
+                    {localUser.role ? `✓ ${localUser.role}` : '⚠ No Role Set'}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -499,17 +601,46 @@ export const AdminViewUser = ({
           <div className="space-y-4">
             {selectedDocument && (
               <>
-                {/* Document Preview Placeholder */}
+                {/* Document Preview */}
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
-                  <FileText className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                  <p className="text-gray-600 mb-2">Document Preview</p>
-                  <p className="text-sm text-gray-500">
-                    {selectedDocument.name} • {selectedDocument.size || 'Unknown size'}
-                  </p>
-                  <Button variant="outline" className="mt-3">
-                    <Eye className="w-4 h-4 mr-2" />
-                    View Full Document
-                  </Button>
+                  {selectedDocument.url ? (
+                    <div>
+                      <img 
+                        src={selectedDocument.url} 
+                        alt={selectedDocument.name}
+                        className="max-w-full max-h-64 mx-auto mb-4 rounded-lg shadow-sm"
+                        onError={(e) => {
+                          // Fallback to file icon if image fails to load
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                      <div className="hidden">
+                        <FileText className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                        <p className="text-gray-600 mb-2">Document Preview</p>
+                      </div>
+                      <p className="text-sm text-gray-500 mb-3">
+                        {selectedDocument.name} • {selectedDocument.size || 'Unknown size'}
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-3"
+                        onClick={() => window.open(selectedDocument.url, '_blank')}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Full Document
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <FileText className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                      <p className="text-gray-600 mb-2">Document Preview</p>
+                      <p className="text-sm text-gray-500">
+                        {selectedDocument.name} • {selectedDocument.size || 'Unknown size'}
+                      </p>
+                      <p className="text-sm text-gray-400 mt-2">Document URL not available</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Document Details */}
@@ -530,7 +661,15 @@ export const AdminViewUser = ({
                   {selectedDocument.uploadDate && (
                     <div>
                       <label className="text-sm font-medium text-gray-600">Upload Date</label>
-                      <p className="text-sm text-gray-900">{selectedDocument.uploadDate}</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(selectedDocument.uploadDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -586,7 +725,7 @@ export const AdminViewUser = ({
           <DialogHeader>
             <DialogTitle>Reject User Verification</DialogTitle>
             <DialogDescription>
-              Please provide a reason for rejecting {user.name}'s verification request.
+              Please provide a reason for rejecting {localUser.name}'s verification request.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -620,7 +759,7 @@ export const AdminViewUser = ({
           <DialogHeader>
             <DialogTitle>Request More Information</DialogTitle>
             <DialogDescription>
-              Specify what additional information you need from {user.name}.
+              Specify what additional information you need from {localUser.name}.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

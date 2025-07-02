@@ -1730,13 +1730,14 @@ export const api = {
     },
 
     getAverageResponseTime: async (userId: string) => {
-      // This would need a messages or response tracking table
-      // For now, returning a placeholder
+      // Get conversations where the user is involved
       const { data: conversations, error } = await supabase
         .from('conversations')
         .select('created_at, updated_at')
         .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
         .limit(10);
+
+      console.log('conversations', conversations);
 
       if (error) {
         throw error;
@@ -1746,8 +1747,33 @@ export const api = {
         return "N/A";
       }
 
-      // Simplified calculation - in reality you'd track actual response times
-      return "< 2 hours";
+      // Calculate average response time based on conversation duration
+      const responseTimes = conversations.map(conversation => {
+        const startTime = new Date(conversation.created_at).getTime();
+        console.log('startTime', startTime);
+        const endTime = new Date(conversation.updated_at).getTime();
+        console.log('endTime', endTime);
+        const durationMs = endTime - startTime;
+        console.log('durationMs', durationMs);
+        // Convert to hours
+        const durationHours = durationMs / (1000 * 60 * 60);
+        return durationHours;
+      });
+
+      // Calculate average
+      const averageHours = responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
+
+      // Format the response time
+      if (averageHours < 1) {
+        const minutes = Math.round(averageHours * 60);
+        return `${minutes} minutes`;
+      } else if (averageHours < 24) {
+        const hours = Math.round(averageHours);
+        return `${hours} hours`;
+      } else {
+        const days = Math.round(averageHours / 24);
+        return `${days} days`;
+      }
     },
 
     getActiveClientStatus: async (userId: string) => {

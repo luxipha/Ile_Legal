@@ -142,6 +142,17 @@ export const PublicLawyerProfile: React.FC = () => {
         feedbackData = [];
       }
 
+      // Load average response time for the lawyer
+      let responseTime = 'N/A';
+      try {
+        responseTime = await api.metrics.getAverageResponseTime(lawyerId);
+        console.log('Response time loaded from API:', responseTime);
+      } catch (responseTimeError) {
+        console.error('Error loading response time from API:', responseTimeError);
+        // Don't fail the entire profile load if response time fails
+        responseTime = 'N/A';
+      }
+
       // Transform profile data
       const lawyerProfile: LawyerProfile = {
         id: profileData.id,
@@ -168,7 +179,7 @@ export const PublicLawyerProfile: React.FC = () => {
           : 0,
         total_reviews: feedbackData.length,
         completed_cases: profileData.jobs_completed || 0,
-        response_time: '< 2 hours'
+        response_time: responseTime
       };
 
       setLawyer(lawyerProfile);

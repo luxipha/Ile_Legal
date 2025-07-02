@@ -1201,6 +1201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Admin-only function to update a user's status
   const updateUserStatus = async (userId: string, status: string): Promise<void> => {
+    console.log('userid', userId);
     if (!user || user.user_metadata?.role_title !== 'admin') {
       throw new Error('Access denied. Admin privileges required.');
     }
