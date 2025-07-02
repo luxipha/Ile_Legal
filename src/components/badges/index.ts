@@ -7,3 +7,4 @@ export * from './icons/ReputationBadges';
 export * from './icons/AchievementBadges';
 export * from './icons/QualityBadges';
 export * from './icons/VerificationBadges';
+export * from './icons/LoyaltyBadges';
