@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircleIcon, AlertCircleIcon, RefreshCcwIcon, ExternalLinkIcon, CopyIcon } from 'lucide-react';
-import { frontendWalletService } from '../../services/frontendWalletService';
+import { getUserWalletData } from '../../services/unifiedWalletService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
@@ -25,80 +25,36 @@ export const WalletStatusNotification: React.FC<WalletStatusNotificationProps> =
       setIsLoading(true);
       setError(null);
       
-      // First try user_wallets table
-      let walletData = await frontendWalletService.getUserWallet(user.id);
+      console.log('🔍 [WalletNotification] Loading wallet data for user:', user.id);
       
-      // If not found in user_wallets, check Profiles table
-      if (!walletData) {
-        const { supabase } = await import('../../lib/supabase');
-        const { data: profileData, error: profileError } = await supabase
-          .from('Profiles')
-          .select('circle_wallet_id, circle_wallet_address, circle_wallet_status')
-          .eq('id', user.id)
-          .single();
-          
-        if (!profileError && profileData?.circle_wallet_id) {
-          // Get real-time balance from Circle API
-          let usdcBalance = '0.00';
-          let maticBalance = '0.00';
-          
-          try {
-            const balanceData = await frontendWalletService.getWalletBalance(profileData.circle_wallet_id);
-            if (balanceData?.tokenBalances?.length > 0) {
-              const usdcToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'USDC');
-              const maticToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'MATIC');
-              usdcBalance = usdcToken?.amount || '0.00';
-              maticBalance = maticToken?.amount || '0.00';
-            }
-          } catch (balanceError) {
-            console.log('Could not fetch real-time balance:', balanceError);
-          }
-          
-          // Convert profile data to wallet format with real balance
-          setWalletInfo({
-            walletId: profileData.circle_wallet_id,
-            address: profileData.circle_wallet_address,
-            status: profileData.circle_wallet_status || 'active',
-            balances: [
-              { currency: 'USDC', amount: usdcBalance },
-              { currency: 'MATIC', amount: maticBalance }
-            ],
-            type: 'circle'
-          });
-          return;
-        }
-      } else {
-        // Get real-time balance from Circle API for user_wallets data too
-        let usdcBalance = walletData.balance_usdc?.toString() || '0.00';
-        let maticBalance = walletData.balance_matic?.toString() || '0.00';
-        
-        try {
-          const balanceData = await frontendWalletService.getWalletBalance(walletData.circle_wallet_id);
-          if (balanceData?.tokenBalances?.length > 0) {
-            const usdcToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'USDC');
-            const maticToken = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'MATIC');
-            usdcBalance = usdcToken?.amount || usdcBalance;
-            maticBalance = maticToken?.amount || maticBalance;
-          }
-        } catch (balanceError) {
-          console.log('Could not fetch real-time balance from user_wallets:', balanceError);
-        }
-        
-        // Convert frontend wallet data to notification format with real balance
-        setWalletInfo({
-          walletId: walletData.circle_wallet_id,
-          address: walletData.wallet_address,
-          status: walletData.wallet_state,
-          balances: [
-            { currency: 'USDC', amount: usdcBalance },
-            { currency: 'MATIC', amount: maticBalance }
-          ],
-          type: 'circle'
-        });
+      // Use the same service that works for payment pages
+      const unifiedWalletData = await getUserWalletData(user.id);
+      
+      console.log('📊 [WalletNotification] Unified wallet data loaded:', {
+        hasEth: unifiedWalletData.hasEthWallet,
+        hasCircle: unifiedWalletData.hasCircleWallet,
+        balance: unifiedWalletData.balance,
+        currency: unifiedWalletData.currency
+      });
+      
+      if (!unifiedWalletData.hasEthWallet && !unifiedWalletData.hasCircleWallet) {
+        console.log('⚠️  [WalletNotification] No wallets found for user');
+        setError('No wallet found');
         return;
       }
       
-      setError('Wallet not found');
+      // Convert unified wallet data to notification format
+      setWalletInfo({
+        walletId: unifiedWalletData.circleWalletId || unifiedWalletData.ethAddress || 'unknown',
+        address: unifiedWalletData.ethAddress || unifiedWalletData.circleWalletAddress || '',
+        status: 'connected',
+        balances: [
+          { currency: unifiedWalletData.currency, amount: unifiedWalletData.balance }
+        ],
+        type: unifiedWalletData.hasEthWallet ? 'ethereum' : 'circle'
+      });
+      
+      console.log('✅ [WalletNotification] Wallet info loaded successfully');
     } catch (err) {
       console.error('Error loading wallet info:', err);
       setError('Wallet is being created...');

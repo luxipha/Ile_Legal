@@ -321,7 +321,7 @@ export const Login = (): JSX.Element => {
                   <button 
                     type="button"
                     onClick={() => setShowForgotPassword(true)}
-                    className="text-sm text-[#1B1828] hover:text-[#FEC85F] font-medium"
+                    className="text-sm text-[#1B1828] hover:text-[#FEC85F] font-medium underline underline-offset-2"
                   >
                     Forgot password?
                   </button>

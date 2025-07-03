@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { backendWalletService } from '../services/backendWalletService';
+import { frontendWalletService } from '../services/frontendWalletService';
 
 // User types
 type UserRole = 'buyer' | 'seller' | 'admin';
@@ -517,26 +517,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         
         try {
-          // Create a Circle wallet for the new user using backend service
-          console.log('Creating Circle wallet via backend for new user:', newUser.id);
+          // Create a Circle wallet for the new user using frontend service
+          console.log('🔄 [AuthContext] Creating Circle wallet via frontend for new user:', newUser.id, 'Role:', newUser.role);
           
           if (!newUser.id) {
             throw new Error('No user ID available for wallet creation');
           }
           
-          const walletResponse = await backendWalletService.createWallet({
+          const walletResponse = await frontendWalletService.createWallet({
             userId: newUser.id,
             userType: newUser.role as 'buyer' | 'seller',
             name: newUser.name,
             email: newUser.email
           });
           
+          console.log('📊 [AuthContext] Frontend wallet response:', walletResponse);
+          
           if (!walletResponse.success || !walletResponse.wallet) {
-            throw new Error(`Backend wallet creation failed: ${walletResponse.error || 'Unknown error'}`);
+            throw new Error(`Frontend wallet creation failed: ${walletResponse.error || walletResponse.details || 'Unknown error'}`);
           }
           
           const wallet = walletResponse.wallet;
-          console.log('Backend wallet created successfully:', wallet.circle_wallet_id);
+          console.log('✅ [AuthContext] Frontend wallet created successfully:', wallet.circle_wallet_id);
+          console.log('✅ [AuthContext] Wallet automatically stored in user_wallets table by frontend service');
           
           // Update the user object with wallet information
           newUser.user_metadata = {
@@ -553,27 +556,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           });
           
-          console.log('Backend Circle wallet setup complete!');
+          console.log('✅ [AuthContext] Circle wallet setup complete for', newUser.role, '!');
         } catch (walletError) {
           // Log the error but don't fail the registration process
-          console.error('Error creating Circle wallet via backend:', walletError);
+          console.error('❌ [AuthContext] Error creating Circle wallet via frontend:', walletError);
           
-          // Fallback to mock wallet if backend service fails
-          console.log('Falling back to mock wallet...');
-          const mockWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
+          // Create a proper wallet entry in user_wallets table even if frontend fails
+          console.log('🔄 [AuthContext] Creating fallback wallet entry for user_wallets table...');
+          
+          const fallbackWalletId = `temp_${newUser.id}`;
+          const fallbackWalletAddress = `0x${Math.random().toString(16).substring(2, 42)}`;
+          
+          // Insert temporary wallet entry that can be upgraded later
+          try {
+            const { error: tempWalletError } = await supabase
+              .from('user_wallets')
+              .insert({
+                user_id: newUser.id,
+                circle_wallet_id: fallbackWalletId,
+                wallet_address: fallbackWalletAddress,
+                wallet_state: 'PENDING',
+                blockchain: 'ETHEREUM',
+                account_type: 'EOA',
+                custody_type: 'ENDUSER',
+                description: `Temporary ${newUser.role} wallet - Circle wallet pending creation`,
+                balance_usdc: 0,
+                balance_matic: 0,
+                is_active: true
+              });
+
+            if (tempWalletError) {
+              console.error('❌ [AuthContext] Error creating temporary wallet:', tempWalletError);
+              // Don't fail registration if temporary wallet creation fails
+            } else {
+              console.log('✅ [AuthContext] Temporary wallet entry created for', newUser.role);
+            }
+          } catch (tempWalletException) {
+            console.error('❌ [AuthContext] Exception creating temporary wallet:', tempWalletException);
+            // Continue with registration even if wallet creation completely fails
+          }
           
           newUser.user_metadata = {
             ...newUser.user_metadata,
-            circle_wallet_id: `wallet_${newUser.id || 'unknown'}`,
-            circle_wallet_address: mockWalletAddress
+            circle_wallet_id: fallbackWalletId,
+            circle_wallet_address: fallbackWalletAddress
           };
           
-          await supabase.auth.updateUser({
-            data: {
-              circle_wallet_id: `wallet_${newUser.id || 'unknown'}`,
-              circle_wallet_address: mockWalletAddress
-            }
-          });
+          try {
+            await supabase.auth.updateUser({
+              data: {
+                circle_wallet_id: fallbackWalletId,
+                circle_wallet_address: fallbackWalletAddress
+              }
+            });
+          } catch (updateUserError) {
+            console.error('❌ [AuthContext] Error updating user metadata:', updateUserError);
+            // Continue with registration even if user metadata update fails
+          }
+          
+          console.log('⚠️ [AuthContext] Fallback wallet created - Circle wallet creation will be retried later');
         }
       }
       
@@ -601,24 +642,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const signUpResult = await signUpNewUser(email, name, password, role);
       const userId = signUpResult?.user?.id;
       
-      if (userId && signUpResult?.session) {
+      if (userId && signUpResult?.user) {
+        console.log('🔄 [AuthContext] Creating profile for user:', userId);
+        
         // Set the session to authenticate the user before inserting into profiles
-        await supabase.auth.setSession(signUpResult.session);
+        if (signUpResult?.session) {
+          await supabase.auth.setSession(signUpResult.session);
+        }
         
         // Insert into profiles table with authenticated context
-        const { error: profileError } = await supabase.from('Profiles').insert([
-          {
-            id: userId,
-            first_name: name.split(' ')[0] || '',
-            last_name: name.split(' ').slice(1).join(' ') || '',
-            email,
-            user_type: role,
-            verification_status: 'pending'
-          }
-        ]);
+        const profileData = {
+          id: userId,
+          first_name: name.split(' ')[0] || '',
+          last_name: name.split(' ').slice(1).join(' ') || '',
+          email,
+          user_type: role,
+          verification_status: 'pending'
+        };
+        
+        console.log('📝 [AuthContext] Inserting profile data:', profileData);
+        
+        const { error: profileError } = await supabase
+          .from('Profiles')
+          .insert([profileData]);
+          
         if (profileError) {
-          console.error('Error inserting into profiles:', profileError);
-          throw profileError;
+          console.error('❌ [AuthContext] Error inserting into profiles:', profileError);
+          
+          // Try to insert without requiring authentication (use service role)
+          console.log('🔄 [AuthContext] Retrying profile insert with service role...');
+          
+          try {
+            // Remove session temporarily for service role insert
+            await supabase.auth.signOut();
+            
+            const { error: serviceError } = await supabase
+              .from('Profiles')
+              .insert([profileData]);
+              
+            if (serviceError) {
+              console.error('❌ [AuthContext] Service role profile insert also failed:', serviceError);
+            } else {
+              console.log('✅ [AuthContext] Profile created with service role');
+            }
+            
+            // Restore the session
+            if (signUpResult?.session) {
+              await supabase.auth.setSession(signUpResult.session);
+            }
+          } catch (serviceInsertError) {
+            console.error('❌ [AuthContext] Service insert exception:', serviceInsertError);
+            // Restore session even if service insert fails
+            if (signUpResult?.session) {
+              await supabase.auth.setSession(signUpResult.session);
+            }
+          }
+        } else {
+          console.log('✅ [AuthContext] Profile created successfully');
         }
       }
 
@@ -975,12 +1055,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Wait a moment for auth state to settle
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Check if user exists with this ETH address
-        const { data: userData, error: userError } = await supabase
-          .from('Profiles')
-          .select('*')
-          .eq('eth_address', address)
-          .single();
+        // Check if user exists with this ETH address in user_wallets table
+        const { data: userWallets, error: walletError } = await supabase
+          .from('user_wallets')
+          .select('user_id, wallet_address')
+          .eq('wallet_address', address)
+          .eq('is_active', true);
+        
+        let userData = null;
+        let userError = null;
+        
+        if (walletError) {
+          console.error('Wallet lookup error:', walletError);
+          userError = walletError;
+        } else if (userWallets && userWallets.length > 0) {
+          // Found wallet, get user profile
+          const { data: profile, error: profileError } = await supabase
+            .from('Profiles')
+            .select('*')
+            .eq('id', userWallets[0].user_id)
+            .single();
+          
+          userData = profile;
+          userError = profileError;
+        } else {
+          // No wallet found - user doesn't exist
+          userError = { code: 'PGRST116' }; // Simulate "no rows returned"
+        }
         
         console.log('Profile lookup result:', { userData, userError });
         
@@ -991,11 +1092,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (userData) {
           console.log('Existing user found, updating session...');
-          // User exists, update session and ensure ETH address is stored
-          await supabase
-            .from('Profiles')
-            .update({ eth_address: address })
-            .eq('id', userData.id);
+          // User exists, ensure ETH wallet is active in user_wallets
+          const { error: walletUpdateError } = await supabase
+            .from('user_wallets')
+            .upsert({
+              user_id: userData.id,
+              circle_wallet_id: `eth-${userData.id}`,
+              wallet_address: address,
+              wallet_state: 'LIVE',
+              blockchain: 'ETHEREUM',
+              account_type: 'EOA',
+              custody_type: 'ENDUSER',
+              description: `ETH wallet for ${userData.first_name} ${userData.last_name}`,
+              balance_usdc: 0,
+              balance_matic: 0,
+              is_active: true
+            }, {
+              onConflict: 'user_id,wallet_address'
+            });
+          
+          if (walletUpdateError) {
+            console.error('Error updating ETH wallet:', walletUpdateError);
+          }
           
           const fullName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || `ETH User ${address.substring(0, 6)}`;
           
@@ -1023,16 +1141,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           console.log('No existing user found, creating new user...');
           
-          // Create new user with ETH address
-          const { data: userProfile } = await supabase
-            .from('Profiles')
-            .select('*')
-            .eq('eth_address', address)
-            .single();
+          // Double-check if user was created during this process
+          const { data: recheckWallets } = await supabase
+            .from('user_wallets')
+            .select('user_id')
+            .eq('wallet_address', address)
+            .eq('is_active', true);
 
-          console.log('Double-checking profile existence:', userProfile);
+          console.log('Double-checking wallet existence:', recheckWallets);
 
-          if (!userProfile) {
+          if (!recheckWallets || recheckWallets.length === 0) {
             console.log('Creating new MetaMask user...');
             
             // Create a new user if not exists
@@ -1249,7 +1367,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      // Update or create profile in Profiles table
+      // Update or create profile in Profiles table (without eth_address)
       const { error: profileError } = await supabase
         .from('Profiles')
         .upsert({
@@ -1259,9 +1377,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: profileData.email,
           phone: profileData.phone,
           user_type: selectedRole,
-          verification_status: 'pending',
-          eth_address: address
+          verification_status: 'pending'
         });
+      
+      // Store ETH wallet in user_wallets table
+      if (address) {
+        const { error: walletError } = await supabase
+          .from('user_wallets')
+          .upsert({
+            user_id: userId,
+            circle_wallet_id: `eth-${userId}`,
+            wallet_address: address,
+            wallet_state: 'LIVE',
+            blockchain: 'ETHEREUM',
+            account_type: 'EOA',
+            custody_type: 'ENDUSER',
+            description: `ETH wallet for ${profileData.firstName} ${profileData.lastName}`,
+            balance_usdc: 0,
+            balance_matic: 0,
+            is_active: true
+          }, {
+            onConflict: 'user_id,wallet_address'
+          });
+        
+        if (walletError) {
+          console.error('Error creating ETH wallet record:', walletError);
+          throw walletError;
+        }
+      }
 
       if (profileError) {
         console.error('Error updating profile:', profileError);

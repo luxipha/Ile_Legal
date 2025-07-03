@@ -10,23 +10,33 @@ import { User } from '../types';
  */
 export const createUserWallet = async (user: User) => {
   try {
-    // Check if user already has a wallet
-    const { data: profile, error: profileError } = await supabase
-      .from('Profiles')
-      .select('circle_wallet_id, circle_wallet_address')
-      .eq('id', user.id)
-      .single();
+    console.log('🏦 [WalletService] Creating wallet for user:', user.id);
     
-    // If profile query fails, it might be because the profile doesn't exist yet
-    // This is normal for new users, so we'll continue with wallet creation
-    if (profileError && profileError.code !== 'PGRST116') {
-      console.log('Profile query error (continuing with wallet creation):', profileError);
+    // Check if user already has a Circle wallet in user_wallets table
+    const { data: existingWallets, error: walletError } = await supabase
+      .from('user_wallets')
+      .select('circle_wallet_id, wallet_address, blockchain')
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+    
+    if (walletError && walletError.code !== 'PGRST116') {
+      console.log('📊 [WalletService] Wallet query error (continuing):', walletError);
     }
     
-    if (profile?.circle_wallet_id) {
-      console.log('User already has a wallet:', profile.circle_wallet_id);
-      return { walletId: profile.circle_wallet_id, address: profile.circle_wallet_address };
+    // Check if user already has a Circle wallet
+    const existingCircleWallet = existingWallets?.find(w => 
+      w.blockchain !== 'ETHEREUM' && !w.circle_wallet_id.startsWith('eth-')
+    );
+    
+    if (existingCircleWallet) {
+      console.log('✅ [WalletService] User already has Circle wallet:', existingCircleWallet.circle_wallet_id);
+      return { 
+        walletId: existingCircleWallet.circle_wallet_id, 
+        address: existingCircleWallet.wallet_address 
+      };
     }
+    
+    console.log('🔨 [WalletService] Creating new Circle wallet...');
     
     // Create a new wallet using frontend service (with node-forge encryption)
     const walletResponse = await frontendWalletService.createWallet({
@@ -37,37 +47,24 @@ export const createUserWallet = async (user: User) => {
     });
     
     if (!walletResponse.success || !walletResponse.wallet) {
+      console.error('❌ [WalletService] Wallet creation failed:', walletResponse.error);
       throw new Error(`Frontend wallet creation failed: ${walletResponse.error || 'Unknown error'}`);
     }
     
     const wallet = walletResponse.wallet;
     
-    // Update user profile with wallet information
-    await supabase
-      .from('Profiles')
-      .update({
-        circle_wallet_id: wallet.circle_wallet_id,
-        circle_wallet_address: wallet.wallet_address,
-        circle_wallet_created_at: new Date().toISOString(),
-        circle_wallet_status: 'active'
-      })
-      .eq('id', user.id);
+    console.log('✅ [WalletService] Circle wallet created successfully:', {
+      walletId: wallet.circle_wallet_id,
+      address: wallet.wallet_address?.substring(0, 10) + '...'
+    });
     
+    // Wallet is already stored in user_wallets by frontendWalletService
     return {
       walletId: wallet.circle_wallet_id,
       address: wallet.wallet_address
     };
   } catch (error) {
-    console.error('Error creating user wallet:', error);
-    
-    // Update user profile with error status
-    await supabase
-      .from('Profiles')
-      .update({
-        circle_wallet_status: 'failed'
-      })
-      .eq('id', user.id);
-    
+    console.error('❌ [WalletService] Error creating user wallet:', error);
     throw error;
   }
 };
@@ -79,16 +76,18 @@ export const createUserWallet = async (user: User) => {
  */
 export const getUserWallet = async (userId: string) => {
   try {
-    // Get wallet data from user profile - check for both Circle and ETH wallets
-    const { data: profile, error } = await supabase
-      .from('Profiles')
-      .select('circle_wallet_id, circle_wallet_address, eth_address')
-      .eq('id', userId)
-      .single();
+    console.log('💰 [WalletService] Getting wallet details for user:', userId);
+    
+    // Get all active wallets from unified user_wallets table
+    const { data: wallets, error } = await supabase
+      .from('user_wallets')
+      .select('circle_wallet_id, wallet_address, blockchain, balance_usdc, balance_matic, wallet_state')
+      .eq('user_id', userId)
+      .eq('is_active', true);
     
     if (error) {
-      console.log('Profile query error, using AuthContext data:', error);
-      // Return mock wallet data when profile query fails
+      console.error('❌ [WalletService] Database error:', error);
+      // Return mock wallet data when query fails
       return {
         walletId: `wallet_${userId}`,
         address: `0x${Math.random().toString(16).substring(2, 42)}`,
@@ -100,11 +99,57 @@ export const getUserWallet = async (userId: string) => {
       };
     }
     
-    // Check for MetaMask wallet first
-    if (profile?.eth_address) {
+    console.log('📊 [WalletService] Found wallets:', wallets?.length || 0);
+    
+    if (!wallets || wallets.length === 0) {
+      console.log('⚠️  [WalletService] No wallets found for user');
+      throw new Error('User does not have a wallet');
+    }
+    
+    // Separate Circle and Ethereum wallets
+    const circleWallet = wallets.find(w => 
+      w.blockchain !== 'ETHEREUM' && !w.circle_wallet_id.startsWith('eth-')
+    );
+    const ethWallet = wallets.find(w => 
+      w.blockchain === 'ETHEREUM' || w.circle_wallet_id.startsWith('eth-')
+    );
+    
+    console.log('🔍 [WalletService] Wallet types found:', {
+      hasCircle: !!circleWallet,
+      hasEth: !!ethWallet
+    });
+    
+    // Prefer Circle wallet if available
+    if (circleWallet) {
+      console.log('✅ [WalletService] Using Circle wallet:', circleWallet.circle_wallet_id);
+      
+      // Get wallet details from frontend wallet service for real-time data
+      let walletData = null;
+      try {
+        walletData = await frontendWalletService.getUserWallet(userId);
+      } catch (serviceError) {
+        console.log('⚠️  [WalletService] Frontend service failed, using stored data:', serviceError);
+      }
+      
       return {
-        walletId: `metamask_${userId}`,
-        address: profile.eth_address,
+        walletId: circleWallet.circle_wallet_id,
+        address: circleWallet.wallet_address,
+        status: circleWallet.wallet_state,
+        type: 'circle',
+        balances: [
+          { currency: 'USDC', amount: walletData?.balance_usdc?.toString() || circleWallet.balance_usdc?.toString() || '0.00' },
+          { currency: 'MATIC', amount: walletData?.balance_matic?.toString() || circleWallet.balance_matic?.toString() || '0.00' }
+        ],
+        availableToWithdraw: walletData?.balance_usdc || circleWallet.balance_usdc || 0
+      };
+    }
+    
+    // Fallback to Ethereum wallet
+    if (ethWallet) {
+      console.log('✅ [WalletService] Using Ethereum wallet:', ethWallet.wallet_address);
+      return {
+        walletId: ethWallet.circle_wallet_id,
+        address: ethWallet.wallet_address,
         balances: [
           { currency: 'ETH', amount: '0.00' }
         ],
@@ -113,42 +158,9 @@ export const getUserWallet = async (userId: string) => {
       };
     }
     
-    // Check for Circle wallet
-    if (!profile?.circle_wallet_id) {
-      throw new Error('User does not have a wallet');
-    }
-    
-    // For mock wallets, return mock data
-    if (profile.circle_wallet_id.startsWith('wallet_')) {
-      return {
-        walletId: profile.circle_wallet_id,
-        address: profile.circle_wallet_address,
-        balances: [
-          { currency: 'USD', amount: '1250.00' }
-        ],
-        status: 'mock'
-      };
-    }
-    
-    // Get wallet details from frontend wallet service
-    const walletData = await frontendWalletService.getUserWallet(userId);
-    
-    if (!walletData) {
-      throw new Error('Wallet data not found');
-    }
-    
-    return {
-      walletId: walletData.circle_wallet_id,
-      address: walletData.wallet_address,
-      status: walletData.wallet_state,
-      balances: [
-        { currency: 'USDC', amount: walletData.balance_usdc?.toString() || '0.00' },
-        { currency: 'MATIC', amount: walletData.balance_matic?.toString() || '0.00' }
-      ],
-      availableToWithdraw: walletData.balance_usdc || 0
-    };
+    throw new Error('No valid wallet found for user');
   } catch (error) {
-    console.error('Error getting user wallet:', error);
+    console.error('❌ [WalletService] Error getting user wallet:', error);
     throw error;
   }
 };
@@ -162,24 +174,40 @@ export const getUserWallet = async (userId: string) => {
  */
 export const getWalletTransactions = async (userId: string) => {
   try {
-    // Get wallet ID from user profile
-    const { data: profile } = await supabase
-      .from('Profiles')
-      .select('circle_wallet_id')
-      .eq('id', userId)
-      .single();
+    console.log('📜 [WalletService] Getting transaction history for user:', userId);
     
-    if (!profile?.circle_wallet_id) {
-      throw new Error('User does not have a wallet');
+    // Get Circle wallet ID from user_wallets table
+    const { data: wallets, error } = await supabase
+      .from('user_wallets')
+      .select('circle_wallet_id, blockchain')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+    
+    if (error) {
+      console.error('❌ [WalletService] Error fetching wallets:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
+    
+    // Find Circle wallet for transactions
+    const circleWallet = wallets?.find(w => 
+      w.blockchain !== 'ETHEREUM' && !w.circle_wallet_id.startsWith('eth-')
+    );
+    
+    if (!circleWallet) {
+      console.log('⚠️  [WalletService] No Circle wallet found for transactions');
+      return [];
+    }
+    
+    console.log('🔍 [WalletService] Fetching transactions for wallet:', circleWallet.circle_wallet_id);
     
     // Get transaction history from frontend wallet service
     // TODO: Implement transaction history in frontendWalletService
     const transactions: any[] = [];
     
+    console.log('📊 [WalletService] Transaction count:', transactions.length);
     return transactions;
   } catch (error) {
-    console.error('Error getting wallet transactions:', error);
+    console.error('❌ [WalletService] Error getting wallet transactions:', error);
     throw error;
   }
 };
@@ -199,16 +227,32 @@ export const createEscrowTransaction = async (
   amount: number
 ) => {
   try {
-    // Get buyer's wallet ID
-    const { data: buyerProfile } = await supabase
-      .from('Profiles')
-      .select('circle_wallet_id')
-      .eq('id', buyerId)
-      .single();
+    console.log('🔒 [WalletService] Creating escrow transaction for gig:', gigId);
+    console.log('💰 [WalletService] Buyer:', buyerId, 'Seller:', sellerId, 'Amount:', amount);
     
-    if (!buyerProfile?.circle_wallet_id) {
+    // Get buyer's wallet ID from user_wallets table
+    const { data: buyerWallets, error: buyerError } = await supabase
+      .from('user_wallets')
+      .select('circle_wallet_id, wallet_address, blockchain')
+      .eq('user_id', buyerId)
+      .eq('is_active', true);
+    
+    if (buyerError) {
+      console.error('❌ [WalletService] Error fetching buyer wallet:', buyerError);
+      throw new Error(`Database error: ${buyerError.message}`);
+    }
+    
+    // Find Circle wallet for the buyer
+    const buyerCircleWallet = buyerWallets?.find(w => 
+      w.blockchain !== 'ETHEREUM' && !w.circle_wallet_id.startsWith('eth-')
+    );
+    
+    if (!buyerCircleWallet?.circle_wallet_id) {
+      console.error('❌ [WalletService] Buyer does not have a Circle wallet');
       throw new Error('Buyer does not have a wallet');
     }
+    
+    console.log('✅ [WalletService] Found buyer wallet:', buyerCircleWallet.circle_wallet_id);
     
     // Get platform escrow wallet ID from settings
     const circleConfig = await SettingsService.getCircleConfig();
@@ -254,7 +298,7 @@ export const createEscrowTransaction = async (
         amount: amount,
         currency: 'USD',
         status: 'completed',
-        source_id: buyerProfile.circle_wallet_id,
+        source_id: buyerCircleWallet.circle_wallet_id,
         destination_id: escrowWalletId,
         metadata: {
           gig_id: gigId,
@@ -276,16 +320,50 @@ export const createEscrowTransaction = async (
  */
 export const releaseEscrowFunds = async (escrowTransactionId: string) => {
   try {
+    console.log('🔓 [WalletService] Releasing escrow funds for transaction:', escrowTransactionId);
+    
     // Get escrow transaction details
     const { data: escrowTransaction } = await supabase
       .from('escrow_transactions')
-      .select('*, buyer:buyer_id(circle_wallet_id), seller:seller_id(circle_wallet_id)')
+      .select('*')
       .eq('id', escrowTransactionId)
       .single();
     
     if (!escrowTransaction) {
+      console.error('❌ [WalletService] Escrow transaction not found:', escrowTransactionId);
       throw new Error('Escrow transaction not found');
     }
+    
+    console.log('📊 [WalletService] Escrow transaction details:', {
+      id: escrowTransaction.id,
+      amount: escrowTransaction.amount,
+      status: escrowTransaction.status,
+      sellerId: escrowTransaction.seller_id
+    });
+    
+    // Get seller's wallet from user_wallets table
+    const { data: sellerWallets, error: sellerError } = await supabase
+      .from('user_wallets')
+      .select('circle_wallet_id, wallet_address, blockchain')
+      .eq('user_id', escrowTransaction.seller_id)
+      .eq('is_active', true);
+    
+    if (sellerError) {
+      console.error('❌ [WalletService] Error fetching seller wallet:', sellerError);
+      throw new Error(`Database error: ${sellerError.message}`);
+    }
+    
+    // Find Circle wallet for the seller
+    const sellerCircleWallet = sellerWallets?.find(w => 
+      w.blockchain !== 'ETHEREUM' && !w.circle_wallet_id.startsWith('eth-')
+    );
+    
+    if (!sellerCircleWallet?.circle_wallet_id) {
+      console.error('❌ [WalletService] Seller does not have a Circle wallet');
+      throw new Error('Seller does not have a wallet');
+    }
+    
+    console.log('✅ [WalletService] Found seller wallet:', sellerCircleWallet.circle_wallet_id);
     
     if (escrowTransaction.status !== 'funded') {
       throw new Error(`Cannot release funds from escrow with status: ${escrowTransaction.status}`);
@@ -333,7 +411,7 @@ export const releaseEscrowFunds = async (escrowTransactionId: string) => {
         currency: 'USD',
         status: 'completed',
         source_id: escrowWalletId,
-        destination_id: escrowTransaction.seller.circle_wallet_id,
+        destination_id: sellerCircleWallet.circle_wallet_id,
         metadata: {
           gig_id: escrowTransaction.gig_id,
           escrow_transaction_id: escrowTransactionId

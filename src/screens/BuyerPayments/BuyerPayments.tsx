@@ -78,8 +78,18 @@ export const BuyerPayments = (): JSX.Element => {
       setError(null);
       
       try {
+        console.log('💳 [BuyerPayments] Loading payment data for user:', user.id);
+        
         // Load wallet data
+        console.log('🔍 [BuyerPayments] Fetching unified wallet data...');
         const walletData = await getUserWalletData(user.id);
+        console.log('📊 [BuyerPayments] Wallet data loaded:', {
+          hasEth: !!walletData.ethAddress,
+          hasCircle: !!walletData.circleWalletId,
+          balance: walletData.balance,
+          currency: walletData.currency
+        });
+        
         setFullWalletData(walletData);
         setWalletData({
           balance: walletData.balance,

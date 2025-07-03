@@ -43,20 +43,35 @@ export const Earnings = (): JSX.Element => {
       if (!user?.id) return;
       
       try {
+        console.log('💰 [Earnings] Loading earnings data for user:', user.id);
+        
         // Load wallet data
+        console.log('🔍 [Earnings] Fetching unified wallet data...');
         const walletData = await getUserWalletData(user.id);
+        console.log('📊 [Earnings] Wallet data loaded:', {
+          hasEth: !!walletData.ethAddress,
+          hasCircle: !!walletData.circleWalletId,
+          balance: walletData.balance,
+          currency: walletData.currency
+        });
         setWalletData(walletData);
 
         // Load bank accounts
+        console.log('🏦 [Earnings] Loading bank accounts...');
         const accounts = await transactionService.getUserBankAccounts();
+        console.log('📊 [Earnings] Bank accounts loaded:', accounts.length);
         setBankAccounts(accounts);
 
         // Load transactions
+        console.log('📜 [Earnings] Loading transactions...');
         const userTransactions = await transactionService.getUserTransactions(user.id, 20);
+        console.log('📊 [Earnings] Transactions loaded:', userTransactions.length);
         setTransactions(userTransactions);
 
         // Load earning summary
+        console.log('📈 [Earnings] Loading earning summary...');
         const summary = await transactionService.getEarningSummary(user.id);
+        console.log('📊 [Earnings] Summary loaded:', summary);
         setEarningSummary(summary);
 
       } catch (error: any) {
