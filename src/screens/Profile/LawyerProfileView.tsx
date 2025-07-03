@@ -12,13 +12,18 @@ import {
   Users, 
   Shield, 
   Wallet,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  QrCodeIcon
 } from 'lucide-react';
 import { Header } from '../../components/Header/Header';
 import { SellerSidebar } from '../../components/SellerSidebar/SellerSidebar';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
+import { QRCodeGenerator } from '../../components/QRCodeGenerator';
+import { BadgeCollection } from '../../components/badges';
+import { reputationService } from '../../services/reputationService';
+import { EarnedBadge } from '../../components/badges';
 
 interface LawyerProfileViewProps {
   isOwnProfile?: boolean;
@@ -36,10 +41,13 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [completedGigs, setCompletedGigs] = useState(0);
   const [projectsData, setProjectsData] = useState<any[]>([]);
+  const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
+  const [currentTierBadge, setCurrentTierBadge] = useState<EarnedBadge | null>(null);
+  const [loadingBadges, setLoadingBadges] = useState(true);
 
   // Extract real user data from auth context and user metadata
   const userMetadata = user?.user_metadata as Record<string, any> || {};
-  const profileData = userMetadata.profile_data ? JSON.parse(userMetadata.profile_data as string) : {};
+  console.log('userMetadata', userMetadata);
 
   // Load user statistics and reviews from API
   useEffect(() => {
@@ -93,6 +101,20 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
         } catch (statsError) {
           console.log('Could not load stats:', statsError);
         }
+
+        // Load user badges
+        try {
+          setLoadingBadges(true);
+          const badgeData = await reputationService.getUserBadges(user.id);
+          setEarnedBadges(badgeData.earned);
+          setCurrentTierBadge(badgeData.currentTier);
+        } catch (badgeError) {
+          console.log('Could not load badges:', badgeError);
+          setEarnedBadges([]);
+          setCurrentTierBadge(null);
+        } finally {
+          setLoadingBadges(false);
+        }
       } catch (error) {
         console.error('Error loading user data:', error);
         // Fallback to default values
@@ -116,20 +138,20 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
   
   const lawyerData = {
     name: formatUser.displayName(user, "Legal Professional"),
-    title: profileData?.title || (userMetadata.user_type === 'seller' ? 'Legal Professional' : 'Legal Practitioner'),
-    location: profileData?.location || userMetadata?.location || "Location not specified",
+    title: userMetadata?.title || (userMetadata.user_type === 'seller' ? 'Legal Professional' : 'Legal Practitioner'),
+    location: userMetadata?.location || "Location not specified",
     rating: averageRating,
     totalReviews: reviews.length,
     completedTasks: completedGigs,
-    yearsExperience: profileData?.yearsExperience || 5,
+    yearsExperience: userMetadata?.yearsExperience || 5,
     specializations: userMetadata?.specializations || [],
     verificationAccuracy: userStats?.verificationAccuracy || "N/A",
     avgCompletionTime: userStats?.averageCompletionTime || "N/A",
     responseTime: userStats?.averageResponseTime || "N/A",
     avatar: formatUser.avatar(user, 128),
-    walletAddress: profileData?.walletAddress || "Not connected",
-    verified: profileData?.verified || false,
-    bio: profileData?.bio || userMetadata?.about || "",
+    walletAddress: userMetadata?.circle_wallet_address || "Not connected",
+    verified: userMetadata?.verified || false,
+    bio: userMetadata?.bio || userMetadata?.about || "",
     education: userMetadata?.education || [],
     certifications: userMetadata?.certifications || []
   };
@@ -210,7 +232,24 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                       
                       <div className="flex items-center gap-2 text-purple-600">
                         <Wallet className="w-4 h-4" />
-                        <span className="text-sm font-mono">{lawyerData.walletAddress}</span>
+                        <span className="text-sm font-mono">
+                          {lawyerData.walletAddress !== "Not connected" 
+                            ? `${lawyerData.walletAddress.slice(0, 4)}...${lawyerData.walletAddress.slice(-2)}`
+                            : lawyerData.walletAddress
+                          }
+                        </span>
+                        {lawyerData.walletAddress !== "Not connected" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                            onClick={() => {
+                              navigator.clipboard.writeText(lawyerData.walletAddress);
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -255,20 +294,56 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                         </div>
                       </div>
 
-                      {/* Badges */}
-                      <div className="flex flex-wrap gap-2">
-                        {dynamicBadges.map((badge: any, index: number) => {
-                          const IconComponent = badge.icon;
-                          return (
-                            <span
-                              key={index}
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color}`}
-                            >
-                              <IconComponent className="w-3 h-3 mr-1" />
-                              {badge.name}
-                            </span>
-                          );
-                        })}
+                      {/* Professional Reputation */}
+                      <div className="flex flex-col gap-3">
+                        {/* Current Tier Badge - Prominently displayed */}
+                        {!loadingBadges && currentTierBadge && (
+                          <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                            <div className="flex-shrink-0">
+                              <BadgeCollection 
+                                badges={[currentTierBadge]} 
+                                maxVisible={1} 
+                                size="md" 
+                                showTooltip={false}
+                              />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900">{currentTierBadge.name}</div>
+                              <div className="text-sm text-gray-600">{currentTierBadge.description}</div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Achievement & Quality Badges */}
+                        {!loadingBadges && earnedBadges.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-700">Achievements & Credentials</h4>
+                            <BadgeCollection 
+                              badges={earnedBadges.filter(badge => badge.type !== 'reputation')} 
+                              maxVisible={5} 
+                              size="sm" 
+                              className="justify-start"
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Legacy badges for fallback */}
+                        {(loadingBadges || earnedBadges.length === 0) && (
+                          <div className="flex flex-wrap gap-2">
+                            {dynamicBadges.map((badge: any, index: number) => {
+                              const IconComponent = badge.icon;
+                              return (
+                                <span
+                                  key={index}
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color}`}
+                                >
+                                  <IconComponent className="w-3 h-3 mr-1" />
+                                  {badge.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Quick Stats */}
@@ -297,13 +372,23 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                     {/* Action Buttons */}
                     <div className="flex flex-col gap-3 lg:w-48">
                       {isOwnProfile && (
-                        <Button 
-                          variant="outline" 
-                          className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                          onClick={() => navigate('/profile')}
-                        >
-                          Edit Profile
-                        </Button>
+                        <>
+                          {/* <Button 
+                            variant="outline" 
+                            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                            onClick={() => navigate('/profile')}
+                          >
+                            Edit Profile
+                          </Button> */}
+                          <Button 
+                            variant="outline" 
+                            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"
+                            onClick={() => setActiveTab('qr-code')}
+                          >
+                            <QrCodeIcon className="w-4 h-4" />
+                            Share Profile
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -315,7 +400,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                 {/* Tabs Navigation */}
                 <div className="border-b border-gray-200 mb-6">
                   <nav className="flex">
-                    {['overview', 'reviews', 'projects', 'credentials'].map((tab) => (
+                    {['overview', 'reviews', 'projects', 'credentials', 'qr-code'].map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -325,7 +410,14 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
                       >
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        {tab === 'qr-code' ? (
+                          <span className="flex items-center gap-2">
+                            <QrCodeIcon className="w-4 h-4" />
+                            QR Code
+                          </span>
+                        ) : (
+                          tab.charAt(0).toUpperCase() + tab.slice(1)
+                        )}
                       </button>
                     ))}
                   </nav>
@@ -556,6 +648,57 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                         </Card>
                       </div>
 
+                    </div>
+                  )}
+
+                  {activeTab === 'qr-code' && (
+                    <div className="space-y-6">
+                      <div className="text-center mb-6">
+                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Share Your Profile</h3>
+                        <p className="text-gray-600">Generate a QR code to easily share your legal profile with clients</p>
+                      </div>
+                      
+                      <div className="max-w-md mx-auto">
+                        <QRCodeGenerator
+                          url={`${window.location.origin}/profile/${user?.id}`}
+                          title="Legal Profile QR Code"
+                          description="Scan to view this lawyer's public profile"
+                          size={250}
+                        />
+                      </div>
+                      
+                      {/* Additional sharing options */}
+                      <div className="mt-8 p-6 bg-gray-50 rounded-lg">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Professional Sharing</h4>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3 bg-white rounded border">
+                            <span className="text-sm text-gray-700">Public Profile URL</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const url = `${window.location.origin}/profile/${user?.id}`;
+                                navigator.clipboard.writeText(url);
+                              }}
+                            >
+                              Copy Link
+                            </Button>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-white rounded border">
+                            <span className="text-sm text-gray-700">Business Card QR</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // This would trigger a download of a business card format
+                                alert('Business card download feature coming soon!');
+                              }}
+                            >
+                              Download
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

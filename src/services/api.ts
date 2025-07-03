@@ -863,17 +863,67 @@ export const api = {
       // Get user's verification documents
       getUserDocuments: async (userId: string) => {
         try {
-          const { data, error } = await supabase
-            .from('user_documents')
-            .select('*')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-
-          if (error) throw error;
-
-          return data || [];
+          // List all files in the user's profile_documents folder
+          const { data: files, error } = await supabase.storage
+            .from('documents')
+            .list(`${userId}/profile_documents/`);
+            
+          if (error) {
+            console.error('Error listing user documents:', error);
+            throw error;
+          }
+          
+          const documents: Array<{
+            id: string;
+            name: string;
+            url: string;
+            type: string;
+            created_at: string;
+          }> = [];
+          
+          if (files && files.length > 0) {
+            for (const file of files) {
+              const filepath = `${userId}/profile_documents/${file.name}`;
+              
+              // Get signed URL for each file (more secure than public URL)
+              const { data: signedUrl, error: urlError } = await supabase.storage
+                .from('documents')
+                .createSignedUrl(filepath, 3600); // 1 hour expiry
+              
+              if (urlError) {
+                console.error('Error creating signed URL for', filepath, urlError);
+                continue; // Skip this file if we can't get a URL
+              }
+              
+              // Determine document type based on filename
+              let documentType = 'other';
+              if (file.name.startsWith('government_id.')) {
+                documentType = 'government_id';
+              } else if (file.name.startsWith('selfie_with_id.')) {
+                documentType = 'selfie_with_id';
+              } else if (file.name.endsWith('.pdf')) {
+                documentType = 'pdf';
+              } else if (file.name.match(/\.(jpg|jpeg|png)$/i)) {
+                documentType = 'image';
+              }
+              
+              documents.push({
+                id: file.id || file.name,
+                name: file.name,
+                url: signedUrl.signedUrl,
+                type: documentType,
+                created_at: file.created_at || new Date().toISOString()
+              });
+            }
+          }
+          
+          // Sort by creation date (newest first)
+          documents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          
+          console.log('User documents retrieved successfully:', documents);
+          return documents;
         } catch (error) {
-          console.error('Error fetching user documents:', error);
+          console.error('Error in getUserDocuments:', error);
           throw error;
         }
       },
@@ -1418,6 +1468,23 @@ export const api = {
 
       return data || [];
     },
+
+    getFeedbackByUserId: async (userId: string) => {
+      const { data, error } = await supabase
+        .from('Feedback')
+        .select(`
+          *,
+          creator_profile:Profiles!creator(*)
+        `)
+        .eq('recipient', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
+    },
   },
 
   submissions: {
@@ -1663,13 +1730,14 @@ export const api = {
     },
 
     getAverageResponseTime: async (userId: string) => {
-      // This would need a messages or response tracking table
-      // For now, returning a placeholder
+      // Get conversations where the user is involved
       const { data: conversations, error } = await supabase
         .from('conversations')
         .select('created_at, updated_at')
         .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
         .limit(10);
+
+      console.log('conversations', conversations);
 
       if (error) {
         throw error;
@@ -1679,8 +1747,33 @@ export const api = {
         return "N/A";
       }
 
-      // Simplified calculation - in reality you'd track actual response times
-      return "< 2 hours";
+      // Calculate average response time based on conversation duration
+      const responseTimes = conversations.map(conversation => {
+        const startTime = new Date(conversation.created_at).getTime();
+        console.log('startTime', startTime);
+        const endTime = new Date(conversation.updated_at).getTime();
+        console.log('endTime', endTime);
+        const durationMs = endTime - startTime;
+        console.log('durationMs', durationMs);
+        // Convert to hours
+        const durationHours = durationMs / (1000 * 60 * 60);
+        return durationHours;
+      });
+
+      // Calculate average
+      const averageHours = responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
+
+      // Format the response time
+      if (averageHours < 1) {
+        const minutes = Math.round(averageHours * 60);
+        return `${minutes} minutes`;
+      } else if (averageHours < 24) {
+        const hours = Math.round(averageHours);
+        return `${hours} hours`;
+      } else {
+        const days = Math.round(averageHours / 24);
+        return `${days} days`;
+      }
     },
 
     getActiveClientStatus: async (userId: string) => {
@@ -1768,7 +1861,7 @@ export const api = {
       try {
         const { data, error } = await supabase
           .from('Profiles')
-          .select('first_name, last_name, avatar_url, email, user_type, bio, location, website, phone, verification_status, jobs_completed')
+          .select('id, created_at, updated_at, first_name, last_name, avatar_url, email, user_type, bio, location, website, phone, verification_status, jobs_completed, specializations, linkedin, education, professional_title, industry, areas_of_interest')
           .eq('id', userId)
           .single();
 

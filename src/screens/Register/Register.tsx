@@ -5,9 +5,13 @@ import { Card, CardContent } from "../../components/ui/card";
 import { EyeIcon, EyeOffIcon, UserIcon, BriefcaseIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon } from "lucide-react";
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types/index';
+import { validateEmail, validatePasswordStrength, PasswordStrength } from '../../utils/validation';
+import { EmailValidationIndicator } from '../../components/ui/EmailValidationIndicator';
+import { PasswordStrengthIndicator } from '../../components/ui/PasswordStrengthIndicator';
+import { RegistrationConfirmationModal } from '../../components/ui/RegistrationConfirmationModal';
 
 export const Register = (): JSX.Element => {
-  const { register, signInWithMetaMask, signInWithGoogle, user, isLoading } = useAuth();
+  const { register, signInWithMetaMask, signInWithGoogle, user, isLoading, isMetaMaskConnecting } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -25,17 +29,67 @@ export const Register = (): JSX.Element => {
     subscribeNewsletter: false,
   });
 
+  // Validation states
+  const [emailValidation, setEmailValidation] = useState({ isValid: false, message: '' });
+  const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({
+    score: 0,
+    feedback: [],
+    isValid: false,
+    requirements: {
+      length: false,
+      uppercase: false,
+      lowercase: false,
+      number: false,
+      special: false,
+    }
+  });
+  const [showValidation, setShowValidation] = useState({
+    email: false,
+    password: false,
+  });
+
+  // Modal states for social auth validation
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [pendingAuthMethod, setPendingAuthMethod] = useState<'google' | 'metamask' | null>(null);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+
+    // Real-time validation
+    if (name === 'email') {
+      const validation = validateEmail(value);
+      setEmailValidation(validation);
+      setShowValidation(prev => ({ ...prev, email: value.length > 0 }));
+    }
+
+    if (name === 'password') {
+      const strength = validatePasswordStrength(value);
+      setPasswordStrength(strength);
+      setShowValidation(prev => ({ ...prev, password: value.length > 0 }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegistrationError("");
+    
+    // Validate email
+    const emailValidationResult = validateEmail(formData.email);
+    if (!emailValidationResult.isValid) {
+      setRegistrationError(emailValidationResult.message);
+      return;
+    }
+
+    // Validate password strength
+    const passwordStrengthResult = validatePasswordStrength(formData.password);
+    if (!passwordStrengthResult.isValid) {
+      setRegistrationError("Password does not meet security requirements");
+      return;
+    }
     
     // Validate form
     if (formData.password !== formData.confirmPassword) {
@@ -64,29 +118,57 @@ export const Register = (): JSX.Element => {
     }
   };
 
-  // Modified to include role selection
-  const handleMetaMaskRegister = async () => {
+  // MetaMask registration with validation
+  const handleMetaMaskRegister = () => {
+    setPendingAuthMethod('metamask');
+    setShowConfirmationModal(true);
+  };
+
+  // Google registration with validation
+  const handleGoogleRegister = () => {
+    setPendingAuthMethod('google');
+    setShowConfirmationModal(true);
+  };
+
+  // Execute the actual social auth after confirmation
+  const executeAuthMethod = async () => {
+    if (!pendingAuthMethod) return;
+
     try {
       setRegistrationError("");
+      setIsSubmitting(true);
       
       // Map userType to UserRole
       const role: UserRole = userType === "professional" ? "seller" : "buyer";
       
-      // Confirm role selection
-      if (!window.confirm(`You're registering as a ${userType}. Continue?`)) {
-        return;
+      console.log(`Initiating ${pendingAuthMethod} registration as ${userType}...`);
+      
+      if (pendingAuthMethod === 'metamask') {
+        await signInWithMetaMask(role);
+      } else if (pendingAuthMethod === 'google') {
+        await signInWithGoogle(role);
       }
       
-      console.log(`Initiating MetaMask registration as ${userType}...`);
-      await signInWithMetaMask(role);
+      console.log(`User registered with ${pendingAuthMethod} as ${userType} (${role})`);
       
-      console.log(`User registered with MetaMask as ${userType} (${role})`);
+      // Close modal and reset state
+      setShowConfirmationModal(false);
+      setPendingAuthMethod(null);
       
-      // User will be redirected based on role after successful login
     } catch (error: any) {
-      console.error('MetaMask registration error:', error);
-      setRegistrationError(error.message || 'Failed to register with MetaMask');
+      console.error(`${pendingAuthMethod} registration error:`, error);
+      setRegistrationError(error.message || `Failed to register with ${pendingAuthMethod}`);
+      setShowConfirmationModal(false);
+      setPendingAuthMethod(null);
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  // Close modal handler
+  const handleCloseModal = () => {
+    setShowConfirmationModal(false);
+    setPendingAuthMethod(null);
   };
   
   // Redirect based on user role when authenticated
@@ -191,15 +273,29 @@ export const Register = (): JSX.Element => {
                 </div>
 
                 {/* Email Field */}
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
-                  placeholder="Enter your email"
-                  required
-                />
+                <div>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                      showValidation.email
+                        ? emailValidation.isValid
+                          ? 'border-green-500'
+                          : 'border-red-500'
+                        : 'border-gray-300'
+                    }`}
+                    placeholder="Enter your email"
+                    required
+                  />
+                  <EmailValidationIndicator
+                    email={formData.email}
+                    isValid={emailValidation.isValid}
+                    message={emailValidation.message}
+                    showValidation={showValidation.email}
+                  />
+                </div>
 
                 {/* Phone Field */}
                 <input
@@ -213,27 +309,40 @@ export const Register = (): JSX.Element => {
                 />
 
                 {/* Password Field */}
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
-                    placeholder="Enter your password"
-                    required
+                <div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                        showValidation.password
+                          ? passwordStrength.isValid
+                            ? 'border-green-500'
+                            : 'border-red-500'
+                          : 'border-gray-300'
+                      }`}
+                      placeholder="Enter your password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? (
+                        <EyeOffIcon className="w-5 h-5" />
+                      ) : (
+                        <EyeIcon className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                  <PasswordStrengthIndicator
+                    password={formData.password}
+                    strength={passwordStrength}
+                    showRequirements={showValidation.password}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon className="w-5 h-5" />
-                    ) : (
-                      <EyeIcon className="w-5 h-5" />
-                    )}
-                  </button>
                 </div>
 
                 {/* Confirm Password Field */}
@@ -307,10 +416,10 @@ export const Register = (): JSX.Element => {
                   onClick={handleMetaMaskRegister}
                   variant="outline"
                   className="w-full py-3 rounded-lg border-gray-300 hover:bg-gray-50 hover:border-[#FEC85F] transition-all"
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || isLoading || isMetaMaskConnecting}
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-3" />
-                  {isLoading ? 'Connecting...' : 'Continue with MetaMask'}
+                  {isMetaMaskConnecting ? 'Connecting to MetaMask...' : isLoading ? 'Loading...' : 'Continue with MetaMask'}
                 </Button>
                 <Button
                   type="button"
@@ -339,7 +448,7 @@ export const Register = (): JSX.Element => {
                       setRegistrationError('Failed to initiate Google login');
                     }
                   }}
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || isLoading || isMetaMaskConnecting}
                 >
                   <img src="/favicon.ico" alt="Google" className="w-5 h-5 mr-3" />
                   {isLoading ? 'Connecting...' : 'Continue with Google'}
@@ -409,6 +518,17 @@ export const Register = (): JSX.Element => {
           </Button>
         </div>
       </div>
+
+      {/* Registration Confirmation Modal */}
+      <RegistrationConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={handleCloseModal}
+        onConfirm={executeAuthMethod}
+        userType={userType}
+        agreeToTerms={formData.agreeToTerms}
+        authMethod={pendingAuthMethod || 'metamask'}
+        loading={isSubmitting || isMetaMaskConnecting}
+      />
     </div>
   );
 };

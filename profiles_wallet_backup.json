@@ -1,0 +1,74 @@
+[
+  {
+    "id": "43613e1c-2d96-44e5-9f5e-84b96ce8d1e0",
+    "eth_address": null,
+    "circle_wallet_id": "1eab6729-4cf6-5559-b211-7c02adbb22be",
+    "circle_wallet_address": "0x8e150358b87cfce0f24f83ec0d29be35e284cb79",
+    "circle_wallet_created_at": "2025-06-28T00:40:28.775+00:00",
+    "circle_wallet_status": "active"
+  },
+  {
+    "id": "e3563646-fea3-47b5-a9f5-2628c7801467",
+    "eth_address": null,
+    "circle_wallet_id": "fd969a74-ad7b-5b90-a6f9-576fb00caf12",
+    "circle_wallet_address": "0x2c0518193271ad51b735e82934f27d97c4399b83",
+    "circle_wallet_created_at": "2025-06-29T17:05:36.375+00:00",
+    "circle_wallet_status": "active"
+  },
+  {
+    "id": "f573e36f-13ec-4855-9229-5868c495b784",
+    "eth_address": null,
+    "circle_wallet_id": "6da4d520-25d9-5841-acc7-5d79a698f1e7",
+    "circle_wallet_address": "0x36a7b179a436707609481721a660673ecfeccebc",
+    "circle_wallet_created_at": "2025-06-28T01:18:07.154+00:00",
+    "circle_wallet_status": "active"
+  },
+  {
+    "id": "d20fe419-e90f-42e7-91f3-b06f77799a4c",
+    "eth_address": null,
+    "circle_wallet_id": "89efdbec-8237-5df3-b553-bbfb5d01ebdc",
+    "circle_wallet_address": "0x6afb0730fb0dcae349e10f259e24ce7f35ecfc82",
+    "circle_wallet_created_at": "2025-06-29T17:58:02.359+00:00",
+    "circle_wallet_status": "active"
+  },
+  {
+    "id": "5b1c259c-3e67-46bb-a6e6-de28f9fe262b",
+    "eth_address": "0x911eb77c30604a8ed21c933b410e8524f4bc5261",
+    "circle_wallet_id": null,
+    "circle_wallet_address": null,
+    "circle_wallet_created_at": null,
+    "circle_wallet_status": null
+  },
+  {
+    "id": "db8c92db-b4ec-4019-be75-6051ec257a7f",
+    "eth_address": "0x3576f34cfe1704e81935aac293be00f270405799",
+    "circle_wallet_id": null,
+    "circle_wallet_address": null,
+    "circle_wallet_created_at": null,
+    "circle_wallet_status": null
+  },
+  {
+    "id": "4445ecb6-6052-44b3-b578-1580f4b901fe",
+    "eth_address": null,
+    "circle_wallet_id": "c0c7b674-3163-59d4-bbb1-8ba650f48ec7",
+    "circle_wallet_address": "0xe9959925d147c82b7b33755ad492b26be28814c4",
+    "circle_wallet_created_at": "2025-06-28T12:36:12.541+00:00",
+    "circle_wallet_status": "active"
+  },
+  {
+    "id": "2e788e2f-f225-4c17-abba-3cab9ff28a73",
+    "eth_address": null,
+    "circle_wallet_id": "e976702a-3e95-5e24-b526-643b39021e15",
+    "circle_wallet_address": "0x271d4ceb463b5d6882006ace3b87ce11c5c467dc",
+    "circle_wallet_created_at": "2025-06-28T16:25:42.847+00:00",
+    "circle_wallet_status": "active"
+  },
+  {
+    "id": "9d521efd-f300-4cbb-ae66-ea1efa3b13f9",
+    "eth_address": null,
+    "circle_wallet_id": "c0c7b674-3163-59d4-bbb1-8ba650f48ec7",
+    "circle_wallet_address": "0xe9959925d147c82b7b33755ad492b26be28814c4",
+    "circle_wallet_created_at": null,
+    "circle_wallet_status": null
+  }
+]

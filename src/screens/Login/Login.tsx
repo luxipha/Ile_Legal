@@ -2,12 +2,14 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { EyeIcon, EyeOffIcon, ArrowLeftIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, ArrowLeftIcon, MessageCircleIcon, HelpCircleIcon, CheckCircleIcon } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { TavusChat } from "../../components/TavusChat";
+import { validateEmail } from "../../utils/validation";
+import { EmailValidationIndicator } from "../../components/ui/EmailValidationIndicator";
 
 export const Login = (): JSX.Element => {
-  const { login, user, isLoading, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
+  const { login, user, isLoading, isMetaMaskConnecting, signInWithGoogle, signInWithMetaMask, resetPassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
@@ -20,6 +22,8 @@ export const Login = (): JSX.Element => {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailValidation, setEmailValidation] = useState({ isValid: false, message: '' });
+  const [showEmailValidation, setShowEmailValidation] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -27,6 +31,13 @@ export const Login = (): JSX.Element => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+
+    // Real-time email validation for login
+    if (name === 'email') {
+      const validation = validateEmail(value);
+      setEmailValidation(validation);
+      setShowEmailValidation(value.length > 0);
+    }
   };
 
   // Redirect based on user role when authenticated
@@ -253,9 +264,21 @@ export const Login = (): JSX.Element => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                      showEmailValidation
+                        ? emailValidation.isValid
+                          ? 'border-green-500'
+                          : 'border-red-500'
+                        : 'border-gray-300'
+                    }`}
                     placeholder="Enter your email"
                     required
+                  />
+                  <EmailValidationIndicator
+                    email={formData.email}
+                    isValid={emailValidation.isValid}
+                    message={emailValidation.message}
+                    showValidation={showEmailValidation}
                   />
                 </div>
 
@@ -298,7 +321,7 @@ export const Login = (): JSX.Element => {
                   <button 
                     type="button"
                     onClick={() => setShowForgotPassword(true)}
-                    className="text-sm text-[#1B1828] hover:text-[#FEC85F] font-medium"
+                    className="text-sm text-[#1B1828] hover:text-[#FEC85F] font-medium underline underline-offset-2"
                   >
                     Forgot password?
                   </button>
@@ -344,10 +367,10 @@ export const Login = (): JSX.Element => {
                       setLoginError(error.message || 'Failed to connect with MetaMask');
                     }
                   }}
-                  disabled={isSubmitting || isLoading}
+                  disabled={isSubmitting || isLoading || isMetaMaskConnecting}
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-3" />
-                  {isLoading ? 'Connecting...' : 'Continue with MetaMask'}
+                  {isMetaMaskConnecting ? 'Connecting to MetaMask...' : isLoading ? 'Loading...' : 'Continue with MetaMask'}
                 </Button>
                 
                 <Button

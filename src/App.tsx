@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -30,6 +31,7 @@ const AuthCallback = lazy(() => import("./screens/AuthCallback/AuthCallback").th
 const TestAccounts = lazy(() => import("./screens/TestAccounts").then(m => ({ default: m.TestAccounts })));
 const BlockchainDemo = lazy(() => import("./screens/BlockchainDemo").then(m => ({ default: m.BlockchainDemo })));
 const WalletIndex = lazy(() => import("./screens/Wallet"));
+const PublicLawyerProfile = lazy(() => import("./components/PublicLawyerProfile").then(m => ({ default: m.PublicLawyerProfile })));
 
 // Loading component for Suspense fallback
 const LoadingSpinner = () => (
@@ -41,7 +43,14 @@ const LoadingSpinner = () => (
 function ProfileCompletionHandler() {
   const { pendingMetaMaskProfile, completeMetaMaskProfile, setPendingMetaMaskProfile } = useAuth();
 
-  const handleProfileCompletion = async (profileData: { firstName: string; lastName: string; email: string; phone?: string }) => {
+  const handleProfileCompletion = async (profileData: { 
+    firstName: string; 
+    lastName: string; 
+    email: string; 
+    phone?: string;
+    userType?: 'client' | 'professional';
+    agreeToTerms?: boolean;
+  }) => {
     await completeMetaMaskProfile(profileData);
   };
 
@@ -56,6 +65,10 @@ function ProfileCompletionHandler() {
       onClose={handleModalClose}
       onSubmit={handleProfileCompletion}
       walletAddress={pendingMetaMaskProfile?.address || ''}
+      authMethod="metamask"
+      requireRoleSelection={true}
+      requireTermsAcceptance={true}
+      showWalletInfo={true}
     />
   );
 }
@@ -71,6 +84,13 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/profile/:id" element={<PublicLawyerProfile />} />
+      <Route path="/profile-demo" element={<PublicLawyerProfile />} />
+      <Route path="/profile-test" element={
+        <Suspense fallback={<LoadingSpinner />}>
+          {React.createElement(React.lazy(() => import("./components/PublicLawyerProfile/PublicLawyerProfileTest").then(m => ({ default: m.PublicLawyerProfileTest }))))}
+        </Suspense>
+      } />
       
       {/* Protected Routes with role-based access */}
       <Route path="/seller-dashboard" element={

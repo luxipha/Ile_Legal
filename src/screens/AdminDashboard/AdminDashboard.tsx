@@ -158,9 +158,10 @@ export const AdminDashboard = (): JSX.Element => {
 
   // Settings component handles its own modal state
 
-  const handleVerifyUser = async (userId: number): Promise<boolean> => {
+  const handleVerifyUser = async (userId: string): Promise<boolean> => {
+    console.log('userId', userId);
     try {
-      await updateUserStatus(userId.toString(), 'verified');
+      await updateUserStatus(userId, 'verified');
       // Optionally refresh users list
       setUsers(users => users.map(u => u.id === userId ? { ...u, status: 'verified' } : u));
       return true;
@@ -170,9 +171,9 @@ export const AdminDashboard = (): JSX.Element => {
     }
   };
 
-  const handleRejectUser = async (userId: number, reason: string) => {
+  const handleRejectUser = async (userId: string, reason: string) => {
     try {
-      await updateUserStatus(userId.toString(), 'rejected');
+      await updateUserStatus(userId, 'rejected');
       // Optionally refresh users list
       setUsers(users => users.map(u => u.id === userId ? { ...u, status: 'rejected' } : u));
     } catch (error) {
@@ -270,6 +271,7 @@ export const AdminDashboard = (): JSX.Element => {
           users={users} 
           onViewUserDetails={handleViewUserDetails} 
           onVerifyUser={(userId, _action) => handleVerifyUser(userId)}
+          onRejectUser={handleRejectUser}
         />
       </AdminLayout>
     );

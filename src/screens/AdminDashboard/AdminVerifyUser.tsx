@@ -10,35 +10,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
+import { User as AuthUser } from "../../contexts/AuthContext";
 
 interface Document {
   name: string;
   status: "verified" | "pending" | "rejected";
 }
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  type: "Property Law" | "Contract Law" | "Business Law";
-  status: "pending" | "verified" | "rejected";
-  submittedDate: string;
-  documents: Document[];
-}
-
 interface AdminVerifyUserProps {
-  users: User[];
-  onViewUserDetails: (userId: number) => void;
-  onVerifyUser: (userId: number, action: string) => void;
+  users: AuthUser[];
+  onViewUserDetails: (userId: string) => void;
+  onVerifyUser: (userId: string, action: string) => void;
+  onRejectUser: (userId: string, reason: string) => void;
 }
 
 export const AdminVerifyUser = ({ 
   users, 
   onViewUserDetails, 
-  onVerifyUser 
+  onVerifyUser,
+  onRejectUser
 }: AdminVerifyUserProps) => {
+  console.log('users', users);
   const [selectedUserTab, setSelectedUserTab] = useState<"all" | "pending" | "verified" | "rejected">("all");
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AuthUser | null>(null);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   // Filter users based on selected tab
@@ -52,6 +46,7 @@ export const AdminVerifyUser = ({
 
   const handleVerifyConfirm = () => {
     if (selectedUser) {
+      console.log('selectedUser', selectedUser);
       onVerifyUser(selectedUser.id, "verify");
       setShowVerifyModal(false);
       setSelectedUser(null);
@@ -90,16 +85,24 @@ export const AdminVerifyUser = ({
           <Card key={user.id} className="bg-white border border-gray-200">
             <CardContent className="p-8">
               <div className="flex items-start gap-6">
-                <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center">
-                  <UserIcon className="w-8 h-8 text-gray-600" />
-                </div>
+                {user.avatar_url ? (
+                  <img 
+                    src={user.avatar_url} 
+                    alt={`${user.name || user.email}'s profile picture`}
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center">
+                    <UserIcon className="w-8 h-8 text-gray-600" />
+                  </div>
+                )}
                 
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-xl font-semibold text-gray-900">{user.name}</h3>
+                      <h3 className="text-xl font-semibold text-gray-900">{user.name || user.email}</h3>
                       <p className="text-gray-600">{user.email}</p>
-                      <p className="text-gray-600">{user.type}</p>
+                      <p className="text-gray-600">{user.user_metadata?.type || "Legal Professional"}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                       user.status === "verified" ? "bg-green-100 text-green-800" :
@@ -159,6 +162,13 @@ export const AdminVerifyUser = ({
                         >
                           Verify
                         </button>
+                        <Button 
+                          onClick={() => onRejectUser(user.id, "Insufficient documentation or verification requirements not met")}
+                          variant="outline"
+                          className="border-red-500 text-red-600 hover:bg-red-50"
+                        >
+                          Reject
+                        </Button>
                       </>
                     )}
                   </div>

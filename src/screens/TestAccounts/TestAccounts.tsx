@@ -11,12 +11,18 @@ export const TestAccounts = (): JSX.Element => {
 
   // Function to create a test user
   const createTestUser = async (role: UserRole) => {
+    // Prevent test account creation in production
+    if (import.meta.env.PROD) {
+      setError('Test account creation is disabled in production');
+      return;
+    }
+
     setIsCreating(true);
     setError(null);
     
     try {
-      // Generate random email and password
-      const randomEmail = `test${Math.floor(Math.random() * 10000)}@example.com`;
+      // Generate random email and password - use real email for testing
+      const randomEmail = `test${Math.floor(Math.random() * 10000)}+${role}@yourdomain.com`;
       const randomPassword = 'Password123!';
       
       // Create user with Supabase

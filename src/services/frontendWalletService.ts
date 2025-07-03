@@ -276,6 +276,7 @@ class FrontendWalletService {
 
       const result = await response.json();
       console.log('✅ Balance fetched:', result.data);
+      console.log('✅ Full balance response structure:', result);
       
       return result.data;
     } catch (error: any) {

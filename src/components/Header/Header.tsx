@@ -13,6 +13,8 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../services/api";
 import { WalletStatusNotification } from "../WalletStatusNotification/WalletStatusNotification";
+import { WalletRetryNotification } from "../WalletRetryNotification/WalletRetryNotification";
+import { getUserWalletData } from "../../services/unifiedWalletService";
 
 interface HeaderProps {
   title: string;
@@ -27,10 +29,11 @@ export const Header: React.FC<HeaderProps> = ({
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showWalletStatus, setShowWalletStatus] = useState(false);
   const navigate = useNavigate();
-  const { user, logout, ethAddress } = useAuth();
+  const { user, logout } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [walletData, setWalletData] = useState<{hasWallet: boolean, balance: string} | null>(null);
   
   const userName = formatUser.displayName(user, 'User');
 
@@ -39,11 +42,13 @@ export const Header: React.FC<HeaderProps> = ({
       console.log('Header: User authenticated, loading notifications for:', user.id);
       loadNotifications();
       loadUnreadCount();
+      loadWalletData();
     } else {
       console.log('Header: No user authenticated, skipping notification load');
       // Clear notifications when no user
       setNotifications([]);
       setUnreadCount(0);
+      setWalletData(null);
     }
   }, [user?.id, userType]);
 
@@ -80,6 +85,34 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const loadWalletData = async () => {
+    if (!user?.id) {
+      console.log('🔍 [Header] No user ID available, skipping wallet data load');
+      return;
+    }
+    
+    try {
+      console.log('🔍 [Header] Loading wallet data from user_wallets table for user:', user.id);
+      const unifiedWalletData = await getUserWalletData(user.id);
+      
+      const hasWallet = unifiedWalletData.hasEthWallet || unifiedWalletData.hasCircleWallet;
+      console.log('✅ [Header] Wallet data loaded:', {
+        hasEth: unifiedWalletData.hasEthWallet,
+        hasCircle: unifiedWalletData.hasCircleWallet,
+        hasWallet,
+        balance: unifiedWalletData.balance
+      });
+      
+      setWalletData({
+        hasWallet,
+        balance: unifiedWalletData.balance
+      });
+    } catch (error) {
+      console.log('⚠️  [Header] Failed to load wallet data:', error);
+      setWalletData({ hasWallet: false, balance: '0.00' });
+    }
+  };
+
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await api.notifications.markAsRead(notificationId);
@@ -103,8 +136,9 @@ export const Header: React.FC<HeaderProps> = ({
   const displayNotifications = notifications;
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
+    <>
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
         <div className="flex items-center gap-4">
           <div className="relative">
@@ -113,17 +147,17 @@ export const Header: React.FC<HeaderProps> = ({
               size="sm"
               onClick={() => setShowWalletStatus(!showWalletStatus)}
               title="Wallet"
-              className={`flex items-center gap-2 border rounded-full px-4 py-2 hover:bg-gray-50 ${!!ethAddress ? 'border-amber-300 bg-amber-50' : 'border-gray-300 bg-gray-50'}`}
+              className={`flex items-center gap-2 border rounded-full px-4 py-2 hover:bg-gray-50 ${walletData?.hasWallet ? 'border-amber-300 bg-amber-50' : 'border-gray-300 bg-gray-50'}`}
             >
-              <WalletIcon className={`w-5 h-5 ${!!ethAddress ? 'text-amber-500' : 'text-gray-500'}`} />
+              <WalletIcon className={`w-5 h-5 ${walletData?.hasWallet ? 'text-amber-500' : 'text-gray-500'}`} />
               <span className="font-medium">Wallet</span>
-              {!!ethAddress && <CheckCircleIcon className="w-5 h-5 text-green-500" />}
+              {walletData?.hasWallet && <CheckCircleIcon className="w-5 h-5 text-green-500" />}
             </Button>
             
             {showWalletStatus && (
               <WalletStatusNotification 
-                isEnabled={!!ethAddress} 
-                walletBalance="1,250.00"
+                isEnabled={walletData?.hasWallet || false} 
+                walletBalance={walletData?.balance || "0.00"}
               />
             )}
           </div>
@@ -229,5 +263,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
     </header>
+    
+    {/* Wallet Setup Notification for users with pending wallet creation */}
+    <WalletRetryNotification className="mx-6 mt-4" />
+    </>
   );
 };

@@ -78,8 +78,18 @@ export const BuyerPayments = (): JSX.Element => {
       setError(null);
       
       try {
+        console.log('💳 [BuyerPayments] Loading payment data for user:', user.id);
+        
         // Load wallet data
+        console.log('🔍 [BuyerPayments] Fetching unified wallet data...');
         const walletData = await getUserWalletData(user.id);
+        console.log('📊 [BuyerPayments] Wallet data loaded:', {
+          hasEth: !!walletData.ethAddress,
+          hasCircle: !!walletData.circleWalletId,
+          balance: walletData.balance,
+          currency: walletData.currency
+        });
+        
         setFullWalletData(walletData);
         setWalletData({
           balance: walletData.balance,
@@ -184,7 +194,7 @@ export const BuyerPayments = (): JSX.Element => {
       case 'active':
       case 'open':
       case 'pending_payment':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-gray-100 text-gray-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
