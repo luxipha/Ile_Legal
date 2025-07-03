@@ -371,10 +371,9 @@ export const AdminViewUser = ({
                   return documents.length > 0 ? (
                     documents.map((doc, index) => {
                     const getDocumentIcon = (type?: string) => {
-                      console.log('type', type);
                       switch (type) {
                         case 'government_id':
-                          return <Shield className="w-5 h-5 text-blue-500" />;
+                          return <FileText className="w-5 h-5 text-blue-500" />;
                         case 'selfie_with_id':
                           return <User className="w-5 h-5 text-green-500" />;
                         case 'bar_license':
@@ -399,9 +398,8 @@ export const AdminViewUser = ({
 
                     // Determine document type based on filename for better icon display
                     const getDocumentType = (filename: string) => {
-                      console.log('filename', filename);
                       const lowerName = filename.toLowerCase();
-                      if (lowerName.includes('government_id')) {
+                      if (lowerName.includes('government_id') || lowerName.includes('id')) {
                         return 'government_id';
                       } else if (lowerName.includes('selfie') || lowerName.includes('photo')) {
                         return 'selfie_with_id';
