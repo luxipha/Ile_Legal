@@ -671,7 +671,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                       <div className="mt-8 p-6 bg-gray-50 rounded-lg">
                         <h4 className="text-lg font-semibold text-gray-900 mb-4">Professional Sharing</h4>
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-white rounded border">
+                          {/* <div className="flex items-center justify-between p-3 bg-white rounded border">
                             <span className="text-sm text-gray-700">Public Profile URL</span>
                             <Button
                               variant="outline"
@@ -683,7 +683,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                             >
                               Copy Link
                             </Button>
-                          </div>
+                          </div> */}
                           <div className="flex items-center justify-between p-3 bg-white rounded border">
                             <span className="text-sm text-gray-700">Business Card QR</span>
                             <Button
