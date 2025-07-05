@@ -122,13 +122,15 @@ export const SellerDashboard = (): JSX.Element => {
             budget: gig.budget || 0,
             deliveryTime: "To be negotiated",
             description: gig.description || "No description provided",
-            requirements: gig.categories || [],
+            // requirements: gig.categories || [],
             companyRating: companyRating,
             projectsPosted: projectsPosted,
             is_flagged: gig.is_flagged || false,
             status: gig.status || "active",
             avatar: gig.buyer?.avatar_url,
-            buyer_id: gig.buyer?.id
+            buyer_id: gig.buyer?.id,
+            attachments: gig.attachments || [],
+            categories: gig.categories || []
           };
         }));
         
@@ -681,7 +683,7 @@ export const SellerDashboard = (): JSX.Element => {
           <main className="flex-1 p-6">
             {selectedGig ? (
               <ViewDetails
-                gig={convertToViewDetailsGig(selectedGig)}
+                gig={selectedGig}
                 onBack={() => setViewMode("dashboard")}
                 onPlaceBid={handleViewDetailsPlaceBid}
                 backButtonText="Back to Dashboard"
