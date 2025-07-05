@@ -69,7 +69,9 @@ export const api = {
         .single();
 
       if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
-        throw checkError;
+        console.log("checkError:", checkError);
+        console.log("this seller does not have a bid for this gig");
+        // throw checkError;
       }
 
       if (existingBid) {
