@@ -176,6 +176,7 @@ export const SellerDashboard = (): JSX.Element => {
           })
         );
         
+        console.log("ongoingGigsWithData:", ongoingGigsWithData);
         // Filter out any null results and convert to OngoingGig format
         const ongoing: OngoingGig[] = ongoingGigsWithData
           .filter((item: any) => item !== null)
@@ -184,12 +185,13 @@ export const SellerDashboard = (): JSX.Element => {
             return status !== 'completed' && status !== 'pending_payment' && status !== 'paid';
           })
           .map((item: any) => ({
+            
             id: item.gig.id.toString(),
             title: item.gig.title || "Legal Service",
             company: item.gig.buyer?.first_name && item.gig.buyer?.last_name 
               ? `${item.gig.buyer.first_name} ${item.gig.buyer.last_name}` 
               : item.gig.buyer?.first_name || item.gig.buyer?.last_name || "Anonymous Client",
-            price: formatCurrency.naira(item.gig.budget, "Budget not specified"),
+            price: formatCurrency.naira(item.bid.amount , "Price not specified"),
             dueDate: formatDate.full(item.gig.deadline),
             progress: item.gig.progress || 0, // Use real progress if available
             description: item.gig.description || "No description provided"
@@ -1128,6 +1130,7 @@ export const SellerDashboard = (): JSX.Element => {
                 ) : (
                   <div className="space-y-4">
                     {ongoingGigs.slice(0, 1).map((gig) => (
+                      console.log("gig:", gig),
                       <Card key={gig.id} className="bg-white border border-gray-200">
                         <CardContent className="p-6">
                           <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
