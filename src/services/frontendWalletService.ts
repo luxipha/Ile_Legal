@@ -107,6 +107,126 @@ class FrontendWalletService {
   }
 
   /**
+   * Create Circle wallet via API only (no database operations)
+   * Used when we want to handle database operations separately
+   */
+  async createCircleWalletOnly(request: Omit<FrontendWalletRequest, 'userId'> & { 
+    blockchains?: string[];
+    accountType?: string;
+    walletSetId?: string;
+  }): Promise<{ wallet: any }> {
+    try {
+      console.log('🏦 Creating Circle wallet via API only...');
+
+      // Validate required parameters
+      const walletSetId = request.walletSetId || CIRCLE_CONFIG.WALLET_SET_ID;
+      if (!walletSetId) {
+        throw new Error('walletSetId is required but not provided in request or environment variables');
+      }
+
+      // Generate fresh ciphertext using node-forge
+      const entitySecretCiphertext = this.generateFreshEntitySecretCiphertext();
+      
+      // Generate proper UUID for idempotency key (Circle API requirement)
+      const idempotencyKey = this.generateUUID();
+      
+      console.log('🆔 Generated UUID idempotency key:', idempotencyKey);
+      console.log('🔒 Generated ciphertext preview:', entitySecretCiphertext.substring(0, 50) + '...');
+      console.log('🏢 Using wallet set ID:', walletSetId);
+
+      // Create wallet description
+      const walletDescription = `${request.userType.charAt(0).toUpperCase() + request.userType.slice(1)} wallet for ${request.name}`;
+
+      // Prepare request body
+      const requestBody = {
+        idempotencyKey: idempotencyKey,
+        blockchains: request.blockchains || ['MATIC-AMOY'],
+        entitySecretCiphertext: entitySecretCiphertext,
+        accountType: request.accountType || 'EOA',
+        walletSetId: walletSetId,
+        metadata: [{
+          name: 'description',
+          value: walletDescription
+        }]
+      };
+
+      console.log('📡 Circle API request body:', {
+        ...requestBody,
+        entitySecretCiphertext: '[HIDDEN]',
+        idempotencyKey: idempotencyKey
+      });
+
+      // Call Circle API directly from frontend
+      const circleResponse = await fetch(`${CIRCLE_CONFIG.API_URL}/v1/w3s/developer/wallets`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CIRCLE_CONFIG.API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      const circleData = await circleResponse.json();
+      
+      console.log('📬 Circle API response status:', circleResponse.status);
+      console.log('📬 Circle API response data:', circleData);
+      
+      if (!circleResponse.ok) {
+        console.error('❌ Circle API error details:', {
+          status: circleResponse.status,
+          statusText: circleResponse.statusText,
+          data: circleData,
+          requestBody: {
+            ...requestBody,
+            entitySecretCiphertext: '[HIDDEN]'
+          }
+        });
+        throw new Error(`Circle API error: ${circleResponse.status} - ${JSON.stringify(circleData)}`);
+      }
+
+      // Extract wallet from Circle response - multiple possible response formats
+      let wallet;
+      
+      // Check different possible response structures from Circle API
+      if (circleData.data?.wallet) {
+        wallet = circleData.data.wallet;
+      } else if (circleData.data?.wallets && circleData.data.wallets.length > 0) {
+        wallet = circleData.data.wallets[0];
+      } else if (circleData.wallet) {
+        wallet = circleData.wallet;
+      } else if (circleData.wallets && circleData.wallets.length > 0) {
+        wallet = circleData.wallets[0];
+      } else {
+        // Log the full response to debug the structure
+        console.log('🔍 Full Circle API response structure:', JSON.stringify(circleData, null, 2));
+        console.warn('⚠️ Unable to extract wallet from Circle response, trying direct data access');
+        wallet = circleData.data || circleData;
+      }
+      
+      console.log('✅ Circle wallet created successfully:', {
+        walletId: wallet?.id,
+        address: wallet?.address,
+        blockchain: wallet?.blockchain,
+        state: wallet?.state,
+        fullResponse: circleData
+      });
+
+      if (!wallet?.id || !wallet?.address) {
+        console.error('❌ Invalid wallet data from Circle API:', circleData);
+        throw new Error('Circle API returned invalid wallet data');
+      }
+
+      return {
+        wallet: wallet
+      };
+
+    } catch (error) {
+      console.error('❌ Circle wallet creation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Create a new wallet using frontend encryption + Circle API directly
    */
   async createWallet(request: FrontendWalletRequest): Promise<FrontendWalletResponse> {

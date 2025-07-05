@@ -3,6 +3,7 @@ import { Container, Typography, Box, Card, CardContent, Button, Grid, Paper, Tab
 import { useAuth } from '../../contexts/AuthContext';
 import { getUserWallet, getWalletTransactions } from '../../services/walletService';
 import { TransactionData } from '../../types';
+import { FilCDNContentViewer } from '../../components/filcdn/FilCDNContentViewer/FilCDNContentViewer';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -293,6 +294,18 @@ const WalletDashboard: React.FC = () => {
               </Box>
             )}
           </Paper>
+        </Grid>
+
+        {/* FilCDN Storage Section */}
+        <Grid sx={{ gridColumn: 'span 12' }}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                Stored Documents (FilCDN)
+              </Typography>
+              <FilCDNContentViewer />
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
     </Container>

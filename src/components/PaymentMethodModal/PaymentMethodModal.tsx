@@ -11,8 +11,11 @@ interface PaymentMethodModalProps {
   amount: string;
   taskTitle: string;
   walletBalance?: string;
+  usdfcBalance?: string;
   walletAddress?: string;
+  filecoinAddress?: string;
   hasWallet: boolean;
+  hasFilecoinWallet?: boolean;
 }
 
 export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
@@ -22,10 +25,14 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   amount,
   taskTitle,
   walletBalance = "0.00",
+  usdfcBalance = "0.00",
   walletAddress,
-  hasWallet
+  filecoinAddress,
+  hasWallet,
+  hasFilecoinWallet = false
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'wallet' | 'paystack' | null>(null);
+  const [selectedToken, setSelectedToken] = useState<'USDC' | 'USDFC'>('USDC');
   const [conversion, setConversion] = useState<ConversionResult | null>(null);
   const [loadingConversion, setLoadingConversion] = useState(false);
 
@@ -60,8 +67,10 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
       onSelectMethod(selectedMethod, {
         amount,
         taskTitle,
-        walletAddress,
-        walletBalance
+        walletAddress: currentAddress,
+        walletBalance: currentWalletBalance.toString(),
+        selectedToken,
+        preferredChain: selectedToken === 'USDFC' ? 'FILECOIN' : undefined
       });
       onClose();
     }
@@ -72,11 +81,12 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
-  const walletBalanceNum = parseFloat(walletBalance);
+  const currentWalletBalance = selectedToken === 'USDC' ? parseFloat(walletBalance) : parseFloat(usdfcBalance);
   const amountNum = parseFloat(amount.replace(/[₦,]/g, ''));
-  // Check balance against converted USDC amount
-  const requiredUsdcAmount = conversion?.totalAmount || 0;
-  const hasEnoughBalance = walletBalanceNum >= requiredUsdcAmount;
+  // Check balance against converted amount (same conversion rate for both USDC and USDFC)
+  const requiredAmount = conversion?.totalAmount || 0;
+  const hasEnoughBalance = currentWalletBalance >= requiredAmount;
+  const currentAddress = selectedToken === 'USDC' ? walletAddress : filecoinAddress;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -104,17 +114,52 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             {conversion && (
               <div className="border-t pt-3 mt-3">
                 <div className="text-sm text-gray-600 mb-2">Wallet Payment Conversion:</div>
+                
+                {/* Token Selection (Phase 4: USDFC Support) */}
+                {(hasWallet || hasFilecoinWallet) && (
+                  <div className="mb-3">
+                    <div className="text-xs text-gray-500 mb-2">Payment Token:</div>
+                    <div className="flex gap-2">
+                      {hasWallet && (
+                        <button
+                          onClick={() => setSelectedToken('USDC')}
+                          className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                            selectedToken === 'USDC' 
+                              ? 'bg-blue-100 border-blue-300 text-blue-800' 
+                              : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          USDC ({walletBalance})
+                        </button>
+                      )}
+                      {hasFilecoinWallet && (
+                        <button
+                          onClick={() => setSelectedToken('USDFC')}
+                          className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                            selectedToken === 'USDFC' 
+                              ? 'bg-purple-100 border-purple-300 text-purple-800' 
+                              : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          USDFC ({usdfcBalance})
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between text-sm">
                   <span>₦{conversion.originalAmount.toLocaleString()}</span>
                   <ArrowRightIcon className="w-4 h-4 text-gray-400" />
-                  <span className="font-medium">${conversion.convertedAmount} USDC</span>
+                  <span className="font-medium">${conversion.convertedAmount} {selectedToken}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
-                  <span>Conversion fee: ${conversion.fee} USDC</span>
-                  <span className="font-medium">Total: ${conversion.totalAmount} USDC</span>
+                  <span>Conversion fee: ${conversion.fee} {selectedToken}</span>
+                  <span className="font-medium">Total: ${conversion.totalAmount} {selectedToken}</span>
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
-                  Rate: 1 USDC = ₦{conversion.exchangeRate.toLocaleString()}
+                  Rate: 1 {selectedToken} = ₦{conversion.exchangeRate.toLocaleString()}
+                  {selectedToken === 'USDFC' && <span className="text-purple-600 ml-1">(Filecoin Network)</span>}
                 </div>
               </div>
             )}
@@ -132,29 +177,39 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                 selectedMethod === 'wallet' 
                   ? 'ring-2 ring-[#FEC85F] border-[#FEC85F]' 
                   : 'border-gray-200 hover:border-gray-300'
-              } ${!hasWallet || !hasEnoughBalance ? 'opacity-50 cursor-not-allowed' : ''}`}
-              onClick={() => hasWallet && hasEnoughBalance && handleMethodSelect('wallet')}
+              } ${!(hasWallet || hasFilecoinWallet) || !hasEnoughBalance ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={() => (hasWallet || hasFilecoinWallet) && hasEnoughBalance && handleMethodSelect('wallet')}
             >
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#1B1828] rounded-lg flex items-center justify-center">
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                    selectedToken === 'USDFC' ? 'bg-purple-600' : 'bg-[#1B1828]'
+                  }`}>
                     <WalletIcon className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">Crypto Wallet</h4>
-                    {hasWallet ? (
+                    <h4 className="font-semibold text-gray-900">
+                      Crypto Wallet 
+                      {selectedToken === 'USDFC' && <span className="text-purple-600 ml-1">(Filecoin)</span>}
+                    </h4>
+                    {(hasWallet || hasFilecoinWallet) ? (
                       <div className="text-sm text-gray-600">
-                        <div>Balance: ${walletBalance} USDC</div>
-                        <div>Address: {formatWalletAddress(walletAddress || '')}</div>
+                        <div>Balance: ${currentWalletBalance.toFixed(6)} {selectedToken}</div>
+                        <div>Address: {formatWalletAddress(currentAddress || '')}</div>
+                        {selectedToken === 'USDFC' && (
+                          <div className="text-xs text-purple-600">
+                            ⚡ Filecoin Native • Storage Optimized
+                          </div>
+                        )}
                         {conversion && (
                           <div className="text-xs text-blue-600 mt-1">
-                            Required: ${conversion.totalAmount} USDC (includes fee)
+                            Required: ${conversion.totalAmount} {selectedToken} (includes fee)
                           </div>
                         )}
                         {!hasEnoughBalance && (
                           <div className="text-red-600 font-medium mt-1">
                             Insufficient balance
-                            {conversion && ` (need $${(requiredUsdcAmount - walletBalanceNum).toFixed(6)} more)`}
+                            {conversion && ` (need $${(requiredAmount - currentWalletBalance).toFixed(6)} more)`}
                           </div>
                         )}
                       </div>
@@ -162,7 +217,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                       <div className="text-sm text-gray-500">No wallet connected</div>
                     )}
                   </div>
-                  {selectedMethod === 'wallet' && hasWallet && hasEnoughBalance && (
+                  {selectedMethod === 'wallet' && (hasWallet || hasFilecoinWallet) && hasEnoughBalance && (
                     <div className="w-5 h-5 bg-[#FEC85F] rounded-full flex items-center justify-center">
                       <div className="w-2 h-2 bg-[#1B1828] rounded-full"></div>
                     </div>

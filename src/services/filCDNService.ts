@@ -1,15 +1,34 @@
 /**
- * FilCDN Service - Fast Content Delivery for Filecoin
- * Provides instant loading for legal documents stored on Filecoin
+ * PHASE 3 & 4.3: Enhanced FilCDN Service - Fast Content Delivery for Filecoin
+ * 
+ * Enhanced FilCDN Service with:
+ * - High-speed content retrieval from Filecoin network
+ * - Intelligent caching layer for legal documents
+ * - Content verification and integrity checking
+ * - Optimized delivery for legal document viewing
+ * - Comprehensive debugging and performance tracking
+ * - Phase 4.3: Enhanced storage integration with FVM contracts
+ * - Storage verification and replication monitoring
  */
 
 import { filecoinStorageService } from './filecoinStorageService';
+import { HashUtils } from '../components/blockchain/shared/hashUtils';
+import { fvmContractService } from './fvmContractService';
 
 export interface CDNLoadOptions {
-  preferredGateway?: 'w3s' | 'dweb' | 'cloudflare' | 'ipfs';
+  preferredGateway?: 'w3s' | 'dweb' | 'cloudflare' | 'ipfs' | 'filecoin';
   timeout?: number;
   retries?: number;
   preload?: boolean;
+  verifyIntegrity?: boolean;
+  expectedHash?: string;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  cacheHint?: 'no-cache' | 'force-cache' | 'default';
+  // Phase 4.3: Enhanced storage options
+  verifyStorageContract?: boolean;
+  taskId?: number;
+  preferIPFS?: boolean;
+  enableReplicationCheck?: boolean;
 }
 
 export interface CDNLoadResult {
@@ -18,115 +37,367 @@ export interface CDNLoadResult {
   loadTime: number;
   cached: boolean;
   error?: string;
+  content?: Blob;
+  contentType?: string;
+  size?: number;
+  hash?: string;
+  verified?: boolean;
+  source?: 'cache' | 'filecoin' | 'gateway' | 'cdn' | 'ipfs';
+  metadata?: {
+    timestamp: string;
+    cacheHit: boolean;
+    compressionUsed: boolean;
+    requestId?: string;
+    // Phase 4.3: Storage contract verification
+    storageContractVerified?: boolean;
+    replicationFactor?: number;
+    storageProvider?: string;
+  };
 }
 
 /**
  * FilCDN Service for fast document loading
  */
 class FilCDNService {
-  private cache = new Map<string, { data: Blob; timestamp: number; url: string }>();
+  private cache = new Map<string, { data: Blob; timestamp: number; url: string; hash?: string; size: number; contentType: string; accessCount: number }>();
   private loadingPromises = new Map<string, Promise<CDNLoadResult>>();
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes (extended for Phase 3)
+  
+  // Phase 3: Enhanced stats tracking
+  private stats = {
+    totalRequests: 0,
+    cacheHits: 0,
+    totalDataTransferred: 0,
+    averageLoadTime: 0,
+    gatewayPerformance: new Map<string, { requests: number; totalTime: number; failures: number }>()
+  };
 
   /**
-   * Load content from Filecoin with CDN acceleration
+   * Load content from Filecoin with CDN acceleration (Enhanced Phase 3)
    */
   async loadContent(cid: string, options: CDNLoadOptions = {}): Promise<CDNLoadResult> {
+    const debugId = `FILCDN_${Date.now()}`;
     const startTime = Date.now();
     const cacheKey = `${cid}_${options.preferredGateway || 'default'}`;
 
-    // Check cache first
-    const cached = this.getCachedContent(cid);
-    if (cached && !this.isCacheExpired(cached.timestamp)) {
-      console.log(`📦 Loading from cache: ${cid}`);
-      return {
-        url: cached.url,
-        gateway: 'cache',
-        loadTime: Date.now() - startTime,
-        cached: true
-      };
+    console.log(`🚀 [${debugId}] Starting FilCDN content load:`, {
+      cid: cid.substring(0, 20) + '...',
+      preferredGateway: options.preferredGateway,
+      priority: options.priority || 'normal',
+      verifyIntegrity: options.verifyIntegrity,
+      hasExpectedHash: !!options.expectedHash,
+      cacheHint: options.cacheHint,
+      timestamp: new Date().toISOString()
+    });
+
+    this.stats.totalRequests++;
+
+    // Check cache first (unless bypassed)
+    if (options.cacheHint !== 'no-cache') {
+      const cached = this.getCachedContent(cid);
+      if (cached && !this.isCacheExpired(cached.timestamp)) {
+        console.log(`💾 [${debugId}] Cache hit found:`, {
+          size: HashUtils.formatFileSize(cached.size),
+          contentType: cached.contentType,
+          cachedAt: new Date(cached.timestamp).toLocaleString(),
+          accessCount: cached.accessCount
+        });
+
+        // Update cache stats
+        cached.accessCount++;
+        this.stats.cacheHits++;
+        
+        const loadTime = Date.now() - startTime;
+        this.updateAverageLoadTime(loadTime);
+
+        return {
+          url: cached.url,
+          gateway: 'cache',
+          loadTime,
+          cached: true,
+          content: cached.data,
+          contentType: cached.contentType,
+          size: cached.size,
+          hash: cached.hash,
+          verified: true,
+          source: 'cache',
+          metadata: {
+            timestamp: new Date().toISOString(),
+            cacheHit: true,
+            compressionUsed: false
+          }
+        };
+      } else {
+        console.log(`❌ [${debugId}] Cache miss - proceeding to network retrieval`);
+      }
+    } else {
+      console.log(`🚫 [${debugId}] Cache bypassed per request hint`);
     }
 
     // Check if already loading
     if (this.loadingPromises.has(cacheKey)) {
-      console.log(`⏳ Waiting for existing load: ${cid}`);
+      console.log(`⏳ [${debugId}] Waiting for existing load request...`);
       return await this.loadingPromises.get(cacheKey)!;
     }
 
     // Start new load
-    const loadPromise = this.performLoad(cid, options, startTime);
+    console.log(`🌐 [${debugId}] Starting new network load...`);
+    const loadPromise = this.performLoad(cid, options, startTime, debugId);
     this.loadingPromises.set(cacheKey, loadPromise);
 
     try {
       const result = await loadPromise;
+      
+      console.log(`✅ [${debugId}] FilCDN load completed:`, {
+        success: !result.error,
+        gateway: result.gateway,
+        loadTime: Math.round(result.loadTime) + 'ms',
+        cached: result.cached,
+        verified: result.verified,
+        size: result.size ? HashUtils.formatFileSize(result.size) : 'unknown'
+      });
+      
       return result;
+    } catch (error) {
+      console.error(`❌ [${debugId}] FilCDN load failed:`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        cid: cid.substring(0, 20) + '...',
+        loadTime: Math.round(Date.now() - startTime) + 'ms'
+      });
+      throw error;
     } finally {
       this.loadingPromises.delete(cacheKey);
     }
   }
 
   /**
-   * Perform the actual content loading with gateway fallback
+   * Perform the actual content loading with gateway fallback (Enhanced Phase 3)
    */
-  private async performLoad(cid: string, options: CDNLoadOptions, startTime: number): Promise<CDNLoadResult> {
+  private async performLoad(cid: string, options: CDNLoadOptions, startTime: number, debugId: string): Promise<CDNLoadResult> {
     const gateways = this.getOrderedGateways(options.preferredGateway);
     const timeout = options.timeout || 10000; // 10 seconds default
     const retries = options.retries || 3;
 
+    console.log(`⚙️ [${debugId}] Starting network load with configuration:`, {
+      gatewayCount: gateways.length,
+      timeout: timeout + 'ms',
+      retries,
+      priority: options.priority || 'normal',
+      verifyIntegrity: options.verifyIntegrity
+    });
+
     let lastError: Error | null = null;
+    let totalBytesTransferred = 0;
+    const attemptLog: any[] = [];
 
     for (let attempt = 0; attempt < retries; attempt++) {
+      console.log(`🔄 [${debugId}] Starting attempt ${attempt + 1}/${retries}...`);
+      
       for (const gateway of gateways) {
+        const gatewayStartTime = Date.now();
+        const gatewayDebugId = `${debugId}_${gateway.name}_${attempt + 1}`;
+        
         try {
-          console.log(`🌐 Loading ${cid} from ${gateway.name} (attempt ${attempt + 1})`);
+          console.log(`🌐 [${gatewayDebugId}] Loading from ${gateway.name}:`, {
+            url: gateway.url.replace('{cid}', cid.substring(0, 20) + '...'),
+            attempt: attempt + 1,
+            priority: options.priority,
+            expectedHash: options.expectedHash ? options.expectedHash.substring(0, 20) + '...' : undefined
+          });
+          
+          // Update gateway performance tracking
+          this.updateGatewayStats(gateway.name, 'request');
           
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeout);
+          const timeoutId = setTimeout(() => {
+            console.warn(`⏰ [${gatewayDebugId}] Gateway timeout after ${timeout}ms`);
+            controller.abort();
+          }, timeout);
 
-          const response = await fetch(gateway.url, {
+          const fullUrl = gateway.url.replace('{cid}', cid);
+          const response = await fetch(fullUrl, {
             signal: controller.signal,
-            method: 'GET'
+            method: 'GET',
+            headers: {
+              'Accept': '*/*',
+              'Cache-Control': options.cacheHint === 'no-cache' ? 'no-cache' : 'default'
+            }
           });
 
           clearTimeout(timeoutId);
+          const responseTime = Date.now() - gatewayStartTime;
+
+          console.log(`📡 [${gatewayDebugId}] Response received:`, {
+            status: response.status,
+            statusText: response.statusText,
+            responseTime: responseTime + 'ms',
+            contentType: response.headers.get('content-type'),
+            contentLength: response.headers.get('content-length')
+          });
 
           if (!response.ok) {
+            this.updateGatewayStats(gateway.name, 'failure');
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
           const data = await response.blob();
           const loadTime = Date.now() - startTime;
+          const size = data.size;
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          
+          totalBytesTransferred += size;
+          this.stats.totalDataTransferred += size;
+          this.updateGatewayStats(gateway.name, 'success', responseTime);
+          this.updateAverageLoadTime(loadTime);
 
-          // Cache the result
-          this.cacheContent(cid, data, gateway.url);
+          console.log(`📥 [${gatewayDebugId}] Content downloaded:`, {
+            size: HashUtils.formatFileSize(size),
+            contentType,
+            downloadTime: responseTime + 'ms',
+            totalLoadTime: loadTime + 'ms',
+            compressionDetected: contentType.includes('gzip') || contentType.includes('compress')
+          });
 
-          console.log(`✅ Content loaded successfully from ${gateway.name} in ${loadTime}ms`);
+          // Integrity verification if requested
+          let verified = false;
+          let hash: string | undefined;
+          
+          if (options.verifyIntegrity || options.expectedHash) {
+            console.log(`🔍 [${gatewayDebugId}] Performing integrity verification...`);
+            
+            try {
+              const file = new File([data], `${cid}.bin`);
+              const hashResult = await HashUtils.hashFile(file);
+              hash = hashResult.hash;
+              
+              if (options.expectedHash) {
+                verified = HashUtils.compareHashes(hash, options.expectedHash);
+                console.log(`✓ [${gatewayDebugId}] Hash verification:`, {
+                  expected: options.expectedHash.substring(0, 20) + '...',
+                  actual: hash.substring(0, 20) + '...',
+                  verified
+                });
+                
+                if (!verified) {
+                  throw new Error('Content integrity verification failed');
+                }
+              } else {
+                verified = true;
+                console.log(`🔐 [${gatewayDebugId}] Content hash computed:`, {
+                  hash: hash.substring(0, 20) + '...',
+                  algorithm: 'SHA-256'
+                });
+              }
+            } catch (verifyError) {
+              console.error(`❌ [${gatewayDebugId}] Integrity verification failed:`, verifyError);
+              if (options.expectedHash) {
+                throw verifyError; // Fail if hash was required
+              }
+            }
+          } else {
+            verified = true; // No verification requested
+          }
+
+          // Cache the result with enhanced metadata
+          this.cacheContentEnhanced(cid, data, fullUrl, {
+            hash,
+            size,
+            contentType,
+            gatewayUsed: gateway.name,
+            loadTime,
+            verified
+          });
+
+          attemptLog.push({
+            attempt: attempt + 1,
+            gateway: gateway.name,
+            success: true,
+            responseTime,
+            size
+          });
+
+          console.log(`✅ [${gatewayDebugId}] Content loaded successfully:`, {
+            gateway: gateway.name,
+            loadTime: loadTime + 'ms',
+            responseTime: responseTime + 'ms',
+            size: HashUtils.formatFileSize(size),
+            verified,
+            totalAttempts: attemptLog.length
+          });
 
           return {
-            url: gateway.url,
+            url: fullUrl,
             gateway: gateway.name,
             loadTime,
-            cached: false
+            cached: false,
+            content: data,
+            contentType,
+            size,
+            hash,
+            verified,
+            source: 'gateway',
+            metadata: {
+              timestamp: new Date().toISOString(),
+              cacheHit: false,
+              compressionUsed: contentType.includes('gzip') || contentType.includes('compress'),
+              requestId: gatewayDebugId
+            }
           };
 
         } catch (error) {
           lastError = error as Error;
-          console.warn(`⚠️ Failed to load from ${gateway.name}:`, error);
+          const errorTime = Date.now() - gatewayStartTime;
+          
+          this.updateGatewayStats(gateway.name, 'failure');
+          
+          attemptLog.push({
+            attempt: attempt + 1,
+            gateway: gateway.name,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            responseTime: errorTime
+          });
+
+          console.warn(`⚠️ [${gatewayDebugId}] Gateway failed:`, {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            responseTime: errorTime + 'ms',
+            willRetry: attempt < retries - 1 || gateways.indexOf(gateway) < gateways.length - 1
+          });
+          
           continue;
         }
+      }
+      
+      if (attempt < retries - 1) {
+        const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff, max 5s
+        console.log(`⏳ [${debugId}] All gateways failed for attempt ${attempt + 1}, waiting ${backoffDelay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
       }
     }
 
     // All gateways failed
     const loadTime = Date.now() - startTime;
-    console.error(`❌ Failed to load content from all gateways after ${retries} attempts`);
+    
+    console.error(`❌ [${debugId}] All gateways failed after ${retries} attempts:`, {
+      totalLoadTime: loadTime + 'ms',
+      attemptsSummary: attemptLog,
+      lastError: lastError?.message,
+      gatewayCount: gateways.length,
+      totalRetries: retries
+    });
     
     return {
       url: '',
       gateway: 'failed',
       loadTime,
       cached: false,
-      error: lastError?.message || 'All gateways failed'
+      error: lastError?.message || 'All gateways failed',
+      metadata: {
+        timestamp: new Date().toISOString(),
+        cacheHit: false,
+        compressionUsed: false,
+        requestId: debugId
+      }
     };
   }
 
@@ -196,13 +467,50 @@ class FilCDNService {
   }
 
   /**
-   * Cache management
+   * Cache management (Enhanced Phase 3)
    */
   private cacheContent(cid: string, data: Blob, url: string): void {
     this.cache.set(cid, {
       data,
       timestamp: Date.now(),
-      url
+      url,
+      hash: undefined,
+      size: data.size,
+      contentType: 'application/octet-stream',
+      accessCount: 0
+    });
+
+    // Cleanup old cache entries
+    this.cleanupCache();
+  }
+
+  /**
+   * Enhanced cache management with metadata
+   */
+  private cacheContentEnhanced(cid: string, data: Blob, url: string, metadata: {
+    hash?: string;
+    size: number;
+    contentType: string;
+    gatewayUsed: string;
+    loadTime: number;
+    verified: boolean;
+  }): void {
+    this.cache.set(cid, {
+      data,
+      timestamp: Date.now(),
+      url,
+      hash: metadata.hash,
+      size: metadata.size,
+      contentType: metadata.contentType,
+      accessCount: 0
+    });
+
+    console.log(`💾 Cache entry created for ${cid}:`, {
+      size: HashUtils.formatFileSize(metadata.size),
+      contentType: metadata.contentType,
+      gateway: metadata.gatewayUsed,
+      verified: metadata.verified,
+      loadTime: metadata.loadTime + 'ms'
     });
 
     // Cleanup old cache entries
@@ -244,6 +552,71 @@ class FilCDNService {
   clearCache(): void {
     this.cache.clear();
     console.log('🧹 FilCDN cache cleared');
+  }
+
+  /**
+   * Update gateway performance statistics (Phase 3)
+   */
+  private updateGatewayStats(gatewayName: string, type: 'request' | 'success' | 'failure', responseTime?: number): void {
+    if (!this.stats.gatewayPerformance.has(gatewayName)) {
+      this.stats.gatewayPerformance.set(gatewayName, {
+        requests: 0,
+        totalTime: 0,
+        failures: 0
+      });
+    }
+
+    const stats = this.stats.gatewayPerformance.get(gatewayName)!;
+
+    switch (type) {
+      case 'request':
+        stats.requests++;
+        break;
+      case 'success':
+        if (responseTime) {
+          stats.totalTime += responseTime;
+        }
+        break;
+      case 'failure':
+        stats.failures++;
+        break;
+    }
+  }
+
+  /**
+   * Update average load time (Phase 3)
+   */
+  private updateAverageLoadTime(loadTime: number): void {
+    if (this.stats.averageLoadTime === 0) {
+      this.stats.averageLoadTime = loadTime;
+    } else {
+      // Exponential moving average
+      this.stats.averageLoadTime = (this.stats.averageLoadTime * 0.8) + (loadTime * 0.2);
+    }
+  }
+
+  /**
+   * Get comprehensive performance statistics (Phase 3)
+   */
+  getPerformanceStats() {
+    const gatewayStats = Array.from(this.stats.gatewayPerformance.entries()).map(([name, stats]) => ({
+      gateway: name,
+      requests: stats.requests,
+      failures: stats.failures,
+      successRate: stats.requests > 0 ? ((stats.requests - stats.failures) / stats.requests * 100).toFixed(1) + '%' : '0%',
+      averageResponseTime: stats.requests > stats.failures && stats.totalTime > 0 
+        ? Math.round(stats.totalTime / (stats.requests - stats.failures)) + 'ms' 
+        : 'N/A'
+    }));
+
+    return {
+      totalRequests: this.stats.totalRequests,
+      cacheHits: this.stats.cacheHits,
+      cacheHitRate: this.stats.totalRequests > 0 ? ((this.stats.cacheHits / this.stats.totalRequests) * 100).toFixed(1) + '%' : '0%',
+      totalDataTransferred: HashUtils.formatFileSize(this.stats.totalDataTransferred),
+      averageLoadTime: Math.round(this.stats.averageLoadTime) + 'ms',
+      gateways: gatewayStats
+    };
   }
 
   /**

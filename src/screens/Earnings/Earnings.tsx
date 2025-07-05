@@ -11,6 +11,7 @@ import { useToast } from "../../components/ui/toast";
 import { useAuth } from "../../contexts/AuthContext";
 import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
 import { transactionService, Transaction as ApiTransaction, BankAccount as ApiBankAccount, EarningSummary } from "../../services/transactionService";
+import { FVMContractStatus } from "../../components/FVMContractStatus/FVMContractStatus";
 import { 
   TrendingUpIcon,
   TrendingDownIcon,
@@ -327,6 +328,11 @@ export const Earnings = (): JSX.Element => {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* FVM Contract Status Section */}
+            <div className="mt-6">
+              <FVMContractStatus />
             </div>
           </div>
         </main>

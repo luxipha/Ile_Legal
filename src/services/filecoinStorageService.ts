@@ -440,6 +440,62 @@ class FilecoinStorageService {
       return [];
     }
   }
+
+  /**
+   * Store multiple files to Filecoin (batch upload)
+   * Required by filecoinFileMergeService for bulk operations
+   */
+  async storeFiles(files: File[], options: {
+    description?: string;
+    metadata?: any;
+  } = {}): Promise<{
+    ipfsCid: string;
+    pieceCid: string;
+    contractTxId?: string;
+  }> {
+    const debugId = `STORE_FILES_${Date.now()}`;
+    console.log(`📦 [${debugId}] Storing ${files.length} files to Filecoin:`, {
+      files: files.map(f => ({ name: f.name, size: f.size })),
+      options
+    });
+
+    try {
+      if (files.length === 0) {
+        throw new Error('No files provided for storage');
+      }
+
+      // Upload files sequentially to avoid overwhelming the service
+      const results: FilecoinUploadResult[] = [];
+      for (const file of files) {
+        console.log(`⬆️ [${debugId}] Uploading file: ${file.name}`);
+        const result = await this.uploadToFilecoin(file, {
+          storageDuration: 365,
+          enableFVM: true
+        });
+        results.push(result);
+      }
+
+      // Return the primary result (first file) for compatibility
+      const primaryResult = results[0];
+      
+      console.log(`✅ [${debugId}] Batch storage completed:`, {
+        totalFiles: results.length,
+        primaryCid: primaryResult.ipfsCid,
+        primaryPiece: primaryResult.pieceId,
+        totalSize: results.reduce((sum, r) => sum + r.size, 0)
+      });
+
+      return {
+        ipfsCid: primaryResult.ipfsCid,
+        pieceCid: primaryResult.pieceId,
+        contractTxId: primaryResult.contractTxId
+      };
+
+    } catch (error) {
+      console.error(`❌ [${debugId}] Batch storage failed:`, error);
+      throw new Error(`Failed to store files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 }
 
 // Export singleton instance

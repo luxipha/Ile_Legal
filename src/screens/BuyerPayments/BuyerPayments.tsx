@@ -8,6 +8,7 @@ import { Header } from "../../components/Header";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
 import { useAuth } from "../../contexts/AuthContext";
 import { getUserWalletData, UnifiedWalletData } from "../../services/unifiedWalletService";
+import { WalletOption } from "../../components/Wallet/Wallet";
 import { paymentIntegrationService } from "../../services/paymentIntegrationService";
 import { usePaystackInline } from "../../hooks/usePaystackInline";
 import { transactionService, Transaction, BankAccount as DBBankAccount } from "../../services/transactionService";
@@ -59,6 +60,7 @@ export const BuyerPayments = (): JSX.Element => {
     address: string;
     currency: string;
   } | null>(null);
+  const [selectedWallet, setSelectedWallet] = useState<WalletOption | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -258,6 +260,16 @@ export const BuyerPayments = (): JSX.Element => {
       console.error('Error removing bank account:', error);
       setError(error.message || 'Failed to remove bank account');
     }
+  };
+
+  const handleWalletChange = (wallet: WalletOption) => {
+    console.log('💰 [BuyerPayments] Wallet changed to:', wallet);
+    setSelectedWallet(wallet);
+    setWalletData({
+      balance: wallet.balance,
+      address: wallet.address,
+      currency: wallet.currency
+    });
   };
 
   const handlePayNow = (taskId: string) => {
@@ -564,6 +576,7 @@ export const BuyerPayments = (): JSX.Element => {
                             balance={walletData.balance}
                             address={walletData.address}
                             currency={walletData.currency}
+                            onWalletChange={handleWalletChange}
                           />
                         </CardContent>
                         <CardContent className="p-6">
@@ -577,8 +590,6 @@ export const BuyerPayments = (): JSX.Element => {
                       </Card>
                     )}
                     
-                 
-               
               </div>
             </div>
               </>
@@ -691,8 +702,11 @@ export const BuyerPayments = (): JSX.Element => {
           amount={selectedTaskForPayment.amount}
           taskTitle={selectedTaskForPayment.title}
           walletBalance={walletData?.balance}
+          usdfcBalance={selectedWallet?.currency === 'USDFC' ? selectedWallet.balance : fullWalletData?.usdfcBalance}
           walletAddress={walletData?.address}
+          filecoinAddress={selectedWallet?.currency === 'USDFC' ? selectedWallet.address : fullWalletData?.filecoinAddress}
           hasWallet={fullWalletData?.hasEthWallet || fullWalletData?.hasCircleWallet || false}
+          hasFilecoinWallet={fullWalletData?.hasFilecoinWallet || selectedWallet?.currency === 'USDFC' || false}
         />
       )}
     </div>

@@ -5,12 +5,17 @@ export interface UnifiedWalletData {
   ethAddress?: string;
   circleWalletId?: string;
   circleWalletAddress?: string;
+  filecoinAddress?: string;
   balance: string;
+  usdcBalance: string;
+  usdfcBalance: string;
   currency: string;
   hasEthWallet: boolean;
   hasCircleWallet: boolean;
+  hasFilecoinWallet: boolean;
   supportedChains: string[];
   chainBalances: { [chain: string]: string };
+  multiTokenBalances: { [token: string]: string };
 }
 
 export interface ChainConfig {
@@ -24,7 +29,7 @@ export interface ChainConfig {
   isTestnet?: boolean;
 }
 
-// Supported blockchain configurations for multichain USDC
+// Supported blockchain configurations for multichain USDC and USDFC
 export const SUPPORTED_CHAINS: { [key: string]: ChainConfig } = {
   'ETHEREUM': {
     name: 'Ethereum',
@@ -44,6 +49,16 @@ export const SUPPORTED_CHAINS: { [key: string]: ChainConfig } = {
     symbol: 'USDC.e',
     rpcUrl: 'https://polygon-rpc.com',
     explorerUrl: 'https://polygonscan.com',
+    isTestnet: false
+  },
+  'FILECOIN': {
+    name: 'Filecoin',
+    chainId: '314',
+    blockchain: 'FILECOIN',
+    tokenId: 'usd-coin-filecoin',
+    symbol: 'USDFC',
+    rpcUrl: 'https://api.node.glif.io',
+    explorerUrl: 'https://filfox.info',
     isTestnet: false
   },
   'BASE': {
@@ -87,10 +102,10 @@ export const getUserWalletData = async (userId: string): Promise<UnifiedWalletDa
   try {
     console.log('🔍 [UnifiedWallet] Fetching wallet data for user:', userId);
     
-    // Get all wallet data from unified user_wallets table (multichain support)
+    // Get all wallet data from unified user_wallets table (multichain support with USDFC)
     const { data: wallets, error: walletError } = await supabase
       .from('user_wallets')
-      .select('circle_wallet_id, wallet_address, balance_usdc, blockchain')
+      .select('circle_wallet_id, wallet_address, balance_usdc, blockchain, filecoin_address, usdfc_balance, supported_networks, network_balances')
       .eq('user_id', userId)
       .eq('is_active', true);
     
@@ -104,12 +119,16 @@ export const getUserWalletData = async (userId: string): Promise<UnifiedWalletDa
       console.error('Error fetching wallet data:', walletError);
     }
 
-    // Separate Circle and Ethereum wallets, collect multichain data
-    const circleWallet = wallets?.find(w => w.blockchain !== 'ETHEREUM' && !w.circle_wallet_id.startsWith('eth-'));
+    // Separate Circle, Ethereum, and Filecoin wallets, collect multichain data
+    const circleWallet = wallets?.find(w => w.blockchain !== 'ETHEREUM' && w.blockchain !== 'FILECOIN' && !w.circle_wallet_id.startsWith('eth-'));
     const ethWallet = wallets?.find(w => w.blockchain === 'ETHEREUM' || w.circle_wallet_id.startsWith('eth-'));
+    const filecoinWallet = wallets?.find(w => w.blockchain === 'FILECOIN');
     
-    // Get supported chains from user's wallets
-    const supportedChains = wallets?.map(w => w.blockchain).filter(Boolean) || [];
+    // Get supported chains from user's wallets (remove duplicates)
+    const supportedChains = Array.from(new Set(wallets?.map(w => w.blockchain).filter(Boolean))) || [];
+    
+    // Extract USDFC balance from Filecoin wallet
+    const usdfcBalance = filecoinWallet?.usdfc_balance || '0.00';
     const chainBalances: { [chain: string]: string } = {};
     
     // Collect balance data for each chain
@@ -128,50 +147,74 @@ export const getUserWalletData = async (userId: string): Promise<UnifiedWalletDa
       ethId: ethWallet?.circle_wallet_id
     });
 
-    // Use stored balance as fallback if API fails
-    let circleBalance = circleWallet?.balance_usdc?.toString() || '0.00';
+    // Validate Circle wallet ID format (should be a proper UUID)
+    const isValidCircleId = circleWallet?.circle_wallet_id && 
+                           !circleWallet.circle_wallet_id.startsWith('eth-') &&
+                           !circleWallet.circle_wallet_id.includes('-demo-') &&
+                           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(circleWallet.circle_wallet_id);
+
+    // For real Circle wallets, prioritize API data; for demo wallets, use stored balance
+    let circleBalance = '0.00';
     
-    if (circleWallet?.circle_wallet_id && !circleWallet.circle_wallet_id.startsWith('eth-')) {
+    if (isValidCircleId) {
       try {
         console.log('💰 [UnifiedWallet] Fetching real-time balance from Circle API for wallet:', circleWallet.circle_wallet_id);
         // Try to get real-time balance from Circle API (only for actual Circle wallets)
         const balanceData = await frontendWalletService.getWalletBalance(circleWallet.circle_wallet_id);
         if (balanceData?.tokenBalances?.length > 0) {
           const usdcBalance = balanceData.tokenBalances.find((b: any) => b.token.symbol === 'USDC');
-          const newBalance = usdcBalance?.amount || circleBalance;
+          const newBalance = usdcBalance?.amount || '0.00';
           console.log('✅ [UnifiedWallet] Balance updated from API:', {
-            stored: circleBalance,
             fromAPI: newBalance,
-            tokenCount: balanceData.tokenBalances.length
+            tokenCount: balanceData.tokenBalances.length,
+            fullBalanceData: balanceData.tokenBalances
           });
           circleBalance = newBalance;
         } else {
-          console.log('⚠️  [UnifiedWallet] No token balances found in API response');
+          console.log('✅ [UnifiedWallet] Real Circle wallet has no token balances (empty wallet):', balanceData);
+          circleBalance = '0.00'; // Real wallet with no tokens = $0.00
         }
       } catch (error) {
-        console.log('⚠️  [UnifiedWallet] Could not fetch Circle wallet balance, using stored balance:', error);
-        // Keep using stored balance from database
+        console.log('⚠️  [UnifiedWallet] Could not fetch Circle wallet balance, defaulting to 0.00:', error);
+        circleBalance = '0.00'; // API error for real wallet = $0.00
       }
     } else {
-      console.log('ℹ️  [UnifiedWallet] Skipping Circle API call for ETH wallet or missing Circle wallet');
+      // For demo wallets or invalid IDs, use stored balance
+      circleBalance = circleWallet?.balance_usdc?.toString() || '0.00';
+      if (circleWallet?.circle_wallet_id) {
+        console.log('⚠️  [UnifiedWallet] Using stored demo balance for invalid wallet ID:', circleWallet.circle_wallet_id);
+      } else {
+        console.log('ℹ️  [UnifiedWallet] Using stored balance for ETH wallet or missing Circle wallet');
+      }
     }
 
     const result = {
       ethAddress: ethWallet?.wallet_address || undefined,
       circleWalletId: circleWallet?.circle_wallet_id || undefined,
       circleWalletAddress: circleWallet?.wallet_address || undefined,
-      balance: circleBalance,
-      currency: 'USDC',
+      filecoinAddress: filecoinWallet?.filecoin_address || undefined,
+      balance: circleBalance, // Legacy field for backward compatibility
+      usdcBalance: circleBalance,
+      usdfcBalance: usdfcBalance.toString(),
+      currency: 'USDC', // Primary currency for backward compatibility
       hasEthWallet: !!ethWallet?.wallet_address,
       hasCircleWallet: !!circleWallet?.circle_wallet_id,
+      hasFilecoinWallet: !!filecoinWallet?.filecoin_address,
       supportedChains: supportedChains,
-      chainBalances: chainBalances
+      chainBalances: chainBalances,
+      multiTokenBalances: {
+        'USDC': circleBalance,
+        'USDFC': usdfcBalance.toString()
+      }
     };
     
     console.log('✅ [UnifiedWallet] Final wallet data:', {
       hasEth: result.hasEthWallet,
       hasCircle: result.hasCircleWallet,
-      balance: result.balance,
+      hasFilecoin: result.hasFilecoinWallet,
+      usdcBalance: result.usdcBalance,
+      usdfcBalance: result.usdfcBalance,
+      supportedChains: result.supportedChains,
       currency: result.currency
     });
     
@@ -273,23 +316,59 @@ export const createMultichainWallet = async (
       address: walletAddress.substring(0, 10) + '...'
     });
 
-    const { error } = await supabase
+    // Check if wallet already exists for this user and blockchain
+    const { data: existingWallet } = await supabase
       .from('user_wallets')
-      .upsert({
-        user_id: userId,
-        circle_wallet_id: circleWalletId || `${blockchain.toLowerCase()}-${userId}`,
-        wallet_address: walletAddress,
-        wallet_state: 'LIVE',
-        blockchain: chainConfig.blockchain,
-        account_type: 'EOA',
-        custody_type: 'ENDUSER',
-        description: `${chainConfig.name} wallet for user ${userId}`,
-        balance_usdc: 0,
-        balance_matic: 0,
-        is_active: true
-      }, {
-        onConflict: 'user_id,wallet_address'
-      });
+      .select('id, circle_wallet_id')
+      .eq('user_id', userId)
+      .eq('blockchain', chainConfig.blockchain)
+      .single();
+
+    let error;
+    if (existingWallet) {
+      // Update existing wallet including the circle_wallet_id to reflect real vs demo status
+      const updatedCircleWalletId = circleWalletId || existingWallet.circle_wallet_id;
+      const { error: updateError } = await supabase
+        .from('user_wallets')
+        .update({
+          circle_wallet_id: updatedCircleWalletId,
+          wallet_address: walletAddress,
+          wallet_state: 'LIVE',
+          is_active: true,
+          description: `${chainConfig.name} wallet for user ${userId}`,
+          ...(chainConfig.blockchain === 'FILECOIN' && { filecoin_address: walletAddress })
+        })
+        .eq('id', existingWallet.id);
+      error = updateError;
+      console.log('✅ [UnifiedWallet] Updated existing wallet:', updatedCircleWalletId);
+    } else {
+      // Generate unique circle_wallet_id to avoid conflicts
+      const uniqueCircleWalletId = circleWalletId || `${blockchain.toLowerCase()}-${userId}-${Date.now()}`;
+      
+      // Insert new wallet
+      const { error: insertError } = await supabase
+        .from('user_wallets')
+        .insert({
+          user_id: userId,
+          circle_wallet_id: uniqueCircleWalletId,
+          wallet_address: walletAddress,
+          wallet_state: 'LIVE',
+          blockchain: chainConfig.blockchain,
+          account_type: 'EOA',
+          custody_type: 'ENDUSER',
+          description: `${chainConfig.name} wallet for user ${userId}`,
+          balance_usdc: 0,
+          balance_matic: 0,
+          is_active: true,
+          supported_networks: JSON.stringify([chainConfig.blockchain]),
+          ...(chainConfig.blockchain === 'FILECOIN' && { 
+            filecoin_address: walletAddress,
+            usdfc_balance: 0
+          })
+        });
+      error = insertError;
+      console.log('✅ [UnifiedWallet] Created new wallet:', uniqueCircleWalletId);
+    }
 
     if (error) {
       throw error;
@@ -363,10 +442,12 @@ export const getOptimalPaymentChain = async (
     }
 
     // Otherwise, prioritize based on gas costs and transaction speed
-    const chainPriority = ['BASE', 'POLYGON', 'ARBITRUM', 'OPTIMISM', 'ETHEREUM'];
+    // FILECOIN prioritized for USDFC native payments and storage integration
+    const chainPriority = ['FILECOIN', 'BASE', 'POLYGON', 'ARBITRUM', 'OPTIMISM', 'ETHEREUM'];
     for (const preferredChain of chainPriority) {
       if (commonChains.includes(preferredChain)) {
         const config = SUPPORTED_CHAINS[preferredChain];
+        console.log(`💎 [UnifiedWallet] Selected optimal chain: ${preferredChain} (${config.symbol})`);
         return { chain: preferredChain, config };
       }
     }
@@ -389,3 +470,144 @@ export const getOptimalPaymentChain = async (
 export const getChainTokenConfig = (blockchain: string): ChainConfig | null => {
   return SUPPORTED_CHAINS[blockchain.toUpperCase()] || null;
 };
+
+/**
+ * Set default wallet for user by storing preference
+ * Since table doesn't have is_default field, we'll use a simpler approach
+ */
+export const setDefaultWallet = async (userId: string, walletId: string): Promise<void> => {
+  try {
+    // Get all user wallets to update their descriptions
+    const { data: userWallets } = await supabase
+      .from('user_wallets')
+      .select('id, description')
+      .eq('user_id', userId);
+
+    if (userWallets) {
+      // Update all wallets to remove (Default) and add it to selected one
+      for (const wallet of userWallets) {
+        const cleanDescription = wallet.description?.replace(' (Default)', '') || '';
+        const newDescription = wallet.id === walletId 
+          ? `${cleanDescription} (Default)` 
+          : cleanDescription;
+
+        await supabase
+          .from('user_wallets')
+          .update({ description: newDescription })
+          .eq('id', wallet.id);
+      }
+    }
+    
+    console.log('✅ [UnifiedWallet] Default wallet updated:', walletId);
+  } catch (error) {
+    console.error('❌ [UnifiedWallet] Error setting default wallet:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get default wallet for user
+ */
+export const getDefaultWallet = async (userId: string): Promise<any | null> => {
+  try {
+    // Look for wallet with (Default) in description
+    const { data: defaultWallet } = await supabase
+      .from('user_wallets')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .like('description', '%(Default)%')
+      .single();
+
+    if (defaultWallet) return defaultWallet;
+
+    // If no default found, return first active wallet
+    const { data: firstWallet } = await supabase
+      .from('user_wallets')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single();
+
+    return firstWallet;
+  } catch (error) {
+    console.error('Error getting default wallet:', error);
+    return null;
+  }
+};
+
+/**
+ * Unified Wallet Service - Service instance for blockchain operations
+ */
+class UnifiedWalletService {
+  /**
+   * Get the active wallet for current user
+   */
+  async getActiveWallet(): Promise<{ 
+    network: string; 
+    address?: string; 
+    balance?: string; 
+  } | null> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const walletData = await getUserWalletData(user.id);
+      
+      // Return most suitable wallet based on priority
+      if (walletData.hasFilecoinWallet) {
+        return {
+          network: 'filecoin',
+          address: walletData.filecoinAddress,
+          balance: walletData.usdfcBalance
+        };
+      }
+      
+      if (walletData.hasEthWallet) {
+        return {
+          network: 'algorand', // For blockchain verification
+          address: walletData.ethAddress,
+          balance: walletData.usdcBalance
+        };
+      }
+      
+      if (walletData.hasCircleWallet) {
+        return {
+          network: 'algorand', // Default to algorand for verification
+          address: walletData.circleWalletAddress,
+          balance: walletData.usdcBalance
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting active wallet:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get wallet data for user
+   */
+  async getUserWalletData(userId: string) {
+    return getUserWalletData(userId);
+  }
+
+  /**
+   * Get primary wallet address
+   */
+  async getPrimaryWalletAddress(userId: string) {
+    return getPrimaryWalletAddress(userId);
+  }
+
+  /**
+   * Update ETH address
+   */
+  async updateEthAddress(userId: string, ethAddress: string) {
+    return updateEthAddress(userId, ethAddress);
+  }
+}
+
+export const unifiedWalletService = new UnifiedWalletService();

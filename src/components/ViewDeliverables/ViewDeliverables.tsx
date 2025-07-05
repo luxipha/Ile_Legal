@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
-import { ArrowLeftIcon, MessageSquareIcon, SendIcon } from "lucide-react";
+import { ArrowLeftIcon, MessageSquareIcon, SendIcon, QrCodeIcon } from "lucide-react";
 import { api } from "../../services/api";
 import { messagingService } from "../../services/messagingService";
 import { useAuth } from "../../contexts/AuthContext";
+import { GigVerificationQR } from "../blockchain/GigVerificationQR/GigVerificationQR";
 
 interface Provider {
   name: string;
@@ -235,6 +236,17 @@ export const ViewDeliverables = ({
           >
             Messages
           </button>
+          <button
+            onClick={() => setActiveTab("verification")}
+            className={`py-4 px-6 font-medium text-sm flex items-center gap-2 ${
+              activeTab === "verification"
+                ? "border-b-2 border-[#1B1828] text-[#1B1828]"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <QrCodeIcon className="w-4 h-4" />
+            Verification
+          </button>
         </nav>
       </div>
 
@@ -349,12 +361,23 @@ export const ViewDeliverables = ({
                         <p className="text-sm text-gray-500">{file.size} · Uploaded on {file.uploadDate}</p>
                       </div>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => file.url && window.open(file.url, '_blank')}
-                    >
-                      Download
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => file.url && window.open(file.url, '_blank')}
+                      >
+                        Download
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setActiveTab("verification")}
+                        className="flex items-center gap-1"
+                      >
+                        <QrCodeIcon className="w-4 h-4" />
+                        QR
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -406,6 +429,68 @@ export const ViewDeliverables = ({
                   <p className="text-sm text-gray-500">Accepted</p>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "verification" && (
+          <div className="space-y-6">
+            <div className="border border-gray-200 rounded-lg p-6">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <QrCodeIcon className="w-6 h-6 text-purple-600" />
+                Blockchain Verification & QR Code
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Verify the authenticity of deliverables using blockchain technology. 
+                Scan the QR code to verify work submission proof.
+              </p>
+              
+              {deliverables.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* QR Code for the gig submission */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Work Verification QR Code</h3>
+                    <GigVerificationQR 
+                      submissionId={gigId.toString()}
+                      title={`${gigTitle} - Verification`}
+                      description="Scan to verify work authenticity on blockchain"
+                      size={250}
+                      onVerificationComplete={(result) => {
+                        console.log('Verification result:', result);
+                      }}
+                    />
+                  </div>
+
+                  {/* Verification Instructions */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">How to Verify</h3>
+                    <div className="space-y-3 text-sm text-gray-700">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">1</div>
+                        <p>Scan the QR code with any QR code reader or smartphone camera</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">2</div>
+                        <p>The QR code contains blockchain transaction proof for this work submission</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">3</div>
+                        <p>Verification works offline - no internet connection required</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">4</div>
+                        <p>This proof is court-admissible and tamper-proof</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <QrCodeIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-lg font-medium">No verification available yet</p>
+                  <p>QR codes will be generated once deliverables are submitted with blockchain verification</p>
+                </div>
+              )}
             </div>
           </div>
         )}

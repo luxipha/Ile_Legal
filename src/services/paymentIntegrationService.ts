@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { getUserWalletData, getOptimalPaymentChain, getChainTokenConfig } from './unifiedWalletService';
 import { SettingsService } from './settingsService';
 import { currencyConversionService, ConversionResult } from './currencyConversionService';
+import { fvmContractService } from './fvmContractService';
 
 export interface PaymentRequest {
   taskId: number;
@@ -11,6 +12,9 @@ export interface PaymentRequest {
   sellerId: string;
   method: 'wallet' | 'paystack';
   description: string;
+  // Phase 4: USDFC on Filecoin support
+  preferredToken?: 'USDC' | 'USDFC';
+  preferredChain?: string;
 }
 
 export interface PaymentResponse {
@@ -52,17 +56,37 @@ class PaymentIntegrationService {
    * Process payment using selected method (wallet or Paystack)
    */
   async processPayment(paymentRequest: PaymentRequest): Promise<PaymentResponse> {
+    const debugId = `PAY_${Date.now()}`;
+    console.log(`💳 [${debugId}] Starting payment processing:`, {
+      taskId: paymentRequest.taskId,
+      amount: paymentRequest.amount,
+      currency: paymentRequest.currency,
+      method: paymentRequest.method,
+      buyerId: paymentRequest.buyerId,
+      sellerId: paymentRequest.sellerId,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       // Log payment attempt
+      console.log(`📝 [${debugId}] Logging payment attempt...`);
       await this.logPaymentAttempt(paymentRequest);
 
       if (paymentRequest.method === 'wallet') {
+        console.log(`🔐 [${debugId}] Processing wallet payment...`);
         return await this.processWalletPayment(paymentRequest);
       } else {
+        console.log(`💰 [${debugId}] Processing Paystack payment...`);
         return await this.processPaystackPayment(paymentRequest);
       }
     } catch (error) {
-      console.error('Payment processing error:', error);
+      console.error(`❌ [${debugId}] Payment processing failed:`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        paymentMethod: paymentRequest.method,
+        amount: paymentRequest.amount,
+        currency: paymentRequest.currency
+      });
       return {
         success: false,
         transactionId: '',
@@ -84,9 +108,18 @@ class PaymentIntegrationService {
         sellerId: paymentRequest.sellerId
       });
 
-      // Determine optimal payment chain for multichain support
-      const optimalChain = await getOptimalPaymentChain(paymentRequest.buyerId, paymentRequest.sellerId);
-      console.log('🌐 [PaymentIntegration] Optimal payment chain:', optimalChain);
+      // Determine optimal payment chain for multichain support (Phase 4: with USDFC preference)
+      const optimalChain = await getOptimalPaymentChain(
+        paymentRequest.buyerId, 
+        paymentRequest.sellerId, 
+        paymentRequest.preferredChain
+      );
+      console.log('🌐 [PaymentIntegration] Optimal payment chain:', {
+        chain: optimalChain?.chain,
+        token: optimalChain?.config.symbol,
+        preferredChain: paymentRequest.preferredChain,
+        preferredToken: paymentRequest.preferredToken
+      });
       
       if (!optimalChain) {
         throw new Error('No compatible blockchain found between buyer and seller wallets');
@@ -127,21 +160,31 @@ class PaymentIntegrationService {
         });
       }
 
-      const walletBalance = parseFloat(walletData.balance);
+      // Use appropriate balance based on selected token (Phase 4: USDFC support)
+      const walletBalance = optimalChain.config.symbol === 'USDFC' 
+        ? parseFloat(walletData.usdfcBalance) 
+        : parseFloat(walletData.usdcBalance);
+      
       console.log('💰 [PaymentIntegration] Balance check:', {
+        selectedToken: optimalChain.config.symbol,
         walletBalance,
         requiredAmount: actualAmount,
-        hasSufficientFunds: walletBalance >= actualAmount
+        hasSufficientFunds: walletBalance >= actualAmount,
+        usdcBalance: walletData.usdcBalance,
+        usdfcBalance: walletData.usdfcBalance
       });
       
       if (walletBalance < actualAmount) {
-        const requiredBalance = currencyConversionService.formatCurrency(actualAmount, paymentCurrency);
-        const currentBalance = currencyConversionService.formatCurrency(walletBalance, 'USDC');
+        const tokenSymbol = optimalChain.config.symbol;
+        const requiredBalance = currencyConversionService.formatCurrency(actualAmount, tokenSymbol);
+        const currentBalance = currencyConversionService.formatCurrency(walletBalance, tokenSymbol);
         console.error('❌ [PaymentIntegration] Insufficient funds:', {
           required: requiredBalance,
-          available: currentBalance
+          available: currentBalance,
+          token: tokenSymbol,
+          blockchain: optimalChain.chain
         });
-        throw new Error(`Insufficient wallet balance. Required: ${requiredBalance}, Available: ${currentBalance}`);
+        throw new Error(`Insufficient ${tokenSymbol} balance. Required: ${requiredBalance}, Available: ${currentBalance}`);
       }
 
       // Create payment record for escrow system (funds held until work completion)
@@ -197,13 +240,18 @@ class PaymentIntegrationService {
           seller_id: paymentRequest.sellerId,
           amount: actualAmount, // Store converted amount
           currency: paymentCurrency, // Store actual payment currency (USDC)
+          blockchain_network: optimalChain.chain, // Add blockchain network support
+          payment_token: optimalChain.config.symbol, // Add payment token (e.g., USDFC)
+          is_usdfc_payment: optimalChain.config.symbol === 'USDFC', // Flag for USDFC payments
           original_amount: paymentRequest.amount, // Store original amount
           original_currency: paymentRequest.currency, // Store original currency (NGN)
           payment_method: 'wallet',
           status: 'escrowed',
           description: paymentRequest.description,
           escrow_status: 'held',
-          wallet_address: walletData.ethAddress || walletData.circleWalletAddress,
+          wallet_address: optimalChain.config.symbol === 'USDFC' 
+            ? walletData.filecoinAddress 
+            : (walletData.ethAddress || walletData.circleWalletAddress),
           transaction_hash: realTransactionHash,
           external_transaction_id: transferData.data.id,
           blockchain_used: optimalChain.chain,
@@ -216,6 +264,36 @@ class PaymentIntegrationService {
 
       // Update task status to payment escrowed
       await this.updateTaskPaymentStatus(paymentRequest.taskId, 'payment_escrowed');
+
+      // Phase 4.2: Create FVM smart contract for USDFC payments
+      if (optimalChain.config.symbol === 'USDFC') {
+        console.log('🔗 [PaymentIntegration] Creating FVM escrow contract for USDFC payment...');
+        const fvmResult = await fvmContractService.createEscrowContract(
+          paymentRequest.taskId,
+          paymentRequest.buyerId,
+          paymentRequest.sellerId,
+          actualAmount.toString(),
+          {
+            expectedSize: 100 * 1024 * 1024, // 100MB
+            duration: 30 * 24 * 60 * 60, // 30 days
+            replicationFactor: 3
+          }
+        );
+
+        if (fvmResult.success) {
+          console.log('✅ [PaymentIntegration] FVM contract created:', fvmResult.contractAddress);
+          // Update payment record with FVM contract address
+          await supabase
+            .from('Payments')
+            .update({
+              fvm_contract_address: fvmResult.contractAddress,
+              contract_transaction_id: fvmResult.transactionHash
+            })
+            .eq('id', transactionId);
+        } else {
+          console.warn('⚠️ [PaymentIntegration] FVM contract creation failed:', fvmResult.error);
+        }
+      }
 
       // Create escrow transaction record in transactions table
       await this.createEscrowTransaction(paymentRequest, actualAmount, paymentCurrency, transactionId);

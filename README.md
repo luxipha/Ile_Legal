@@ -8,20 +8,25 @@
 
 ### **For Legal Professionals (Sellers)**
 - **Gig Discovery & Bidding**: Browse legal work opportunities and submit competitive bids
-- **Secure Document Management**: Upload legal documents with blockchain verification on Algorand
-- **Circle Wallet Integration**: Automatic cryptocurrency wallet creation and management
-- **Payment Processing**: Bank account integration for seamless traditional and crypto payments
+- **Blockchain Work Submission**: Multi-file upload with automatic verification on Algorand/Filecoin
+- **File Merge & PDF Generation**: Automatically combine multiple documents into verified bundles
+- **QR Code Verification**: Generate offline-verifiable QR codes for submitted work
+- **Circle Wallet Integration**: Automatic multi-chain cryptocurrency wallet creation
+- **USDFC Payment Reception**: Receive payments in Filecoin's native USDFC token
+- **FVM Contract Monitoring**: Track escrow contracts and storage deals in real-time
 - **Professional Profile Management**: Comprehensive profiles with ratings, reviews, and specializations
-- **Work Submission System**: Submit completed work with court-admissible documentation
 - **Real-time Messaging**: Communicate directly with clients through integrated chat system
 
 ### **For Clients (Buyers)**
 - **Legal Service Requests**: Post detailed gig requirements for legal services
-- **Secure Escrow Payments**: Protected transactions using Circle SDK and Paystack
-- **Document Security**: IPFS + Algorand blockchain verification for tamper-proof storage
-- **Professional Dashboard**: Track project progress, payments, and deliverables
+- **USDFC Smart Payments**: Make payments with Filecoin's native USDFC token
+- **FVM Escrow Protection**: Automated smart contract escrow with release conditions
+- **Document Verification**: IPFS + Filecoin + Algorand triple-verification for court-grade security
+- **QR Code Authentication**: Verify work authenticity offline using generated QR codes
+- **FilCDN Document Access**: Fast content delivery through Filecoin's CDN network
+- **Professional Dashboard**: Track project progress, payments, and blockchain deliverables
 - **Rating & Review System**: Evaluate legal professionals based on performance
-- **Dispute Resolution**: Built-in dispute management system for conflict resolution
+- **Dispute Resolution**: Built-in dispute management with blockchain evidence
 
 ## 🛠️ **Technical Architecture**
 
@@ -40,15 +45,19 @@
 
 ### **Blockchain & Storage**
 - **Algorand Blockchain**: Document verification and timestamps
-- **IPFS Storage**: Decentralized file storage with Filecoin integration
+- **Filecoin Network**: Decentralized storage with USDFC native payments
+- **IPFS Storage**: Permanent file storage with CDN optimization
 - **SHA-256 Hashing**: Industry-standard file integrity verification
-- **Multi-chain Support**: Ethereum, Polygon, and Algorand integration
+- **Multi-chain Support**: Filecoin, Ethereum, Polygon, and Algorand integration
+- **FVM Smart Contracts**: Automated escrow and storage deals
 
 ### **Payment Systems**
-- **Circle SDK**: Cryptocurrency wallet creation and USDC transactions
+- **USDFC Integration**: Native Filecoin payments with Circle API
+- **Circle SDK**: Multi-chain wallet creation and USDC transactions
+- **FVM Escrow Contracts**: Smart contract payment protection
 - **Paystack Integration**: Traditional Nigerian payment processing
 - **MetaMask Support**: Web3 wallet connectivity
-- **Escrow Protection**: Secure payment holding until work completion
+- **Automated Escrow**: Smart contracts hold funds until work completion
 
 ## 📋 **Legal Service Categories**
 
@@ -68,10 +77,13 @@ The platform specializes in **real estate legal services** including:
 ## 🔐 **Security Features**
 
 ### **Court-Grade Document Security**
-- **Blockchain Verification**: Every document gets cryptographic timestamps on Algorand
-- **IPFS Storage**: Permanent, tamper-proof file storage
-- **Filecoin Integration**: Decentralized storage with economic incentives
-- **Professional Compliance**: Meets legal industry standards for evidence
+- **Triple Blockchain Verification**: Documents verified on Algorand + stored on Filecoin
+- **File Merge & Bundling**: Multiple documents combined into cryptographically signed bundles
+- **QR Code Authentication**: Offline verification through cryptographic QR codes
+- **SHA-256 Hash Chains**: Individual + merged file hashing for complete integrity
+- **IPFS + FilCDN Storage**: Permanent, tamper-proof file storage with fast CDN access
+- **FVM Smart Contracts**: Automated storage deals and payment escrow
+- **Professional Compliance**: Exceeds legal industry standards for digital evidence
 
 ### **User Authentication & Authorization**
 - **Multi-modal Authentication**: Email, Google, and MetaMask login
@@ -127,32 +139,75 @@ The platform specializes in **real estate legal services** including:
 - **Registration Help**: Automated onboarding assistance
 - **24/7 Support**: Round-the-clock platform assistance
 
+## 🔄 **Blockchain Workflow Integration**
+
+### **Complete Work Submission Process**
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│Multi-File   │───▶│File Merge   │───▶│Blockchain   │───▶│QR Code      │
+│Upload       │    │& Bundle     │    │Verification │    │Generation   │
+│(.pdf,.docx) │    │(JSON+Base64)│    │(Algorand)   │    │(Offline)    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+       │                  │                  │                  │
+       ▼                  ▼                  ▼                  ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│IPFS Storage │    │SHA-256      │    │Smart        │    │Verification │
+│(Filecoin)   │    │Hashing      │    │Contract     │    │Tab (UI)     │
+│Permanent    │    │Individual   │    │Storage      │    │Mobile Ready │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+### **USDFC Payment Flow**
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│Circle Wallet│───▶│USDFC        │───▶│FVM Escrow   │───▶│Auto Release │
+│Connected    │    │Payment      │    │Contract     │    │On Approval  │
+│Multi-chain  │    │Filecoin     │    │Smart Lock   │    │To Seller    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+```
+
+### **Integrated Dashboard Features**
+- **FVM Contract Status**: Real-time escrow and storage contract monitoring
+- **Verification Tab**: QR codes and blockchain proofs for all submissions
+- **FilCDN Content Viewer**: Fast document access through Filecoin CDN
+- **USDFC Payment Demo**: Native Filecoin payment testing interface
+
 ## 🚀 **Innovation Highlights**
 
-- **First-of-its-kind**: Legal services marketplace with blockchain verification
-- **Court-Admissible Evidence**: All documents meet legal industry standards
-- **Zero Technical Complexity**: Lawyers focus on legal work, not technology
-- **Production Ready**: Fully deployable with proper environment setup
+- **First Filecoin Legal Platform**: Revolutionary legal services with FVM smart contracts
+- **Triple Blockchain Security**: Algorand verification + Filecoin storage + USDFC payments
+- **Offline Verification**: QR codes work without internet for court presentations
+- **Auto File Bundling**: Multiple documents merged into cryptographically signed packages
+- **Court-Admissible Evidence**: All documents exceed legal industry standards
+- **Zero Technical Complexity**: Lawyers focus on legal work, not blockchain technology
+- **Production Ready**: Fully deployable with comprehensive environment setup
 - **Scalable Architecture**: Handles multiple users and high transaction volumes
-- **Multi-Currency Support**: Traditional and cryptocurrency payment options
+- **Native Web3 Integration**: USDFC payments with traditional UI/UX
 
 ## 📊 **Key Statistics**
 
 - **50+ API Endpoints**: Comprehensive backend functionality
 - **4 User Roles**: Buyer, Seller, Admin, Super Admin
 - **16 Legal Service Categories**: Specialized real estate legal services
-- **3 Payment Methods**: Circle SDK, Paystack, MetaMask
-- **3 Blockchain Networks**: Algorand, Ethereum, Polygon
-- **Court-Grade Security**: SHA-256 hashing + blockchain verification
+- **4 Payment Methods**: USDFC, Circle SDK, Paystack, MetaMask
+- **4 Blockchain Networks**: Filecoin (primary), Algorand, Ethereum, Polygon
+- **Triple Security Layer**: SHA-256 hashing + Algorand verification + Filecoin storage
+- **4 New Blockchain Services**: File merge, QR generation, FVM contracts, FilCDN
+- **Auto File Processing**: Multi-format support with automatic bundling
 
 ## 🏆 **Technical Achievements**
 
 - ✅ **Full-Stack Implementation**: Complete legal services platform
-- ✅ **Blockchain Integration**: Real Algorand blockchain verification
-- ✅ **Financial Technology**: Circle SDK cryptocurrency integration
-- ✅ **Professional UX**: Lawyer-friendly interface design
-- ✅ **Production Ready**: Deployable with proper environment setup
-- ✅ **Scalable Architecture**: Handles multiple users and transactions
+- ✅ **Triple Blockchain Integration**: Filecoin + Algorand + Ethereum support
+- ✅ **FVM Smart Contracts**: Native Filecoin Virtual Machine integration
+- ✅ **USDFC Payment System**: Native Filecoin token integration
+- ✅ **Auto File Processing**: Multi-file merge with cryptographic bundling
+- ✅ **QR Code Verification**: Offline document authentication
+- ✅ **FilCDN Integration**: Fast content delivery network
+- ✅ **Financial Technology**: Multi-chain Circle SDK integration
+- ✅ **Professional UX**: Lawyer-friendly interface with blockchain transparency
+- ✅ **Production Ready**: Deployable with comprehensive environment setup
+- ✅ **Scalable Architecture**: Handles multiple users and high-volume transactions
 
 ## 🚀 **Getting Started**
 
@@ -205,8 +260,16 @@ VITE_ALGORAND_NETWORK=testnet
 
 ### **Production (.env.production)**
 ```env
+# Filecoin Configuration
+VITE_FILECOIN_ENABLED=true
+VITE_FVM_ESCROW_CONTRACT=
+VITE_LOTUS_API_TOKEN=
+VITE_WEB3_STORAGE_DID=your_web3_storage_did
+VITE_WEB3_STORAGE_PRIVATE_KEY=your_web3_storage_private_key
+VITE_WEB3_STORAGE_SPACE_DID=your_web3_storage_space_did
+
 # Algorand IPFS
-VITE_IPFS_URL=https://ipfs.algonode.xyz
+VITE_IPFS_URL=
 VITE_ALGORAND_IPFS_TOKEN=your_algorand_ipfs_token
 VITE_ALGORAND_NETWORK=mainnet
 VITE_ALGORAND_MNEMONIC=your_25_word_mnemonic_phrase
@@ -257,15 +320,39 @@ npm run test         # Run tests (when implemented)
 ## 🔧 **Architecture**
 
 ```
-Frontend (React/TS)
+Frontend (React/TS + New Blockchain UI)
     ↓
-Supabase (Database/Auth)
+Supabase (Database/Auth + Filecoin Storage Tracking)
     ↓
-Circle SDK (Payments)
+┌─────────────────────────────────────────┐
+│            Payment Layer                │
+│  Circle SDK (USDFC) + FVM Contracts    │
+└─────────────────────────────────────────┘
     ↓
-Algorand IPFS (Storage)
+┌─────────────────────────────────────────┐
+│           Storage Layer                 │
+│    IPFS + Filecoin + FilCDN            │
+│  (File merge + Piece CID generation)   │
+└─────────────────────────────────────────┘
     ↓
-Algorand Blockchain (Verification)
+┌─────────────────────────────────────────┐
+│          Verification Layer             │
+│   Algorand + Filecoin Dual Blockchain  │
+│      (Hash verification + QR codes)    │
+└─────────────────────────────────────────┘
+```
+
+### **New Service Architecture**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Blockchain Services                         │
+├─────────────────────────────────────────────────────────────────┤
+│ filecoinStorageService      │ Store files + generate Piece CIDs│
+│ filecoinFileMergeService    │ Bundle multiple files into JSON  │
+│ blockchainVerifiedSubmission│ Hash + verify on dual blockchains│
+│ unifiedWalletService        │ Multi-chain wallet management    │
+│ algorandService             │ Document verification + timestmp │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## 🏆 **Hackathon Highlights**
@@ -281,10 +368,10 @@ Algorand Blockchain (Verification)
 
 This project was built for a hackathon. For questions or contributions, please contact the development team.
 
-## 📄 **License**
+##**License**
 
 Built by Bolt for the Hackathon - All rights reserved.
 
 ---
 
-**Ile Legal** - Revolutionizing legal services with blockchain technology 🏛️⚖️
+**Ile** - Tokenizing Property for fractional Ownership 🏛️⚖️

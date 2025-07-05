@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircleIcon, AlertCircleIcon, RefreshCcwIcon, ExternalLinkIcon, CopyIcon } from 'lucide-react';
+import { CheckCircleIcon, AlertCircleIcon, RefreshCcwIcon, CopyIcon } from 'lucide-react';
 import { getUserWalletData } from '../../services/unifiedWalletService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Link } from 'react-router-dom';
 
 interface WalletStatusNotificationProps {
   isEnabled: boolean;

@@ -7,6 +7,7 @@ import { ViewDetails, Gig as ViewDetailsGig } from "../../components/ViewDetails
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
 import { SecureLegalUpload, SecureUploadResult } from "../../components/SecureLegalUpload";
+// import { WildcardSubmissionForm } from "../../components/wildcard";
 import { api } from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { 
@@ -849,6 +850,29 @@ export const SellerDashboard = (): JSX.Element => {
                         maxFiles={10}
                         disabled={isSubmitting}
                       />
+                    </div>
+
+                    {/* Wildcard Secure Submission Option */}
+                    <div className="border-t border-gray-200 pt-6">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          🛡️ Enhanced Security Option
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Use Wildcard technology for maximum security, court-admissible verification, 
+                          and blockchain-based proof of authenticity.
+                        </p>
+                      </div>
+                      
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <p className="text-purple-800 font-medium">🚀 Wildcard Security Available</p>
+                        <p className="text-purple-700 text-sm mt-1">
+                          Enhanced submission with blockchain verification will be enabled automatically when files are uploaded.
+                        </p>
+                        <p className="text-purple-600 text-xs mt-2">
+                          Features: File merging, QR generation, blockchain verification, court-admissible proofs
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex justify-end gap-4 pt-6">

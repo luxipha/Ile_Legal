@@ -1555,7 +1555,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           try {
             // Upload file to documents bucket
-            const { data, error } = await supabase.storage
+            const { error } = await supabase.storage
               .from('documents')
               .upload(filepath, file, {
                 cacheControl: '3600',

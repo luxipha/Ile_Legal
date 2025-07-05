@@ -3,6 +3,8 @@ import { ipfsService, IPFSUploadResult } from './ipfsService';
 import { reputationService } from './reputationService';
 import { generateRandom12DigitId } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { filecoinFileMergeService } from './filecoinFileMergeService';
+import { blockchainVerifiedSubmissionService } from './blockchainVerifiedSubmissionService';
 
 
 // Mock API service for frontend-only development
@@ -1498,63 +1500,113 @@ export const api = {
         txId?: string;
       }>;
       use_ipfs?: boolean;
+      enable_file_merge?: boolean;
+      enable_blockchain_verification?: boolean;
     }) => {
+      const debugId = `SUBMISSION_${Date.now()}`;
+      console.log(`🚀 [${debugId}] Starting enhanced submission with file merge and QR generation:`, {
+        gigId: submissionData.gig_id,
+        fileCount: submissionData.deliverables ? Array.from(submissionData.deliverables).length : 0,
+        enableFileMerge: submissionData.enable_file_merge,
+        enableBlockchainVerification: submissionData.enable_blockchain_verification,
+        useIpfs: submissionData.use_ipfs
+      });
+
       let deliverableFilenames: string[] = [];
       let ipfsResults: IPFSUploadResult[] = [];
+      let mergedFileResult: any = null;
+      let blockchainVerificationResult: any = null;
       
       // Upload files if they exist
       if (submissionData.deliverables) {
         // Convert FileList to array of Files
         const files = Array.from(submissionData.deliverables);
         
-        if (submissionData.use_ipfs) {
-          // Upload to IPFS
-          console.log('Uploading files to IPFS...');
+        // 🔄 NEW: File Merge Integration
+        if (submissionData.enable_file_merge && files.length > 1) {
+          console.log(`📦 [${debugId}] Merging ${files.length} files into single bundle...`);
           try {
-            const ipfsUploadPromises = files.map(async (file) => {
-              // Generate hash if blockchain verification is enabled
-              let fileHash: string | undefined;
-              if (submissionData.blockchain_hashes?.some(bh => bh.fileName === file.name)) {
-                const { HashUtils } = await import('../components/blockchain/shared/hashUtils');
-                const fileResult = await HashUtils.hashFile(file);
-                fileHash = HashUtils.createDocumentHash(fileResult).hash;
-              }
-              
-              return await ipfsService.uploadFile(file, {
-                hash: fileHash
-              });
+            mergedFileResult = await filecoinFileMergeService.mergeAndStoreFiles(files, {
+              mergeStrategy: 'json_bundle',
+              includeMetadata: true,
+              description: `Merged deliverables for gig ${submissionData.gig_id}`
             });
             
-            ipfsResults = await Promise.all(ipfsUploadPromises);
-            deliverableFilenames = ipfsResults.map(result => result.cid);
+            console.log(`✅ [${debugId}] File merge completed:`, {
+              mergedCid: mergedFileResult.filecoinCid,
+              pieceCid: mergedFileResult.pieceCid,
+              originalCount: mergedFileResult.metadata.originalCount,
+              compressionRatio: mergedFileResult.metadata.compressionRatio
+            });
             
-            console.log('Files uploaded to IPFS:', ipfsResults);
-          } catch (ipfsError) {
-            console.error('IPFS upload failed, falling back to Supabase:', ipfsError);
-            // Fallback to Supabase if IPFS fails
-            submissionData.use_ipfs = false;
+            // Use merged file for deliverables
+            deliverableFilenames = [mergedFileResult.filecoinCid];
+            ipfsResults = [{
+              cid: mergedFileResult.filecoinCid,
+              size: mergedFileResult.metadata.mergedSize,
+              name: mergedFileResult.mergedFile.name,
+              url: `https://ipfs.io/ipfs/${mergedFileResult.filecoinCid}`,
+              pieceId: mergedFileResult.pieceCid
+            }];
+            
+          } catch (mergeError) {
+            console.warn(`⚠️ [${debugId}] File merge failed, proceeding with individual files:`, mergeError);
+            submissionData.enable_file_merge = false;
           }
         }
         
-        if (!submissionData.use_ipfs) {
-          // Upload to Supabase storage (fallback or default)
-          console.log('Uploading files to Supabase storage...');
-          const uploadPromises = files.map(async (file) => {
-            const filePath = `${submissionData.gig_id}/${file.name}`;
-            
-            const { error: uploadError } = await supabase.storage
-              .from('deliverables')
-              .upload(filePath, file, { contentType: file.type });
+        // Original upload logic if merge is disabled or failed
+        if (!submissionData.enable_file_merge || !mergedFileResult) {
+          if (submissionData.use_ipfs) {
+            // Upload to IPFS
+            console.log(`⬆️ [${debugId}] Uploading ${files.length} files to IPFS...`);
+            try {
+              const ipfsUploadPromises = files.map(async (file) => {
+                // Generate hash if blockchain verification is enabled
+                let fileHash: string | undefined;
+                if (submissionData.blockchain_hashes?.some(bh => bh.fileName === file.name)) {
+                  const { HashUtils } = await import('../components/blockchain/shared/hashUtils');
+                  const fileResult = await HashUtils.hashFile(file);
+                  fileHash = HashUtils.createDocumentHash(fileResult).hash;
+                }
+                
+                return await ipfsService.uploadFile(file, {
+                  hash: fileHash
+                });
+              });
               
-            if (uploadError) {
-              console.error('Upload error:', uploadError);
-              throw uploadError;
+              ipfsResults = await Promise.all(ipfsUploadPromises);
+              deliverableFilenames = ipfsResults.map(result => result.cid);
+              
+              console.log(`✅ [${debugId}] Files uploaded to IPFS:`, ipfsResults.length);
+            } catch (ipfsError) {
+              console.error(`❌ [${debugId}] IPFS upload failed, falling back to Supabase:`, ipfsError);
+              // Fallback to Supabase if IPFS fails
+              submissionData.use_ipfs = false;
             }
-            
-            return file.name;
-          });
+          }
           
-          deliverableFilenames = await Promise.all(uploadPromises);
+          if (!submissionData.use_ipfs) {
+            // Upload to Supabase storage (fallback or default)
+            console.log(`📁 [${debugId}] Uploading ${files.length} files to Supabase storage...`);
+            const uploadPromises = files.map(async (file) => {
+              const filePath = `${submissionData.gig_id}/${file.name}`;
+              
+              const { error: uploadError } = await supabase.storage
+                .from('deliverables')
+                .upload(filePath, file, { contentType: file.type });
+                
+              if (uploadError) {
+                console.error('Upload error:', uploadError);
+                throw uploadError;
+              }
+              
+              return file.name;
+            });
+            
+            deliverableFilenames = await Promise.all(uploadPromises);
+            console.log(`✅ [${debugId}] Files uploaded to Supabase storage`);
+          }
         }
       }
 
@@ -1564,18 +1616,61 @@ export const api = {
         throw new Error('User must be logged in to submit work');
       }
 
+      // 🔗 NEW: Blockchain Verification & QR Generation
+      if (submissionData.enable_blockchain_verification && deliverableFilenames.length > 0) {
+        console.log(`⛓️ [${debugId}] Creating blockchain verification for submission...`);
+        try {
+          // Create blockchain verification with the uploaded files
+          const files = submissionData.deliverables ? Array.from(submissionData.deliverables) : [];
+          blockchainVerificationResult = await blockchainVerifiedSubmissionService.submitVerifiedWork({
+            workSubmissionId: submissionData.gig_id,
+            files: files,
+            description: `Deliverables for gig ${submissionData.gig_id}`,
+            blockchainNetwork: 'algorand'
+          });
+
+          console.log(`✅ [${debugId}] Blockchain verification completed:`, {
+            submissionId: blockchainVerificationResult.submissionId,
+            isVerified: blockchainVerificationResult.isVerified,
+            transactionId: blockchainVerificationResult.blockchainProof?.transactionId,
+            qrCodeGenerated: !!blockchainVerificationResult.qrCodeData
+          });
+
+        } catch (verificationError) {
+          console.warn(`⚠️ [${debugId}] Blockchain verification failed, proceeding without:`, verificationError);
+        }
+      }
+
+      // Create the Work Submission record with enhanced data
+      const submissionRecord = {
+        gig_id: submissionData.gig_id,
+        seller_id: user.id,
+        deliverables: deliverableFilenames,
+        notes: submissionData.notes || '',
+        blockchain_hashes: submissionData.blockchain_hashes || [],
+        status: 'submitted',
+        storage_type: submissionData.use_ipfs ? 'ipfs' : 'supabase',
+        ipfs_data: submissionData.use_ipfs ? ipfsResults : null,
+        // Enhanced fields
+        file_merge_data: mergedFileResult ? {
+          merged_cid: mergedFileResult.filecoinCid,
+          piece_cid: mergedFileResult.pieceCid,
+          original_count: mergedFileResult.metadata.originalCount,
+          compression_ratio: mergedFileResult.metadata.compressionRatio,
+          merge_strategy: 'json_bundle'
+        } : null,
+        blockchain_verification_data: blockchainVerificationResult ? {
+          submission_id: blockchainVerificationResult.submissionId,
+          is_verified: blockchainVerificationResult.isVerified,
+          blockchain_proof: blockchainVerificationResult.blockchainProof,
+          qr_code_data: blockchainVerificationResult.qrCodeData,
+          offline_verification_hash: blockchainVerificationResult.offlineVerificationHash
+        } : null
+      };
+
       const { data, error } = await supabase
         .from('Work Submissions')
-        .insert({
-          gig_id: submissionData.gig_id,
-          seller_id: user.id,
-          deliverables: deliverableFilenames,
-          notes: submissionData.notes || '',
-          blockchain_hashes: submissionData.blockchain_hashes || [],
-          status: 'submitted',
-          storage_type: submissionData.use_ipfs ? 'ipfs' : 'supabase',
-          ipfs_data: submissionData.use_ipfs ? ipfsResults : null
-        });
+        .insert(submissionRecord);
 
       if (error) {
         throw error;
@@ -1591,7 +1686,34 @@ export const api = {
         // Don't throw error here as the submission was created successfully
       }
 
-      return data;
+      console.log(`🎉 [${debugId}] Enhanced submission completed successfully:`, {
+        submissionId: Array.isArray(data) && (data as any[])?.length > 0 ? (data[0] as any)?.id : 'unknown',
+        filesMerged: !!mergedFileResult,
+        blockchainVerified: !!blockchainVerificationResult,
+        qrGenerated: !!blockchainVerificationResult?.qrCodeData
+      });
+
+      // Return enhanced data including QR code and verification info
+      const enhancedResult = {
+        submission: data,
+        enhanced_features: {
+          file_merge: mergedFileResult ? {
+            enabled: true,
+            merged_cid: mergedFileResult.filecoinCid,
+            compression_ratio: mergedFileResult.metadata.compressionRatio,
+            original_file_count: mergedFileResult.metadata.originalCount
+          } : { enabled: false },
+          blockchain_verification: blockchainVerificationResult ? {
+            enabled: true,
+            is_verified: blockchainVerificationResult.isVerified,
+            qr_code_data: blockchainVerificationResult.qrCodeData,
+            transaction_id: blockchainVerificationResult.blockchainProof?.transactionId,
+            offline_hash: blockchainVerificationResult.offlineVerificationHash
+          } : { enabled: false }
+        }
+      };
+
+      return enhancedResult;
     },
 
     getSubmissionsByGig: async (gigId: string) => {
