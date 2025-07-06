@@ -11,7 +11,7 @@
  * - Storage verification and replication monitoring
  */
 
-import { filecoinStorageService } from './filecoinStorageService';
+import { ipfsService } from './ipfsService';
 import { HashUtils } from '../components/blockchain/shared/hashUtils';
 import { fvmContractService } from './fvmContractService';
 

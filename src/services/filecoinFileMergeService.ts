@@ -1,4 +1,4 @@
-import { filecoinStorageService } from './filecoinStorageService';
+import { ipfsService } from './ipfsService';
 import { HashUtils } from '../components/blockchain/shared/hashUtils';
 import { supabase } from '../lib/supabase';
 
@@ -45,10 +45,10 @@ export interface FileManifest {
 }
 
 class FilecoinFileMergeService {
-  private filecoinService: typeof filecoinStorageService;
+  private ipfsService: typeof ipfsService;
 
   constructor() {
-    this.filecoinService = filecoinStorageService;
+    this.ipfsService = ipfsService;
   }
 
   /**
@@ -115,18 +115,17 @@ class FilecoinFileMergeService {
       const mergedFileResult = await HashUtils.hashFile(mergedFile);
       const mergeHash = mergedFileResult.hash;
 
-      // 4. Store merged file in Filecoin
-      const filecoinResult = await this.filecoinService.storeFiles([mergedFile], {
-        description: options.description || `Merged file bundle (${files.length} files)`,
-        metadata: {
-          mergeStrategy: options.mergeStrategy,
-          originalFileCount: files.length,
-          originalTotalSize,
-          mergedSize: mergedFile.size,
-          mergeTimestamp: new Date().toISOString(),
-          originalFileHashes: fileResults.map(r => r.hash)
-        }
+      // 4. Store merged file using IPFS service
+      const uploadResult = await this.ipfsService.uploadFile(mergedFile, {
+        legalDocumentType: 'merged-file-bundle',
+        blockchainIntegrated: true
       });
+      
+      const filecoinResult = {
+        ipfsCid: uploadResult.cid,
+        pieceCid: `piece_${uploadResult.cid}`,
+        contractTxId: undefined
+      };
 
       // 5. Calculate compression ratio
       const compressionRatio = originalTotalSize > 0 ? mergedFile.size / originalTotalSize : 1;

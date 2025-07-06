@@ -1,9 +1,12 @@
-import { create, IPFSHTTPClient } from 'kubo-rpc-client';
+import { create } from 'kubo-rpc-client';
 
 // IPFS configuration
 const IPFS_URL = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_IPFS_URL : process.env.VITE_IPFS_URL) || 'https://ipfs.algonode.xyz';
 const ALGORAND_IPFS_TOKEN = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_ALGORAND_IPFS_TOKEN : process.env.VITE_ALGORAND_IPFS_TOKEN) || '';
 const ALGORAND_NETWORK = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_ALGORAND_NETWORK : process.env.VITE_ALGORAND_NETWORK) || 'testnet';
+const WEB3_STORAGE_PRIVATE_KEY = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_WEB3_STORAGE_PRIVATE_KEY : process.env.VITE_WEB3_STORAGE_PRIVATE_KEY) || '';
+const WEB3_STORAGE_SPACE_DID = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_WEB3_STORAGE_SPACE_DID : process.env.VITE_WEB3_STORAGE_SPACE_DID) || '';
+const WEB3_STORAGE_PROOF = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_WEB3_STORAGE_PROOF : process.env.VITE_WEB3_STORAGE_PROOF) || '';
 
 export interface IPFSUploadResult {
   cid: string;
@@ -29,7 +32,7 @@ export interface IPFSFileMetadata {
 }
 
 class IPFSService {
-  private client: IPFSHTTPClient | null = null;
+  private client: any | null = null;
 
   constructor() {
     this.initializeClient();
@@ -39,8 +42,13 @@ class IPFSService {
     try {
       // Try different IPFS endpoints in order of preference
       const endpoints = [
-        // Local IPFS node (development)
-        { url: 'http://localhost:5001', name: 'Local IPFS' },
+        // Web3.Storage as primary production endpoint
+        ...(WEB3_STORAGE_PRIVATE_KEY ? [{ 
+          url: 'web3-storage', 
+          name: 'Web3.Storage', 
+          requiresAuth: true,
+          isWeb3Storage: true 
+        }] : []),
         // Algorand IPFS (production) - only if token is available
         ...(ALGORAND_IPFS_TOKEN ? [{ 
           url: IPFS_URL, 
@@ -52,6 +60,14 @@ class IPFSService {
 
       for (const endpoint of endpoints) {
         try {
+          // Special handling for Web3.Storage (not a traditional IPFS client)
+          if (endpoint.isWeb3Storage) {
+            console.log(`🌐 Web3.Storage integration available for production uploads`);
+            // Don't create a traditional IPFS client for Web3.Storage
+            // This will be handled in uploadFile method
+            continue;
+          }
+
           let clientConfig: any = { url: endpoint.url };
           
           // Add auth for Algorand IPFS if token is available
@@ -81,6 +97,13 @@ class IPFSService {
         }
       }
       
+      // If all traditional endpoints fail, check if Web3.Storage is available
+      if (WEB3_STORAGE_PRIVATE_KEY) {
+        console.log('🚀 Using Web3.Storage as primary upload service');
+        this.client = null; // Will use Web3.Storage in uploadFile method
+        return;
+      }
+      
       // If all endpoints fail, create a mock client for development
       console.warn('No IPFS endpoint available, using mock implementation for development');
       this.client = null;
@@ -98,18 +121,14 @@ class IPFSService {
    */
   async uploadFile(file: File, metadata?: Partial<IPFSFileMetadata>): Promise<IPFSUploadResult> {
     if (!this.client) {
-      // Mock implementation for development when IPFS is not available
-      console.warn('IPFS not available, using mock implementation');
-      
-      // Generate a mock CID based on file content
-      const mockCid = await this.generateMockCID(file);
-      
-      return {
-        cid: mockCid,
-        path: file.name,
-        size: file.size,
-        url: `https://ipfs.io/ipfs/${mockCid}`
-      };
+      // Try Web3.Storage NEW API for production IPFS upload
+      console.log('🚀 Using Web3.Storage NEW API for production upload');
+      try {
+        return await this.uploadToWeb3StorageNew(file);
+      } catch (web3Error: any) {
+        console.error('Web3.Storage upload failed:', web3Error);
+        throw new Error(`PRODUCTION ERROR: Web3.Storage upload failed - ${web3Error?.message || 'Unknown error'}`);
+      }
     }
 
     try {
@@ -158,36 +177,78 @@ class IPFSService {
     } catch (error) {
       console.error('Error uploading file to IPFS:', error);
       
-      // Fallback to mock implementation if real IPFS fails
-      console.warn('IPFS upload failed, falling back to mock implementation');
-      const mockCid = await this.generateMockCID(file);
-      
-      return {
-        cid: mockCid,
-        path: file.name,
-        size: file.size,
-        url: `https://ipfs.io/ipfs/${mockCid}`
-      };
+      // Try Web3.Storage as fallback for production IPFS upload
+      console.log('🔄 IPFS upload failed, trying Web3.Storage fallback');
+      try {
+        return await this.uploadToWeb3StorageNew(file);
+      } catch (web3Error: any) {
+        console.error('Web3.Storage fallback also failed:', web3Error);
+        throw new Error(`PRODUCTION ERROR: All IPFS services failed - ${web3Error?.message || 'Unknown error'}`);
+      }
     }
   }
 
   /**
-   * Generate a mock CID for development purposes
-   * @param file - File to generate CID for
-   * @returns Promise with mock CID
+   * Upload file to Web3.Storage using w3up client with UCAN authentication
+   * @param file - File to upload
+   * @returns Promise with upload result
    */
-  private async generateMockCID(file: File): Promise<string> {
-    // Create a hash-like string based on file properties
-    const content = `${file.name}-${file.size}-${file.lastModified}`;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(content);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  private async uploadToWeb3StorageNew(file: File): Promise<IPFSUploadResult> {
+    console.log('🌐 Uploading to Web3.Storage using w3up with UCAN...');
     
-    // Format like a real IPFS CID (QmHash format)
-    return `Qm${hashHex.substring(0, 44)}`;
+    if (!WEB3_STORAGE_PRIVATE_KEY || !WEB3_STORAGE_PROOF) {
+      throw new Error('Web3.Storage configuration missing - need PRIVATE_KEY and PROOF delegation');
+    }
+    
+    try {
+      // Import the new w3up client modules and utilities
+      const { create } = await import('@web3-storage/w3up-client');
+      const { StoreMemory } = await import('@web3-storage/w3up-client/stores/memory');
+      const Proof = await import('@web3-storage/w3up-client/proof');
+      const { Signer } = await import('@web3-storage/w3up-client/principal/ed25519');
+      
+      console.log('🔐 Creating UCAN client with delegation...');
+      
+      // Create client with specific private key
+      const principal = Signer.parse(WEB3_STORAGE_PRIVATE_KEY);
+      const store = new StoreMemory();
+      const client = await create({ principal, store });
+      
+      // Add proof that this agent has been delegated capabilities on the space
+      console.log('📜 Adding delegation proof...');
+      const proof = await Proof.parse(WEB3_STORAGE_PROOF);
+      const space = await client.addSpace(proof);
+      await client.setCurrentSpace(space.did());
+      
+      // Upload the file to the space
+      console.log('📤 Uploading file to Web3.Storage space...');
+      const cid = await client.uploadFile(file);
+      
+      console.log('✅ Web3.Storage UCAN upload successful:', cid.toString());
+      console.log('🔗 Production IPFS URL:', `https://${cid}.ipfs.w3s.link`);
+      
+      return {
+        cid: cid.toString(),
+        path: file.name,
+        size: file.size,
+        url: this.getIPFSUrl(cid.toString())
+      };
+      
+    } catch (w3upError: any) {
+      console.error('❌ Web3.Storage UCAN upload failed:', {
+        error: w3upError?.message || 'Unknown error',
+        stack: w3upError?.stack,
+        hasPrivateKey: !!WEB3_STORAGE_PRIVATE_KEY,
+        hasSpaceDid: !!WEB3_STORAGE_SPACE_DID,
+        fileName: file.name,
+        fileSize: file.size
+      });
+      
+      // No fallback to old API - new system only
+      throw new Error(`Web3.Storage UCAN upload failed: ${w3upError?.message || 'Unknown error'}`);
+    }
   }
+
 
   /**
    * Upload multiple files to IPFS as a directory
@@ -197,11 +258,18 @@ class IPFSService {
    */
   async uploadFiles(files: File[], directoryName?: string): Promise<IPFSUploadResult[]> {
     if (!this.client) {
-      throw new Error('IPFS client not initialized');
+      // Use Web3.Storage for multiple file upload
+      console.log('📦 Uploading multiple files via Web3.Storage UCAN...');
+      const results: IPFSUploadResult[] = [];
+      for (const file of files) {
+        const result = await this.uploadFile(file);
+        results.push(result);
+      }
+      return results;
     }
 
     try {
-      const uploadPromises = files.map(async (file, index) => {
+      const uploadPromises = files.map(async (file) => {
         const fileBuffer = await file.arrayBuffer();
         const uint8Array = new Uint8Array(fileBuffer);
         
@@ -310,11 +378,17 @@ class IPFSService {
   }
 
   /**
-   * Get public IPFS URL for a CID
+   * Get public IPFS URL for a CID with CDN optimization
    * @param cid - Content Identifier
-   * @returns Public IPFS URL
+   * @returns Public IPFS URL (with CDN preference for Web3.Storage CIDs)
    */
   getIPFSUrl(cid: string): string {
+    // Check if this might be a Web3.Storage CID and prefer their CDN
+    if (WEB3_STORAGE_PRIVATE_KEY && (cid.startsWith('bafybei') || cid.startsWith('bafkrei'))) {
+      // Use Web3.Storage CDN for optimal performance
+      return `https://${cid}.ipfs.w3s.link`;
+    }
+    
     // Use multiple gateways for redundancy
     const gateways = [
       'https://ipfs.io/ipfs/',
@@ -328,28 +402,40 @@ class IPFSService {
   }
 
   /**
-   * Get multiple gateway URLs for redundancy
+   * Get multiple gateway URLs for redundancy with CDN optimization
    * @param cid - Content Identifier
-   * @returns Array of gateway URLs
+   * @returns Array of gateway URLs (CDN-optimized when available)
    */
   getGatewayUrls(cid: string): string[] {
-    const gateways = [
+    const gateways = [];
+    
+    // Prioritize Web3.Storage CDN if available and CID looks compatible
+    if (WEB3_STORAGE_PRIVATE_KEY && (cid.startsWith('bafybei') || cid.startsWith('bafkrei'))) {
+      gateways.push(
+        `https://${cid}.ipfs.w3s.link`,        // Web3.Storage CDN (fastest)
+        `https://w3s.link/ipfs/${cid}`,        // Web3.Storage gateway
+      );
+    }
+    
+    // Standard IPFS gateways
+    gateways.push(
       'https://ipfs.io/ipfs/',
       'https://gateway.pinata.cloud/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
       'https://dweb.link/ipfs/'
-    ];
+    );
     
-    return gateways.map(gateway => `${gateway}${cid}`);
+    return gateways.map(gateway => 
+      gateway.includes(cid) ? gateway : `${gateway}${cid}`
+    );
   }
 
   /**
    * Submit file hash to Algorand blockchain for verification
-   * @param cid - IPFS Content Identifier
    * @param fileHash - SHA-256 hash of the file
    * @returns Promise with Algorand transaction ID
    */
-  async submitToAlgorandBlockchain(cid: string, fileHash: string): Promise<string> {
+  async submitToAlgorandBlockchain(fileHash: string): Promise<string> {
     try {
       // Import the working Algorand service class
       const { AlgorandService } = await import('../components/blockchain/shared/algorandService');
@@ -370,12 +456,49 @@ class IPFSService {
    * Test IPFS connection
    * @returns Promise with connection status
    */
-  async testConnection(): Promise<{ connected: boolean; nodeId?: string; error?: string; algorandIntegrated?: boolean }> {
+  async testConnection(): Promise<{ connected: boolean; nodeId?: string; error?: string; algorandIntegrated?: boolean; web3StorageAvailable?: boolean }> {
+    // Check for Web3.Storage UCAN availability first
+    if (!this.client && WEB3_STORAGE_PRIVATE_KEY && WEB3_STORAGE_PROOF) {
+      try {
+        // Test Web3.Storage UCAN configuration  
+        const { create } = await import('@web3-storage/w3up-client');
+        const { StoreMemory } = await import('@web3-storage/w3up-client/stores/memory');
+        const Proof = await import('@web3-storage/w3up-client/proof');
+        const { Signer } = await import('@web3-storage/w3up-client/principal/ed25519');
+        
+        // Test delegation setup
+        const principal = Signer.parse(WEB3_STORAGE_PRIVATE_KEY);
+        const client = await create({ principal, store: new StoreMemory() });
+        const proof = await Proof.parse(WEB3_STORAGE_PROOF);
+        await client.addSpace(proof);
+        
+        console.log('🌐 Web3.Storage UCAN service available for uploads');
+        return { 
+          connected: true, 
+          nodeId: `w3s-delegated-agent`,
+          error: undefined,
+          algorandIntegrated: false,
+          web3StorageAvailable: true
+        };
+      } catch (error) {
+        console.warn('Web3.Storage UCAN test failed:', error);
+        return { 
+          connected: false, 
+          error: `Web3.Storage UCAN configuration invalid: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          algorandIntegrated: false,
+          web3StorageAvailable: false
+        };
+      }
+    }
+
     if (!this.client) {
       return { 
         connected: false, 
-        error: 'IPFS not available - using mock implementation for development',
-        algorandIntegrated: false
+        error: WEB3_STORAGE_PRIVATE_KEY ? 
+          'Traditional IPFS not available - using Web3.Storage for uploads' : 
+          'No IPFS service available - using mock implementation for development',
+        algorandIntegrated: false,
+        web3StorageAvailable: !!WEB3_STORAGE_PRIVATE_KEY
       };
     }
 
@@ -389,14 +512,29 @@ class IPFSService {
       return { 
         connected: true, 
         nodeId: nodeInfo.id,
-        algorandIntegrated: isAlgorandIPFS
+        algorandIntegrated: isAlgorandIPFS,
+        web3StorageAvailable: !!WEB3_STORAGE_PRIVATE_KEY
       };
     } catch (error) {
       console.error('IPFS connection test failed:', error);
+      
+      // Check if Web3.Storage UCAN is available as fallback
+      if (WEB3_STORAGE_PRIVATE_KEY && WEB3_STORAGE_PROOF) {
+        console.log('🔄 Traditional IPFS failed, but Web3.Storage UCAN is available');
+        return { 
+          connected: true, 
+          nodeId: 'web3-storage-ucan-fallback',
+          error: `Traditional IPFS failed: ${error instanceof Error ? error.message : 'Unknown error'} - Using Web3.Storage UCAN`,
+          algorandIntegrated: false,
+          web3StorageAvailable: true
+        };
+      }
+      
       return { 
         connected: false, 
         error: error instanceof Error ? error.message : 'Unknown error',
-        algorandIntegrated: false
+        algorandIntegrated: false,
+        web3StorageAvailable: false
       };
     }
   }

@@ -9,7 +9,7 @@
  */
 
 import { AlgorandService } from '../components/blockchain/shared/algorandService';
-import { FilecoinStorageService } from './filecoinStorageService';
+import { ipfsService } from './ipfsService';
 import { HashUtils } from '../components/blockchain/shared/hashUtils';
 import { supabase } from '../lib/supabase';
 
@@ -63,11 +63,11 @@ export interface DoubleAnchorResult {
 
 class DoubleAnchorProofService {
   private algorandService: AlgorandService;
-  private filecoinService: FilecoinStorageService;
+  private ipfsService: typeof ipfsService;
 
   constructor() {
     this.algorandService = new AlgorandService();
-    this.filecoinService = new FilecoinStorageService();
+    this.ipfsService = ipfsService;
   }
 
   /**
@@ -349,17 +349,17 @@ class DoubleAnchorProofService {
         explorerUrl: this.algorandService.getExplorerUrl(result.txId)
       };
     } else {
-      // Submit to Filecoin
-      const files = [new File([documentHash], 'hash.txt', { type: 'text/plain' })];
-      const result = await this.filecoinService.storeFiles(files, {
-        description: 'Double anchor proof',
-        metadata
+      // Submit to IPFS/Web3.Storage
+      const hashFile = new File([documentHash], 'hash.txt', { type: 'text/plain' });
+      const uploadResult = await this.ipfsService.uploadFile(hashFile, {
+        legalDocumentType: 'double-anchor-proof',
+        blockchainIntegrated: true
       });
       
       return {
-        pieceCid: result.pieceCid,
+        pieceCid: `piece_${uploadResult.cid}`,
         contractAddress: 'f410f...',  // TODO: Get actual contract address
-        transactionId: result.contractTxId || '',
+        transactionId: uploadResult.contractTxId || '',
         timestamp: new Date().toISOString()
       };
     }

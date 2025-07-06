@@ -1658,14 +1658,9 @@ export const api = {
           original_count: mergedFileResult.metadata.originalCount,
           compression_ratio: mergedFileResult.metadata.compressionRatio,
           merge_strategy: 'json_bundle'
-        } : null,
-        blockchain_verification_data: blockchainVerificationResult ? {
-          submission_id: blockchainVerificationResult.submissionId,
-          is_verified: blockchainVerificationResult.isVerified,
-          blockchain_proof: blockchainVerificationResult.blockchainProof,
-          qr_code_data: blockchainVerificationResult.qrCodeData,
-          offline_verification_hash: blockchainVerificationResult.offlineVerificationHash
         } : null
+        // Note: blockchain_verification_data removed - column doesn't exist in database
+        // Blockchain verification data is stored separately in blockchain_verifications table
       };
 
       const { data, error } = await supabase

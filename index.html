@@ -19,6 +19,15 @@
   </head>
   <body>
     <div id="app"></div>
+    <script type="module">
+      // Buffer polyfill for Web3.Storage
+      import { Buffer } from 'buffer';
+      window.Buffer = Buffer;
+      globalThis.Buffer = Buffer;
+      if (typeof global !== 'undefined') {
+        global.Buffer = Buffer;
+      }
+    </script>
     <script type="module" src="./src/index.tsx"></script>
   </body>
 </html>

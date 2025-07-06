@@ -343,12 +343,21 @@ export const SellerDashboard = (): JSX.Element => {
       return;
     }
     console.log("selectedGig:", selectedGig);
+    
+    // Validate buyer_id before submitting
+    const buyerId = selectedGig.buyer_id || selectedGig.buyer?.id;
+    if (!buyerId) {
+      console.error('Missing buyer_id in selectedGig:', selectedGig);
+      alert('Unable to submit bid: buyer information is missing. Please refresh and try again.');
+      return;
+    }
+    
     try {
       await api.bids.createBid(
         selectedGig.id,
         Number(bidFormData.bidAmount),
         bidFormData.proposal,
-        selectedGig.buyer_id || ""
+        buyerId
       );
 
       // Reset form and return to dashboard
@@ -387,7 +396,9 @@ export const SellerDashboard = (): JSX.Element => {
         deliverables: files,
         notes: submitWorkData.description,
         blockchain_hashes: blockchainHashes,
-        use_ipfs: true // Always use IPFS with secure upload
+        use_ipfs: true, // Always use IPFS with secure upload
+        enable_file_merge: true, // Enable file merge + PDF generation
+        enable_blockchain_verification: true // Enable QR code generation + blockchain verification
       });
       
       // Reset form and go back to dashboard

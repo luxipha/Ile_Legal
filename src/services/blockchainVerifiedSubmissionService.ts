@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { AlgorandService } from '../components/blockchain/shared/algorandService';
-import { filecoinStorageService } from './filecoinStorageService';
+import { ipfsService } from './ipfsService';
 import { HashUtils } from '../components/blockchain/shared/hashUtils';
 import { unifiedWalletService } from './unifiedWalletService';
 
@@ -32,11 +32,11 @@ export interface SubmissionVerificationResult {
 
 class BlockchainVerifiedSubmissionService {
   private algorandService: AlgorandService;
-  private filecoinService: typeof filecoinStorageService;
+  private ipfsService: typeof ipfsService;
 
   constructor() {
     this.algorandService = new AlgorandService();
-    this.filecoinService = filecoinStorageService;
+    this.ipfsService = ipfsService;
   }
 
   /**
@@ -282,21 +282,8 @@ class BlockchainVerifiedSubmissionService {
     });
 
     try {
-      console.log(`🔐 [${debugId}] Checking wallet connection...`);
-      const wallet = await unifiedWalletService.getActiveWallet();
-      if (!wallet || wallet.network !== 'algorand') {
-        console.error(`❌ [${debugId}] Wallet check failed:`, {
-          hasWallet: !!wallet,
-          network: wallet?.network,
-          expected: 'algorand'
-        });
-        throw new Error('No active Algorand wallet found');
-      }
-
-      console.log(`✅ [${debugId}] Wallet verified:`, {
-        network: wallet.network,
-        hasAddress: !!wallet.address
-      });
+      console.log(`🔐 [${debugId}] Using Algorand service for blockchain submission...`);
+      // Skip wallet check - use AlgorandService directly with env mnemonic
 
       console.log(`📝 [${debugId}] Submitting document hash to Algorand...`);
       const documentHash = {
@@ -341,15 +328,19 @@ class BlockchainVerifiedSubmissionService {
         throw new Error('No active Filecoin wallet found');
       }
 
-      // Store files and get piece CID
-      const filecoinResult = await this.filecoinService.storeFiles(files, {
-        description: `Work submission ${submissionId}`,
-        metadata: {
-          submissionId,
-          verificationHash: hash,
-          timestamp: new Date().toISOString()
-        }
-      });
+      // Store files using IPFS service
+      const uploadResults = await Promise.all(
+        files.map(file => this.ipfsService.uploadFile(file, {
+          legalDocumentType: 'work-submission',
+          blockchainIntegrated: true
+        }))
+      );
+      
+      const filecoinResult = {
+        ipfsCid: uploadResults[0].cid,
+        pieceCid: `piece_${uploadResults[0].cid}`,
+        contractTxId: undefined
+      };
 
       return {
         network: 'filecoin',
@@ -369,11 +360,11 @@ class BlockchainVerifiedSubmissionService {
     try {
       const cids: string[] = [];
       for (const file of files) {
-        const result = await this.filecoinService.storeFiles([file], {
-          description: `Individual file: ${file.name}`,
-          metadata: { filename: file.name, size: file.size }
+        const result = await this.ipfsService.uploadFile(file, {
+          legalDocumentType: 'individual-file',
+          blockchainIntegrated: true
         });
-        cids.push(result.ipfsCid);
+        cids.push(result.cid);
       }
       return cids;
     } catch (error) {

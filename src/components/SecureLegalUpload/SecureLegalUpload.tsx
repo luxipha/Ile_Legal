@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { ipfsService, IPFSUploadResult } from '../../services/ipfsService';
-import { enhancedIPFSService } from '../../services/filecoinStorageService';
 import { InstantDocumentViewer } from '../InstantDocumentViewer/InstantDocumentViewer';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -103,10 +102,10 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
       // Step 1: Upload with enhanced Filecoin support
       result.status = 'uploading';
       
-      // Use enhanced IPFS service with optional Filecoin storage
-      const uploadResult = await enhancedIPFSService.uploadWithFilecoin(file, {
-        useFilecoin: true, // Enable Filecoin for enhanced storage
-        storageDuration: 365 // 1 year storage
+      // Use enhanced IPFS service (now with Web3.Storage integration)
+      const uploadResult = await ipfsService.uploadFile(file, {
+        legalDocumentType: 'court-admissible',
+        blockchainIntegrated: true
       });
 
       result.ipfsCid = uploadResult.cid;
@@ -114,11 +113,11 @@ export const SecureLegalUpload: React.FC<SecureLegalUploadProps> = ({
       result.metadata.verification.permanentStorage = true;
       result.metadata.verification.encrypted = true;
       
-      // Add Filecoin-specific metadata if available
+      // Add Web3.Storage metadata if available
       if (uploadResult.pieceId) {
         result.metadata.filecoinPieceId = uploadResult.pieceId;
         result.metadata.filecoinStorageCost = uploadResult.storageCost;
-        console.log(`🚀 Filecoin piece ID: ${uploadResult.pieceId}`);
+        console.log(`🚀 Web3.Storage piece ID: ${uploadResult.pieceId}`);
       }
 
       // Step 2: Generate blockchain hash and submit to Algorand

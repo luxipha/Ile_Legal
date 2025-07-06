@@ -15,9 +15,11 @@ export default defineConfig({
   define: {
     global: 'globalThis',
     'process.env': JSON.stringify(process.env),
+    'process.version': JSON.stringify('v18.0.0'),
+    'process.platform': JSON.stringify('browser'),
   },
   optimizeDeps: {
-    include: ['algosdk'],
+    include: ['algosdk', 'buffer', 'process'],
     exclude: ['@zondax/filecoin-signing-tools'] // Exclude WASM modules from pre-bundling
   },
   worker: {
@@ -30,7 +32,8 @@ export default defineConfig({
       stream: 'stream-browserify',
       assert: 'assert',
       crypto: 'crypto-browserify',
-      util: 'util'
+      util: 'util',
+      process: 'process/browser'
     }
   }
 });
