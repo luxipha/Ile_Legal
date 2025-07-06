@@ -37,6 +37,7 @@ interface Bid {
   seller_rating?: number; // New API field
   completedJobs?: number; // Legacy field
   seller_completed_jobs?: number; // New API field
+  seller_verification_status?: string; // New API field
   amount: string | number;
   deliveryTime?: string;
   submittedDate?: string;
@@ -138,6 +139,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   const getBidSellerTitle = (bid: Bid): string => bid.seller_title || bid.title || 'Seller';
   const getBidSellerRating = (bid: Bid): number => bid.seller_rating || bid.rating || 0;
   const getBidSellerCompletedJobs = (bid: Bid): number => bid.seller_completed_jobs || bid.completedJobs || 0;
+  const getBidSellerVerificationStatus = (bid: Bid): string => bid.seller_verification_status || 'pending';
   const getBidAmount = (bid: Bid): string => {
     if (typeof bid.amount === 'string') return bid.amount;
     return `₦${bid.amount.toLocaleString()}`;
@@ -298,7 +300,8 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                 seller_avatar: profileData.avatar_url || profileData.name?.charAt(0)?.toUpperCase() || 'S',
                 seller_title: profileData.title || 'Legal Professional',
                 seller_rating: profileData.rating || 0,
-                seller_completed_jobs: profileData.completed_jobs || 0
+                seller_completed_jobs: profileData.completed_jobs || 0,
+                seller_verification_status: profileData.verification_status || 'pending'
               };
             }
             return {
@@ -307,7 +310,8 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               seller_avatar: 'S',
               seller_title: 'Legal Professional',
               seller_rating: 0,
-              seller_completed_jobs: 0
+              seller_completed_jobs: 0,
+              seller_verification_status: 'pending'
             };
           } catch (profileError) {
             console.log('Could not load seller profile for bid:', bid.id);
@@ -317,7 +321,8 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               seller_avatar: 'S',
               seller_title: 'Legal Professional',
               seller_rating: 0,
-              seller_completed_jobs: 0
+              seller_completed_jobs: 0,
+              seller_verification_status: 'pending'
             };
           }
         })
@@ -748,8 +753,35 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
                             <div>
-                              <h4 className="font-semibold text-gray-900">{getBidSellerName(bid)}</h4>
+                              <h4 className="font-semibold text-gray-900">
+                                <a 
+                                  href={`${window.location.origin}/profile/${bid.seller_id}`}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {getBidSellerName(bid)}
+                                </a>
+                              </h4>
                               <p className="text-gray-600">{getBidSellerTitle(bid)}</p>
+                              <div className="flex items-center gap-4 mt-1">
+                                <div className="flex items-center gap-1">
+                                  {renderStars(Math.floor(getBidSellerRating(bid)))}
+                                  <span className="text-sm text-gray-600">{getBidSellerRating(bid).toFixed(1)}</span>
+                                </div>
+                                <span className="text-sm text-gray-600">{getBidSellerCompletedJobs(bid)} jobs completed</span>
+                                <span className={`text-sm px-2 py-1 rounded-full ${
+                                  getBidSellerVerificationStatus(bid) === 'verified' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : getBidSellerVerificationStatus(bid) === 'rejected'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {getBidSellerVerificationStatus(bid) === 'verified' ? '✓ Verified' :
+                                   getBidSellerVerificationStatus(bid) === 'rejected' ? '✗ Rejected' :
+                                   '⏳ Pending'}
+                                </span>
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-2xl font-bold text-gray-900">{getBidAmount(bid)}</div>

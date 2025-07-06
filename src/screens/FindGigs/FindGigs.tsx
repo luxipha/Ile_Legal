@@ -58,8 +58,46 @@ export const FindGigs = (): JSX.Element => {
         setLoading(true);
         const data = await api.gigs.getAllGigs();
         
+        // Convert API gigs to Gig format with additional formatting
+        const formattedGigs: Gig[] = await Promise.all(data.map(async (gig: any) => {
+          // Get average rating for the buyer
+          let companyRating = 0;
+          try {
+            if (gig.buyer?.id) {
+              companyRating = await api.feedback.getAverageRating(gig.buyer.id);
+            }
+          } catch (error) {
+            console.error('Error fetching average rating:', error);
+          }
+
+          // Get projects posted count for the buyer
+          let projectsPosted = 0;
+          try {
+            if (gig.buyer?.id) {
+              const buyerGigs = await api.gigs.getMyGigs(gig.buyer.id);
+              projectsPosted = buyerGigs.length;
+            }
+          } catch (error) {
+            console.error('Error fetching buyer gigs:', error);
+          }
+
+          return {
+            ...gig,
+            company: gig.buyer?.first_name && gig.buyer?.last_name 
+              ? `${gig.buyer.first_name} ${gig.buyer.last_name}` 
+              : gig.buyer?.first_name || gig.buyer?.last_name || "Anonymous Client",
+            companyRating: companyRating,
+            projectsPosted: projectsPosted,
+            deliveryTime: "To be negotiated",
+            avatar: gig.buyer?.avatar_url,
+            buyer_id: gig.buyer?.id,
+            attachments: gig.attachments || [],
+            categories: gig.categories || []
+          };
+        }));
+        
         // Filter to show only gigs available for bidding (not ongoing or completed)
-        const availableForBidding = data.filter(gig => {
+        const availableForBidding = formattedGigs.filter(gig => {
           const status = gig.status?.toLowerCase();
           return status !== 'ongoing' && 
                  status !== 'in progress' && 
