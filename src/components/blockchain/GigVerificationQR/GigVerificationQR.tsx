@@ -2,8 +2,9 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
-import { QrCodeIcon, DownloadIcon, ShareIcon, CopyIcon, CheckCircleIcon, AlertCircleIcon } from 'lucide-react';
+import { QrCodeIcon, DownloadIcon, ShareIcon, CopyIcon, CheckCircleIcon, AlertCircleIcon, CloudIcon } from 'lucide-react';
 import { blockchainVerifiedSubmissionService } from '../../../services/blockchainVerifiedSubmissionService';
+import { FilCDNViewer } from '../../FilCDN';
 
 interface GigVerificationQRProps {
   submissionId: string;
@@ -270,93 +271,45 @@ export const GigVerificationQR: React.FC<GigVerificationQRProps> = ({
             </div>
           </div>
 
-          {/* QR Data Display */}
-          {qrParsedData && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg text-left">
-              <h4 className="font-semibold mb-2 text-center">QR Code Contains:</h4>
-              <div className="text-sm space-y-1">
-                <p><span className="font-medium">Type:</span> {qrParsedData.type}</p>
-                <p><span className="font-medium">Submission ID:</span> {qrParsedData.submission_id}</p>
-                <p><span className="font-medium">Network:</span> {qrParsedData.network}</p>
-                <p><span className="font-medium">Transaction:</span> 
-                  <span className="font-mono text-xs break-all ml-1">
-                    {qrParsedData.tx_id || 'Pending'}
-                  </span>
-                </p>
-                <p><span className="font-medium">Verified:</span> {new Date(qrParsedData.verified_at).toLocaleString()}</p>
-              </div>
-            </div>
-          )}
 
-          {/* Offline Verification Hash */}
-          {verificationData.offlineVerificationHash && (
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <h4 className="font-semibold mb-2 text-blue-800">Offline Verification Hash:</h4>
-              <div className="font-mono text-xs break-all bg-white p-2 rounded border">
-                {verificationData.offlineVerificationHash}
+          {/* FilCDN Direct Access - Track 4 Integration */}
+          {qrParsedData?.cid && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CloudIcon className="w-5 h-5 text-blue-600" />
+                <h4 className="font-semibold text-blue-800">Direct File Access via FilCDN</h4>
               </div>
-              <p className="text-xs text-blue-600 mt-1">
-                Use this hash for offline verification when internet is unavailable
-              </p>
-            </div>
-          )}
-
-          {/* Blockchain Proof */}
-          {verificationData.isVerified && verificationData.blockchainProof.transactionId && (
-            <div className="mb-4 p-3 bg-purple-50 rounded-lg">
-              <h4 className="font-semibold mb-2 text-purple-800">Blockchain Proof:</h4>
-              <div className="text-sm space-y-1 text-left">
-                <p><span className="font-medium">Transaction ID:</span> 
-                  <span className="font-mono text-xs break-all ml-1">
-                    {verificationData.blockchainProof.transactionId}
-                  </span>
-                </p>
-                <p><span className="font-medium">Network:</span> {verificationData.blockchainProof.network}</p>
-                <p><span className="font-medium">Timestamp:</span> {new Date(verificationData.blockchainProof.timestamp).toLocaleString()}</p>
-              </div>
+              <FilCDNViewer
+                cid={qrParsedData.cid}
+                fileName={`Verified Document - ${submissionId.substring(0, 8)}`}
+                description="Access the verified document directly from Filecoin network"
+                className="border border-blue-200"
+                showDetails={true}
+              />
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+          <div className="flex gap-2 justify-center">
             <Button
               onClick={handleDownload}
               variant="outline"
-              className="flex items-center gap-2 hover:bg-gray-50"
-              disabled={!qrDataUrl}
+              size="sm"
+              className="flex items-center gap-2"
             >
               <DownloadIcon className="w-4 h-4" />
-              Download QR
+              Download
             </Button>
             
             <Button
               onClick={handleShare}
               variant="outline"
-              className="flex items-center gap-2 hover:bg-gray-50"
+              size="sm"
+              className="flex items-center gap-2"
             >
               <ShareIcon className="w-4 h-4" />
-              Share Verification
+              Share
             </Button>
-            
-            <Button
-              onClick={handleCopyQRData}
-              variant="outline"
-              className={`flex items-center gap-2 hover:bg-gray-50 ${copied ? 'bg-green-50 text-green-700' : ''}`}
-            >
-              <CopyIcon className="w-4 h-4" />
-              {copied ? 'Copied!' : 'Copy QR Data'}
-            </Button>
-          </div>
-
-          {/* Info Box */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg text-left">
-            <h4 className="font-semibold text-blue-800 mb-2">How Verification Works:</h4>
-            <div className="text-sm text-blue-700 space-y-1">
-              <p>• QR code contains blockchain transaction proof</p>
-              <p>• Scan with any QR reader to verify authenticity</p>
-              <p>• Offline hash enables verification without internet</p>
-              <p>• Visit verification URL to see full details</p>
-            </div>
           </div>
         </div>
       </CardContent>

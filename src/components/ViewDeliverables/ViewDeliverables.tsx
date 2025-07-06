@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
-import { ArrowLeftIcon, MessageSquareIcon, SendIcon, QrCodeIcon } from "lucide-react";
+import { ArrowLeftIcon, MessageSquareIcon, SendIcon, QrCodeIcon, CheckCircleIcon } from "lucide-react";
 import { api } from "../../services/api";
 import { messagingService } from "../../services/messagingService";
 import { useAuth } from "../../contexts/AuthContext";
@@ -58,9 +58,10 @@ export const ViewDeliverables = ({
 }: ViewDeliverablesProps) => {
   console.log('provider', provider);
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"details" | "bids" | "deliverables" | "messages">("messages");
+  const [activeTab, setActiveTab] = useState<"details" | "bids" | "deliverables" | "messages" | "verification">("messages");
   const [messageText, setMessageText] = useState("");
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -91,6 +92,8 @@ export const ViewDeliverables = ({
       setLoadingDeliverables(true);
       try {
         const submissionsData = await api.submissions.getSubmissionsByGig(gigId.toString());
+        setSubmissions(submissionsData); // Store submissions for QR verification
+        
         const formattedDeliverables: Deliverable[] = submissionsData.flatMap((submission: any) => 
           submission.deliverables.map((filename: string, index: number) => ({
             id: `${submission.id}-${index}`,
@@ -434,64 +437,95 @@ export const ViewDeliverables = ({
         )}
 
         {activeTab === "verification" && (
-          <div className="space-y-6">
-            <div className="border border-gray-200 rounded-lg p-6">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <QrCodeIcon className="w-6 h-6 text-purple-600" />
-                Blockchain Verification & QR Code
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Verify the authenticity of deliverables using blockchain technology. 
-                Scan the QR code to verify work submission proof.
-              </p>
-              
-              {deliverables.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* QR Code for the gig submission */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Work Verification QR Code</h3>
+          <div className="border border-gray-200 rounded-lg p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <QrCodeIcon className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Blockchain Verification</h2>
+                <p className="text-sm text-gray-600">Cryptographically verified and tamper-proof</p>
+              </div>
+            </div>
+
+            {deliverables.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* QR Code Section */}
+                <div>
+                  {submissions.length > 0 ? (
                     <GigVerificationQR 
-                      submissionId={gigId.toString()}
+                      submissionId={submissions[0].id}
                       title={`${gigTitle} - Verification`}
                       description="Scan to verify work authenticity on blockchain"
-                      size={250}
+                      size={240}
                       onVerificationComplete={(result) => {
                         console.log('Verification result:', result);
                       }}
                     />
+                  ) : (
+                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <QrCodeIcon className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Generating QR Code</h3>
+                      <p className="text-gray-500">Blockchain verification in progress...</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Info */}
+                <div className="space-y-4">
+                  <div className="bg-green-50 rounded-lg border border-green-200 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                      <h3 className="font-semibold text-green-900">Verified Benefits</h3>
+                    </div>
+                    <div className="space-y-2 text-sm text-green-800">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                        <span>Court-admissible evidence</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                        <span>Tamper-proof blockchain record</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                        <span>Instant file access via FilCDN</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Verification Instructions */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">How to Verify</h3>
-                    <div className="space-y-3 text-sm text-gray-700">
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">1</div>
-                        <p>Scan the QR code with any QR code reader or smartphone camera</p>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-3">Technical Stack</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Blockchain:</span>
+                        <span className="font-medium">Algorand</span>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">2</div>
-                        <p>The QR code contains blockchain transaction proof for this work submission</p>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Storage:</span>
+                        <span className="font-medium">Filecoin + IPFS</span>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">3</div>
-                        <p>Verification works offline - no internet connection required</p>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs mt-0.5">4</div>
-                        <p>This proof is court-admissible and tamper-proof</p>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Algorithm:</span>
+                        <span className="font-medium">SHA-256</span>
                       </div>
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <QrCodeIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No verification available yet</p>
-                  <p>QR codes will be generated once deliverables are submitted with blockchain verification</p>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <QrCodeIcon className="w-8 h-8 text-gray-400" />
                 </div>
-              )}
-            </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Verification Available</h3>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  Blockchain verification will be available once deliverables are submitted.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

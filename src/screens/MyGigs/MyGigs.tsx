@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header";
 import { ViewBids } from "../../components/ViewBids/ViewBids";
+import { ViewDeliverables } from "../../components/ViewDeliverables/ViewDeliverables";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
 import { api } from "../../services/api";
 import { supabase } from "../../lib/supabase";
@@ -23,7 +24,7 @@ import {
 } from "lucide-react";
 import { MultiSelectDropdown } from "../../components/ui/MultiSelectDropdown";
 
-type ViewMode = "list" | "view-gig" | "edit-gig";
+type ViewMode = "list" | "view-gig" | "edit-gig" | "view-deliverables";
 
 interface Gig {
   id: number;
@@ -33,7 +34,7 @@ interface Gig {
   description: string;
   budget: string;
   deadline: string;
-  status: "Active" | "Paused" | "Draft" | "Completed" | "Pending";
+  status: "Active" | "Paused" | "Draft" | "Completed" | "Pending" | "Pending Payment";
   statusColor: string;
   orders: number;
   rating: number;
@@ -56,6 +57,7 @@ interface AttachedFile {
 
 export const MyGigs = (): JSX.Element => {
   // Navigation is handled through state changes and component rendering
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [selectedFilter, setSelectedFilter] = useState("All Gigs");
@@ -79,7 +81,7 @@ export const MyGigs = (): JSX.Element => {
     requirements: [] as string[]
   });
 
-  const filters = ["All Gigs", "Active", "Paused", "Draft"];
+  const filters = ["All Gigs", "Active", "Paused", "Draft", "Pending Payment"];
   const categories = ["All Categories", "Contract Law", "Business Law", "Family Law", "Property Law", "Immigration Law"];
 
   const categoryOptions = [
@@ -108,7 +110,9 @@ export const MyGigs = (): JSX.Element => {
       if (!user) return;
 
       const filters = {
-        status: selectedFilter === "All Gigs" ? undefined : selectedFilter.toLowerCase(),
+        status: selectedFilter === "All Gigs" ? undefined : 
+               selectedFilter === "Pending Payment" ? "pending_payment" : 
+               selectedFilter.toLowerCase(),
         categories: selectedCategory === "All Categories" ? undefined : [selectedCategory]
       };
 
@@ -124,7 +128,7 @@ export const MyGigs = (): JSX.Element => {
         description: gig.description,
         budget: `₦${gig.budget}`,
         deadline: new Date(gig.deadline).toLocaleDateString(),
-        status: gig.status.charAt(0).toUpperCase() + gig.status.slice(1),
+        status: gig.status === 'pending_payment' ? 'Pending Payment' : gig.status.charAt(0).toUpperCase() + gig.status.slice(1),
         statusColor: getStatusColor(gig.status),
         orders: 0, // These would need to be fetched separately
         rating: 0,
@@ -153,6 +157,10 @@ export const MyGigs = (): JSX.Element => {
         return 'bg-yellow-100 text-yellow-800';
       case 'draft':
         return 'bg-gray-100 text-gray-800';
+      case 'pending_payment':
+        return 'bg-red-100 text-red-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -186,6 +194,16 @@ export const MyGigs = (): JSX.Element => {
     })));
 
     setViewMode("edit-gig");
+  };
+
+  const handleViewDeliverables = (gig: Gig) => {
+    setSelectedGig(gig);
+    setViewMode("view-deliverables");
+  };
+
+  const handlePayNow = (gig: Gig) => {
+    // Navigate to payments page for pending payment gigs
+    navigate("/payments");
   };
 
   const handlePauseGig = async (gig: Gig): Promise<void> => {
@@ -429,7 +447,8 @@ export const MyGigs = (): JSX.Element => {
     total: gigs.length,
     active: gigs.filter(g => g.status === "Active").length,
     paused: gigs.filter(g => g.status === "Paused").length,
-    draft: gigs.filter(g => g.status === "Draft").length
+    draft: gigs.filter(g => g.status === "Draft").length,
+    pendingPayment: gigs.filter(g => g.status === "Pending Payment").length
   };
 
   const handleCategoriesChange = (selectedCategories: string[]) => {
@@ -469,6 +488,42 @@ export const MyGigs = (): JSX.Element => {
               }}
               onBack={() => setViewMode("list")}
               backButtonText="Back to My Gigs"
+            />
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (viewMode === "view-deliverables" && selectedGig) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
+        {/* Sidebar */}
+        <BuyerSidebar activePage="my-gigs" />
+
+        {/* Main Content - View Deliverables */}
+        <div className="flex-1 flex flex-col">
+          <Header title="View Deliverables" />
+
+          <main className="flex-1 p-6">
+            <ViewDeliverables 
+              gigId={selectedGig.id}
+              gigTitle={selectedGig.title}
+              postedDate={selectedGig.postedDate}
+              deadline={selectedGig.deadline}
+              budget={selectedGig.budget}
+              status={selectedGig.status}
+              description={selectedGig.description}
+              provider={{
+                id: "provider-id",
+                name: "Provider Name", 
+                avatar: "P",
+                rating: 4.8,
+                completedJobs: 12,
+                location: "Location"
+              }}
+              onBack={() => setViewMode("list")}
+              onMessage={() => {}}
             />
           </main>
         </div>
@@ -857,6 +912,10 @@ export const MyGigs = (): JSX.Element => {
                     <div className="text-3xl font-bold text-gray-900">{gigStats.draft}</div>
                     <div className="text-sm text-gray-600">Draft</div>
                   </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-red-600">{gigStats.pendingPayment}</div>
+                    <div className="text-sm text-gray-600">Pending Payment</div>
+                  </div>
                 </div>
               </div>
 
@@ -1022,31 +1081,55 @@ export const MyGigs = (): JSX.Element => {
                           
                           {!isSelectMode && (
                             <div className="flex gap-2">
-                              <Button
-                                onClick={() => handleViewGig(gig)}
-                                size="sm"
-                                className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white flex-1"
-                              >
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() => handleEditGig(gig)}
-                                size="sm"
-                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                              >
-                                Edit
-                              </Button>
-                              {gig.status === 'Pending' && (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => handleSingleDelete(gig.id.toString())}
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                                  title="Delete Gig"
-                                >
-                                  <TrashIcon className="w-4 h-4" />
-                                </Button>
+                              {gig.status === 'Pending Payment' ? (
+                                /* Pending Payment Actions */
+                                <>
+                                  <Button
+                                    onClick={() => handleViewDeliverables(gig)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-blue-500 text-blue-600 hover:bg-blue-50 flex-1"
+                                  >
+                                    View Deliverables
+                                  </Button>
+                                  <Button
+                                    onClick={() => handlePayNow(gig)}
+                                    size="sm"
+                                    className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] flex-1"
+                                  >
+                                    Pay Now
+                                  </Button>
+                                </>
+                              ) : (
+                                /* Regular Actions */
+                                <>
+                                  <Button
+                                    onClick={() => handleViewGig(gig)}
+                                    size="sm"
+                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white flex-1"
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => handleEditGig(gig)}
+                                    size="sm"
+                                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                                  >
+                                    Edit
+                                  </Button>
+                                  {gig.status === 'Pending' && (
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => handleSingleDelete(gig.id.toString())}
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                      title="Delete Gig"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </>
                               )}
                             </div>
                           )}
@@ -1124,37 +1207,59 @@ export const MyGigs = (): JSX.Element => {
 
                           {!isSelectMode && (
                             <div className="flex gap-3">
-                              <Button
-                                onClick={() => handleViewGig(gig)}
-                                className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2"
-                              >
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() => handleEditGig(gig)}
-                                className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
-                              >
-                                Edit
-                              </Button>
-                              {!(String(gig.status).toLowerCase() === "active" || String(gig.status).toLowerCase() === "completed" || String(gig.status).toLowerCase() === "suspended") && (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => handlePauseGig(gig)}
-                                  className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
-                                >
-                                  {gig.status === "Paused" ? "Resume" : "Pause"}
-                                </Button>
-                              )}
-                              {gig.status === 'Pending' && (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => handleSingleDelete(gig.id.toString())}
-                                  className="text-red-600 hover:text-red-800 hover:bg-red-50 px-6 py-2"
-                                  title="Delete Gig"
-                                >
-                                  <TrashIcon className="w-4 h-4" />
-                                </Button>
+                              {gig.status === 'Pending Payment' ? (
+                                /* Pending Payment Actions */
+                                <>
+                                  <Button
+                                    onClick={() => handleViewDeliverables(gig)}
+                                    variant="outline"
+                                    className="border-blue-500 text-blue-600 hover:bg-blue-50 px-6 py-2"
+                                  >
+                                    View Deliverables
+                                  </Button>
+                                  <Button
+                                    onClick={() => handlePayNow(gig)}
+                                    className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-2"
+                                  >
+                                    Pay Now
+                                  </Button>
+                                </>
+                              ) : (
+                                /* Regular Actions */
+                                <>
+                                  <Button
+                                    onClick={() => handleViewGig(gig)}
+                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2"
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => handleEditGig(gig)}
+                                    className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                                  >
+                                    Edit
+                                  </Button>
+                                  {!(String(gig.status).toLowerCase() === "active" || String(gig.status).toLowerCase() === "completed" || String(gig.status).toLowerCase() === "suspended") && (
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => handlePauseGig(gig)}
+                                      className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                                    >
+                                      {gig.status === "Paused" ? "Resume" : "Pause"}
+                                    </Button>
+                                  )}
+                                  {gig.status === 'Pending' && (
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => handleSingleDelete(gig.id.toString())}
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50 px-6 py-2"
+                                      title="Delete Gig"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </>
                               )}
                             </div>
                           )}

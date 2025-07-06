@@ -11,9 +11,7 @@
  * - Storage verification and replication monitoring
  */
 
-import { ipfsService } from './ipfsService';
 import { HashUtils } from '../components/blockchain/shared/hashUtils';
-import { fvmContractService } from './fvmContractService';
 
 export interface CDNLoadOptions {
   preferredGateway?: 'w3s' | 'dweb' | 'cloudflare' | 'ipfs' | 'filecoin';
@@ -220,7 +218,6 @@ class FilCDNService {
             method: 'GET',
             headers: {
               'Accept': '*/*',
-              'Cache-Control': options.cacheHint === 'no-cache' ? 'no-cache' : 'default'
             }
           });
 
@@ -467,24 +464,6 @@ class FilCDNService {
   }
 
   /**
-   * Cache management (Enhanced Phase 3)
-   */
-  private cacheContent(cid: string, data: Blob, url: string): void {
-    this.cache.set(cid, {
-      data,
-      timestamp: Date.now(),
-      url,
-      hash: undefined,
-      size: data.size,
-      contentType: 'application/octet-stream',
-      accessCount: 0
-    });
-
-    // Cleanup old cache entries
-    this.cleanupCache();
-  }
-
-  /**
    * Enhanced cache management with metadata
    */
   private cacheContentEnhanced(cid: string, data: Blob, url: string, metadata: {
@@ -526,7 +505,6 @@ class FilCDNService {
   }
 
   private cleanupCache(): void {
-    const now = Date.now();
     for (const [cid, cached] of this.cache.entries()) {
       if (this.isCacheExpired(cached.timestamp)) {
         this.cache.delete(cid);

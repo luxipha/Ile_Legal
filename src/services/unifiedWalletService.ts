@@ -416,7 +416,8 @@ export const getUserWalletForChain = async (userId: string, blockchain: string):
 export const getOptimalPaymentChain = async (
   buyerId: string, 
   sellerId: string, 
-  preferredChain?: string
+  preferredChain?: string,
+  preferredToken?: 'USDC' | 'USDFC'
 ): Promise<{ chain: string; config: ChainConfig } | null> => {
   try {
     // Get wallet data for both users
@@ -433,6 +434,27 @@ export const getOptimalPaymentChain = async (
     if (commonChains.length === 0) {
       console.warn('No common chains found between buyer and seller');
       return null;
+    }
+
+    // If a preferred token is specified, filter chains by that token
+    if (preferredToken) {
+      const preferredTokenChains = commonChains.filter(chain => {
+        const config = SUPPORTED_CHAINS[chain.toUpperCase()];
+        return config && config.symbol === preferredToken;
+      });
+
+      if (preferredTokenChains.length > 0) {
+        // If a preferred chain is also specified and valid, use it
+        if (preferredChain && preferredTokenChains.includes(preferredChain.toUpperCase())) {
+          const config = SUPPORTED_CHAINS[preferredChain.toUpperCase()];
+          return { chain: preferredChain.toUpperCase(), config };
+        }
+        // Otherwise, use the first available chain for that token
+        const chain = preferredTokenChains[0];
+        const config = SUPPORTED_CHAINS[chain];
+        console.log(`💎 [UnifiedWallet] Selected optimal chain by token: ${chain} (${config.symbol})`);
+        return { chain, config };
+      }
     }
 
     // If preferred chain is available and both users support it, use it

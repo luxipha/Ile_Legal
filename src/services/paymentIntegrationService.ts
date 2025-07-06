@@ -112,7 +112,8 @@ class PaymentIntegrationService {
       const optimalChain = await getOptimalPaymentChain(
         paymentRequest.buyerId, 
         paymentRequest.sellerId, 
-        paymentRequest.preferredChain
+        paymentRequest.preferredChain,
+        paymentRequest.preferredToken
       );
       console.log('🌐 [PaymentIntegration] Optimal payment chain:', {
         chain: optimalChain?.chain,

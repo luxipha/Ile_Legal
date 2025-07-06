@@ -1616,14 +1616,43 @@ export const api = {
         throw new Error('User must be logged in to submit work');
       }
 
-      // 🔗 NEW: Blockchain Verification & QR Generation
+      // Create the Work Submission record first
+      const submissionRecord = {
+        gig_id: submissionData.gig_id,
+        seller_id: user.id,
+        deliverables: deliverableFilenames,
+        notes: submissionData.notes || '',
+        blockchain_hashes: submissionData.blockchain_hashes || [],
+        status: 'submitted',
+        storage_type: submissionData.use_ipfs ? 'ipfs' : 'supabase',
+        ipfs_data: submissionData.use_ipfs ? ipfsResults : null,
+        // Enhanced fields - file merge data stored in ipfs_data
+        // Note: blockchain_verification_data removed - column doesn't exist in database
+        // Blockchain verification data is stored separately in blockchain_verifications table
+      };
+
+      const { data, error } = await supabase
+        .from('Work Submissions')
+        .insert(submissionRecord)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Get the actual submission ID from the created record
+      const actualSubmissionId = data.id;
+      console.log(`✅ [${debugId}] Submission record created with ID: ${actualSubmissionId}`);
+
+      // 🔗 NEW: Blockchain Verification & QR Generation (after submission creation)
       if (submissionData.enable_blockchain_verification && deliverableFilenames.length > 0) {
-        console.log(`⛓️ [${debugId}] Creating blockchain verification for submission...`);
+        console.log(`⛓️ [${debugId}] Creating blockchain verification for submission: ${actualSubmissionId}`);
         try {
-          // Create blockchain verification with the uploaded files
+          // Create blockchain verification with the uploaded files and real submission ID
           const files = submissionData.deliverables ? Array.from(submissionData.deliverables) : [];
           blockchainVerificationResult = await blockchainVerifiedSubmissionService.submitVerifiedWork({
-            workSubmissionId: submissionData.gig_id,
+            workSubmissionId: actualSubmissionId,
             files: files,
             description: `Deliverables for gig ${submissionData.gig_id}`,
             blockchainNetwork: 'algorand'
@@ -1641,36 +1670,6 @@ export const api = {
         }
       }
 
-      // Create the Work Submission record with enhanced data
-      const submissionRecord = {
-        gig_id: submissionData.gig_id,
-        seller_id: user.id,
-        deliverables: deliverableFilenames,
-        notes: submissionData.notes || '',
-        blockchain_hashes: submissionData.blockchain_hashes || [],
-        status: 'submitted',
-        storage_type: submissionData.use_ipfs ? 'ipfs' : 'supabase',
-        ipfs_data: submissionData.use_ipfs ? ipfsResults : null,
-        // Enhanced fields
-        file_merge_data: mergedFileResult ? {
-          merged_cid: mergedFileResult.filecoinCid,
-          piece_cid: mergedFileResult.pieceCid,
-          original_count: mergedFileResult.metadata.originalCount,
-          compression_ratio: mergedFileResult.metadata.compressionRatio,
-          merge_strategy: 'json_bundle'
-        } : null
-        // Note: blockchain_verification_data removed - column doesn't exist in database
-        // Blockchain verification data is stored separately in blockchain_verifications table
-      };
-
-      const { data, error } = await supabase
-        .from('Work Submissions')
-        .insert(submissionRecord);
-
-      if (error) {
-        throw error;
-      }
-
       // Update the gig status to 'pending_payment'
       const { error: gigUpdateError } = await supabase
         .from('Gigs')
@@ -1682,7 +1681,7 @@ export const api = {
       }
 
       console.log(`🎉 [${debugId}] Enhanced submission completed successfully:`, {
-        submissionId: Array.isArray(data) && (data as any[])?.length > 0 ? (data[0] as any)?.id : 'unknown',
+        submissionId: actualSubmissionId,
         filesMerged: !!mergedFileResult,
         blockchainVerified: !!blockchainVerificationResult,
         qrGenerated: !!blockchainVerificationResult?.qrCodeData
