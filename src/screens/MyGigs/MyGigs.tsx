@@ -892,10 +892,54 @@ export const MyGigs = (): JSX.Element => {
             {/* Header with Stats and Post Button */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6 sm:mb-8">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">My Gigs</h1>
+                <div className="flex items-center justify-between mb-4">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Gigs</h1>
+                  <div className="md:hidden flex items-center gap-2">
+                    {!isSelectMode ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={toggleSelectMode}
+                        title="Delete Gigs"
+                        className="px-2 py-1.5"
+                      >
+                        <TrashIcon className="w-3 h-3" />
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        {selectedGigs.size > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDeleteSelected}
+                            disabled={deleting}
+                            className="bg-red-600 text-white hover:bg-red-700 px-2 py-1.5 text-xs"
+                          >
+                            {deleting ? 'Del...' : `Del ${selectedGigs.size}`}
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={toggleSelectMode}
+                          title="Cancel Selection"
+                          className="px-2 py-1.5"
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                    <Link to="/post-gig">
+                      <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-3 py-1.5 text-sm">
+                        <PlusIcon className="w-3 h-3 mr-1" />
+                        Post a Gig
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
                 
                 {/* Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-8">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 sm:gap-8">
                   <div className="text-center">
                     <div className="text-xl sm:text-3xl font-bold text-gray-900">{gigStats.total}</div>
                     <div className="text-xs sm:text-sm text-gray-600">Total Gigs</div>
@@ -908,7 +952,7 @@ export const MyGigs = (): JSX.Element => {
                     <div className="text-xl sm:text-3xl font-bold text-gray-900">{gigStats.paused}</div>
                     <div className="text-xs sm:text-sm text-gray-600">Paused</div>
                   </div>
-                  <div className="text-center">
+                  <div className="text-center hidden md:block">
                     <div className="text-xl sm:text-3xl font-bold text-gray-900">{gigStats.draft}</div>
                     <div className="text-xs sm:text-sm text-gray-600">Draft</div>
                   </div>
@@ -919,7 +963,7 @@ export const MyGigs = (): JSX.Element => {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+              <div className="hidden md:flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                 {!isSelectMode ? (
                   <Button 
                     variant="outline" 
@@ -972,7 +1016,7 @@ export const MyGigs = (): JSX.Element => {
                 )}
                 
                 {/* View Toggle Buttons */}
-                <div className="flex items-center gap-2 order-1 sm:order-none">
+                <div className="hidden md:flex items-center gap-2 order-1 sm:order-none">
                   <span className="text-xs sm:text-sm text-gray-600 mr-2">View:</span>
                   <Button
                     variant={gridViewMode === "grid" ? "default" : "outline"}
@@ -992,7 +1036,7 @@ export const MyGigs = (): JSX.Element => {
                   </Button>
                 </div>
                 
-                <Link to="/post-gig" className="w-full sm:w-auto">
+                <Link to="/post-gig" className="hidden md:block w-full sm:w-auto">
                   <Button className="w-full sm:w-auto bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base">
                     <PlusIcon className="w-4 h-4 mr-2" />
                     Post a Gig
@@ -1087,15 +1131,13 @@ export const MyGigs = (): JSX.Element => {
                                   <Button
                                     onClick={() => handleViewDeliverables(gig)}
                                     variant="outline"
-                                    size="sm"
-                                    className="border-blue-500 text-blue-600 hover:bg-blue-50 flex-1"
+                                    className="border-blue-500 text-blue-600 hover:bg-blue-50 flex-1 py-2.5 text-sm sm:text-base"
                                   >
                                     View Deliverables
                                   </Button>
                                   <Button
                                     onClick={() => handlePayNow(gig)}
-                                    size="sm"
-                                    className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] flex-1"
+                                    className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] flex-1 py-2.5 text-sm sm:text-base"
                                   >
                                     Pay Now
                                   </Button>
@@ -1105,16 +1147,14 @@ export const MyGigs = (): JSX.Element => {
                                 <>
                                   <Button
                                     onClick={() => handleViewGig(gig)}
-                                    size="sm"
-                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white flex-1"
+                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white flex-1 py-2.5 text-sm sm:text-base"
                                   >
                                     View
                                   </Button>
                                   <Button
                                     variant="outline"
                                     onClick={() => handleEditGig(gig)}
-                                    size="sm"
-                                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                                    className="border-gray-300 text-gray-700 hover:bg-gray-50 py-2.5 text-sm sm:text-base"
                                   >
                                     Edit
                                   </Button>
@@ -1122,8 +1162,7 @@ export const MyGigs = (): JSX.Element => {
                                     <Button
                                       variant="outline"
                                       onClick={() => handleSingleDelete(gig.id.toString())}
-                                      size="sm"
-                                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50 py-2.5 px-3"
                                       title="Delete Gig"
                                     >
                                       <TrashIcon className="w-4 h-4" />
@@ -1213,13 +1252,13 @@ export const MyGigs = (): JSX.Element => {
                                   <Button
                                     onClick={() => handleViewDeliverables(gig)}
                                     variant="outline"
-                                    className="border-blue-500 text-blue-600 hover:bg-blue-50 px-6 py-2"
+                                    className="border-blue-500 text-blue-600 hover:bg-blue-50 px-4 sm:px-6 py-3 text-sm sm:text-base"
                                   >
                                     View Deliverables
                                   </Button>
                                   <Button
                                     onClick={() => handlePayNow(gig)}
-                                    className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-2"
+                                    className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4 sm:px-6 py-3 text-sm sm:text-base"
                                   >
                                     Pay Now
                                   </Button>
@@ -1229,14 +1268,14 @@ export const MyGigs = (): JSX.Element => {
                                 <>
                                   <Button
                                     onClick={() => handleViewGig(gig)}
-                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-2"
+                                    className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-4 sm:px-6 py-3 text-sm sm:text-base"
                                   >
                                     View
                                   </Button>
                                   <Button
                                     variant="outline"
                                     onClick={() => handleEditGig(gig)}
-                                    className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                                    className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 sm:px-6 py-3 text-sm sm:text-base"
                                   >
                                     Edit
                                   </Button>
@@ -1244,7 +1283,7 @@ export const MyGigs = (): JSX.Element => {
                                     <Button
                                       variant="outline"
                                       onClick={() => handlePauseGig(gig)}
-                                      className="border-gray-300 text-gray-700 hover:bg-gray-50 px-6 py-2"
+                                      className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 sm:px-6 py-3 text-sm sm:text-base"
                                     >
                                       {gig.status === "Paused" ? "Resume" : "Pause"}
                                     </Button>
@@ -1253,7 +1292,7 @@ export const MyGigs = (): JSX.Element => {
                                     <Button
                                       variant="outline"
                                       onClick={() => handleSingleDelete(gig.id.toString())}
-                                      className="text-red-600 hover:text-red-800 hover:bg-red-50 px-6 py-2"
+                                      className="text-red-600 hover:text-red-800 hover:bg-red-50 px-4 sm:px-6 py-3"
                                       title="Delete Gig"
                                     >
                                       <TrashIcon className="w-4 h-4" />

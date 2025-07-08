@@ -5,6 +5,8 @@ import { Card, CardContent } from "../../components/ui/card";
 import { MultiSelectDropdown } from "../../components/ui/MultiSelectDropdown";
 import { Header } from "../../components/Header";
 import { BuyerSidebar } from "../../components/BuyerSidebar/BuyerSidebar";
+import { MobileHeader } from "../../components/MobileHeader/MobileHeader";
+import { MobileNavigation } from "../../components/MobileNavigation/MobileNavigation";
 import { 
   ArrowLeftIcon,
   CalendarIcon,
@@ -133,6 +135,9 @@ export const PostGig = (): JSX.Element => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile Header */}
+      <MobileHeader />
+
       {/* Sidebar */}
       <BuyerSidebar activePage="post-gig" />
 
@@ -141,7 +146,7 @@ export const PostGig = (): JSX.Element => {
         <Header title="Post a Gig" userName="Demo Client" userType="buyer" />
 
         {/* Post Gig Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 sm:p-6 pt-16 md:pt-4 pb-20 md:pb-6">
           <div className="max-w-4xl mx-auto">
             {/* Back Button */}
             <Button
@@ -155,18 +160,18 @@ export const PostGig = (): JSX.Element => {
 
             {/* Post Gig Form Card */}
             <Card className="bg-white border border-gray-200 shadow-lg">
-              <CardContent className="p-8">
+              <CardContent className="p-4 sm:p-6 lg:p-8">
                 {/* Header */}
-                <div className="mb-8">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Post a New Gig</h1>
-                  <p className="text-gray-600">Describe your legal needs and get bids from qualified professionals</p>
+                <div className="mb-6 sm:mb-8">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Post a New Gig</h1>
+                  <p className="text-sm sm:text-base text-gray-600">Describe your legal needs and get bids from qualified professionals</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-8">
+                <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
                   {/* Gig Title and Category Row */}
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div>
-                      <label className="block text-lg font-semibold text-gray-900 mb-3">
+                      <label className="block text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">
                         Gig Title
                       </label>
                       <input
@@ -175,12 +180,12 @@ export const PostGig = (): JSX.Element => {
                         value={formData.title}
                         onChange={handleInputChange}
                         placeholder="E.g. Land Title Verification for Victoria Island Property"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-lg"
+                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-sm sm:text-lg"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-lg font-semibold text-gray-900 mb-3">
+                      <label className="block text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">
                         Categories
                       </label>
                       <MultiSelectDropdown
@@ -194,7 +199,7 @@ export const PostGig = (): JSX.Element => {
 
                   {/* Description */}
                   <div>
-                    <label className="block text-lg font-semibold text-gray-900 mb-3">
+                    <label className="block text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">
                       Description
                     </label>
                     <textarea
@@ -202,20 +207,20 @@ export const PostGig = (): JSX.Element => {
                       value={formData.description}
                       onChange={handleInputChange}
                       placeholder="Describe the legal service you need in detail. Include specific requirements, documents available, and expected outcomes."
-                      rows={6}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none resize-none text-lg"
+                      rows={4}
+                      className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none resize-none text-sm sm:text-lg sm:min-h-[120px]"
                       required
                     />
                   </div>
 
                   {/* Budget and Deadline Row */}
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div>
-                      <label className="block text-lg font-semibold text-gray-900 mb-3">
+                      <label className="block text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">
                         Budget (₦)
                       </label>
                       <div className="relative">
-                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-[#FEC85F] text-[#1B1828] px-2 py-1 rounded text-sm font-medium">
+                        <div className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 bg-[#FEC85F] text-[#1B1828] px-2 py-1 rounded text-xs sm:text-sm font-medium">
                           ₦
                         </div>
                         <input
@@ -224,13 +229,13 @@ export const PostGig = (): JSX.Element => {
                           value={formData.budget}
                           onChange={handleInputChange}
                           placeholder="50,000"
-                          className="w-full pl-16 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-lg"
+                          className="w-full pl-12 sm:pl-16 pr-3 sm:pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-sm sm:text-lg"
                           required
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-lg font-semibold text-gray-900 mb-3">
+                      <label className="block text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">
                         Deadline
                       </label>
                       <div className="relative">
@@ -239,7 +244,7 @@ export const PostGig = (): JSX.Element => {
                           name="deadline"
                           value={formData.deadline}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-lg"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-sm sm:text-lg"
                           required
                         />
                         <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -251,7 +256,7 @@ export const PostGig = (): JSX.Element => {
 
                   {/* Attachments */}
                   <div>
-                    <label className="block text-lg font-semibold text-gray-900 mb-3">
+                    <label className="block text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">
                       Attachments
                     </label>
                     
@@ -260,16 +265,16 @@ export const PostGig = (): JSX.Element => {
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
-                      className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                      className={`border-2 border-dashed rounded-lg p-4 sm:p-6 lg:p-8 text-center transition-colors ${
                         isDragOver 
                           ? 'border-[#1B1828] bg-gray-50' 
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                     >
-                      <UploadIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <UploadIcon className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
                       <div className="mb-2">
-                        <span className="text-lg text-gray-700">Drag & drop or </span>
-                        <label className="text-lg text-blue-600 hover:text-blue-700 cursor-pointer font-medium">
+                        <span className="text-sm sm:text-base lg:text-lg text-gray-700">Drag & drop or </span>
+                        <label className="text-sm sm:text-base lg:text-lg text-blue-600 hover:text-blue-700 cursor-pointer font-medium">
                           Browse
                           <input
                             type="file"
@@ -290,15 +295,15 @@ export const PostGig = (): JSX.Element => {
                       <div className="mt-4 space-y-2">
                         {attachedFiles.map((file) => (
                           <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-100 rounded flex items-center justify-center flex-shrink-0">
+                                <svg className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                               </div>
-                              <div>
-                                <div className="font-medium text-gray-900">{file.name}</div>
-                                <div className="text-sm text-gray-500">{formatFileSize(file.size)}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-sm sm:text-base text-gray-900 truncate">{file.name}</div>
+                                <div className="text-xs sm:text-sm text-gray-500">{formatFileSize(file.size)}</div>
                               </div>
                             </div>
                             <Button
@@ -306,7 +311,7 @@ export const PostGig = (): JSX.Element => {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeFile(file.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0 p-1 sm:p-2"
                             >
                               <XIcon className="w-4 h-4" />
                             </Button>
@@ -317,18 +322,18 @@ export const PostGig = (): JSX.Element => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex justify-end gap-4 pt-6">
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-6">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleCancel}
-                      className="px-8 py-3 text-lg"
+                      className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 text-base sm:text-lg"
                     >
                       Cancel
                     </Button>
                     <Button
                       type="submit"
-                      className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-3 text-lg font-medium"
+                      className="w-full sm:w-auto bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 sm:px-8 py-2 sm:py-3 text-base sm:text-lg font-medium"
                       disabled={formData.categories.length === 0}
                     >
                       Post Gig
@@ -340,6 +345,9 @@ export const PostGig = (): JSX.Element => {
           </div>
         </main>
       </div>
+
+      {/* Mobile Navigation */}
+      <MobileNavigation />
     </div>
   );
 };
