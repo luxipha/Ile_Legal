@@ -60,7 +60,7 @@ export const ResetPassword = (): JSX.Element => {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3">
-            <div className="text-[#FEC85F] text-3xl font-bold">Ilé</div>
+            <img src="/logo.svg" alt="Ilé Legal" className="w-12 h-12 sm:w-16 sm:h-16" />
             <div className="text-gray-700 text-lg">
               Legal
               <br />

@@ -66,43 +66,48 @@ export const Home = (): JSX.Element => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="w-full bg-[#282536] border-b border-gray-700 py-4">
+      <header className="w-full bg-[#282536] border-b border-gray-700 py-3 sm:py-4">
         
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
-            <div className="text-gray-300 text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <img src="/logo.svg" alt="Ilé Legal" className="w-8 h-8 sm:w-10 sm:h-10" />
+            <div className="text-gray-300 text-xs sm:text-sm">
               Legal
               <br />
               Marketplace
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {user ? (
               <>
-                <div className="text-gray-300 mr-2">
+                <div className="hidden sm:block text-gray-300 mr-2">
                   Logged in as: <span className="font-medium">{user.email}</span>
                   {user.role && <span className="ml-2 px-2 py-1 bg-gray-700 rounded-md text-xs">{user.role}</span>}
+                </div>
+                <div className="sm:hidden text-gray-300 mr-2">
+                  <span className="text-sm">{user.email.split('@')[0]}</span>
+                  {user.role && <span className="ml-1 px-2 py-1 bg-gray-700 rounded-md text-xs">{user.role}</span>}
                 </div>
                 <Button
                   onClick={handleLogout}
                   variant="outline"
+                  size="sm"
                   className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
                 >
-                  <LogOutIcon className="w-4 h-4 mr-2" />
-                  Logout
+                  <LogOutIcon className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Logout</span>
                 </Button>
                 {user.role === 'buyer' && (
                   <Link to="/buyer-dashboard">
-                    <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4">
-                      Go to Dashboard
+                    <Button size="sm" className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-3 sm:px-4">
+                      <span className="hidden sm:inline">Go to </span>Dashboard
                     </Button>
                   </Link>
                 )}
                 {user.role === 'seller' && (
                   <Link to="/seller-dashboard">
-                    <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4">
-                      Go to Dashboard
+                    <Button size="sm" className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-3 sm:px-4">
+                      <span className="hidden sm:inline">Go to </span>Dashboard
                     </Button>
                   </Link>
                 )}
@@ -112,18 +117,19 @@ export const Home = (): JSX.Element => {
                 <Button
                   onClick={handleMetaMaskConnect}
                   variant="outline"
-                  className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-4 py-2"
+                  size="sm"
+                  className="hidden sm:flex border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-3 sm:px-4 py-2"
                 >
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-5 h-5 mr-2" />
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   MetaMask
                 </Button>
                 <Link to="/login">
-                  <Button variant="ghost" className="text-gray-300 hover:text-white">
+                  <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white">
                     Sign In
                   </Button>
                 </Link>
                 <Link to="/register">
-                  <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6">
+                  <Button size="sm" className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-3 sm:px-6">
                     Register
                   </Button>
                 </Link>
@@ -134,27 +140,27 @@ export const Home = (): JSX.Element => {
       </header>
 
       {/* Hero Section */}
-      <section className="w-full py-20 bg-[#1B1828]">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <img src="/20250628-095507.jpg" alt="Hero" width={210} height={140} className="mx-auto mb-6" />
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
+      <section className="w-full py-12 sm:py-16 lg:py-20 bg-[#1B1828]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <img src="/20250628-095507.jpg" alt="Hero" width={180} height={120} className="mx-auto mb-4 sm:mb-6 w-36 h-24 sm:w-52 sm:h-35 object-cover" />
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
             Simplifying Legal Due Diligence
             <br />
             <span className="text-[#FEC85F]">for Property Transactions</span>
           </h1>
           
-          <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-300 mb-6 sm:mb-8 lg:mb-10 max-w-3xl mx-auto leading-relaxed px-2">
             Connect with verified legal professionals for seamless property due diligence. 
             Secure, efficient, and transparent legal services at your fingertips.
           </p>
 
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-4 text-lg h-auto font-medium">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
+            <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg h-auto font-medium">
               Hire Legal Professionals
-              <ArrowRightIcon className="ml-2 w-5 h-5" />
+              <ArrowRightIcon className="ml-2 w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
             <Link to="/seller-dashboard">
-              <Button variant="outline" className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-8 py-4 text-lg h-auto">
+              <Button variant="outline" className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg h-auto">
                 Join as Legal Professional
               </Button>
             </Link>
@@ -163,15 +169,15 @@ export const Home = (): JSX.Element => {
       </section>
 
       {/* Cards Section - Original Design */}
-      <section className="w-full py-20 bg-white -mt-10 relative z-10">
-        <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-center text-4xl font-bold text-gray-900 mb-16">How It Works</h2>
+      <section className="w-full py-12 sm:py-16 lg:py-20 bg-white -mt-6 sm:-mt-10 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <h2 className="text-center text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-8 sm:mb-12 lg:mb-16">How It Works</h2>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {/* Step 1 - Post Your Requirements */}
-            <Card className="bg-white border border-gray-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <CardContent className="p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Post Your Requirements</h3>
+            <Card className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+              <CardContent className="p-6 sm:p-8">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 text-center">Post Your Requirements</h3>
                 
                 <div className="space-y-4 mb-6">
                   <div className="bg-gray-50 rounded-xl p-4">
@@ -190,9 +196,9 @@ export const Home = (): JSX.Element => {
             </Card>
 
             {/* Step 2 - Receive Expert Bids */}
-            <Card className="bg-white border border-gray-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <CardContent className="p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Receive Expert Bids</h3>
+            <Card className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+              <CardContent className="p-6 sm:p-8">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 text-center">Receive Expert Bids</h3>
                 
                 <div className="space-y-4">
                   {/* First Bid */}
@@ -236,9 +242,9 @@ export const Home = (): JSX.Element => {
             </Card>
 
             {/* Step 3 - Get Work Completed */}
-            <Card className="bg-white border border-gray-200 rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <CardContent className="p-8 text-center">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">Get Work completed</h3>
+            <Card className="bg-white border border-gray-200 rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden lg:col-span-1 sm:col-span-2 lg:col-start-auto sm:mx-auto sm:max-w-md lg:max-w-none lg:mx-0">
+              <CardContent className="p-6 sm:p-8 text-center">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Get Work completed</h3>
                 
                 <div className="flex justify-center mb-6">
                   <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
@@ -254,51 +260,51 @@ export const Home = (): JSX.Element => {
       </section>
 
       {/* Benefits Section */}
-      <section className="w-full py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
+      <section className="w-full py-12 sm:py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 text-center">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 bg-[#1B1828] rounded-full flex items-center justify-center mb-4">
                 <ClockIcon className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Time-Saving</h3>
-              <p className="text-gray-600">Quick turnaround times for all legal processes</p>
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Time-Saving</h3>
+              <p className="text-sm sm:text-base text-gray-600">Quick turnaround times for all legal processes</p>
             </div>
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 bg-[#1B1828] rounded-full flex items-center justify-center mb-4">
                 <CheckCircleIcon className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Verified Professionals</h3>
-              <p className="text-gray-600">All legal professionals are thoroughly vetted</p>
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Verified Professionals</h3>
+              <p className="text-sm sm:text-base text-gray-600">All legal professionals are thoroughly vetted</p>
             </div>
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center lg:col-span-1 sm:col-span-2 lg:col-start-auto sm:mx-auto">
               <div className="w-12 h-12 bg-[#1B1828] rounded-full flex items-center justify-center mb-4">
                 <LockIcon className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Secure Transactions</h3>
-              <p className="text-gray-600">Payments protected with escrow services</p>
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Secure Transactions</h3>
+              <p className="text-sm sm:text-base text-gray-600">Payments protected with escrow services</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="w-full py-20 bg-[#1B1828]">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">
+      <section className="w-full py-12 sm:py-16 lg:py-20 bg-[#1B1828]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-4 sm:mb-6">
             Ready to streamline your property due diligence?
           </h2>
-          <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-300 mb-6 sm:mb-8 lg:mb-10 max-w-2xl mx-auto px-2">
             Join thousands of property developers and investors who trust our platform
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
             <Link to="/register">
-              <Button className="bg-[#FEC85F] text-[#1B1828] hover:bg-[#FEC85F]/90 px-8 py-4 text-lg h-auto">
+              <Button className="bg-[#FEC85F] text-[#1B1828] hover:bg-[#FEC85F]/90 px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg h-auto">
                 Register Now
               </Button>
             </Link>
             <Link to="/login">
-              <Button variant="outline" className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-8 py-4 text-lg h-auto">
+              <Button variant="outline" className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg h-auto">
                 Sign In
               </Button>
             </Link>
@@ -307,13 +313,13 @@ export const Home = (): JSX.Element => {
       </section>
 
       {/* Footer */}
-      <footer className="w-full bg-gray-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-8 mb-12">
+      <footer className="w-full bg-gray-900 text-white py-12 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8 sm:mb-12">
             {/* Company Info */}
             <div className="md:col-span-2">
               <div className="flex items-center mb-6">
-                <span className="text-[#FEC85F] text-3xl font-bold">Ilé</span>
+                <img src="/logo.svg" alt="Ilé Legal" className="w-12 h-12 sm:w-16 sm:h-16" />
                 <span className="text-white text-2xl font-normal ml-2">Legal</span>
               </div>
               <p className="text-gray-400 text-lg leading-relaxed max-w-md mb-6">

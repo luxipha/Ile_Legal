@@ -193,15 +193,15 @@ export const Register = (): JSX.Element => {
   // Password validation is handled by the backend
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
       {/* Left Section - Sign Up Form */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-y-auto">
         <div className="w-full max-w-lg">
           {/* Logo */}
-          <div className="text-center mb-6">
-            <Link to="/" className="inline-flex items-center gap-3">
-              <div className="text-[#FEC85F] text-3xl font-bold">Ilé</div>
-              <div className="text-gray-700 text-lg">
+          <div className="text-center mb-4 sm:mb-6">
+            <Link to="/" className="inline-flex items-center gap-2 sm:gap-3">
+              <img src="/logo.svg" alt="Ilé Legal" className="w-12 h-12 sm:w-16 sm:h-16" />
+              <div className="text-gray-700 text-base sm:text-lg">
                 Legal
                 <br />
                 Marketplace
@@ -209,15 +209,15 @@ export const Register = (): JSX.Element => {
             </Link>
           </div>
 
-          <Card className="bg-white shadow-lg border-0 rounded-2xl">
-            <CardContent className="p-8">
-              <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Sign up</h1>
-                <p className="text-gray-600">Welcome onboard! Please enter your details.</p>
+          <Card className="bg-white shadow-lg border-0 rounded-xl sm:rounded-2xl">
+            <CardContent className="p-4 sm:p-6 lg:p-8">
+              <div className="mb-4 sm:mb-6">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Sign up</h1>
+                <p className="text-sm sm:text-base text-gray-600">Welcome onboard! Please enter your details.</p>
               </div>
 
               {/* User Type Selection */}
-              <div className="mb-6">
+              <div className="mb-4 sm:mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Choose your account type:
                 </label>
@@ -225,39 +225,39 @@ export const Register = (): JSX.Element => {
                   <button
                     type="button"
                     onClick={() => setUserType("client")}
-                    className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                    className={`p-3 sm:p-4 rounded-lg border-2 transition-all duration-300 ${
                       userType === "client"
                         ? "border-[#1B1828] bg-[#1B1828] text-white"
                         : "border-gray-300 hover:border-gray-400 bg-white"
                     }`}
                   >
-                    <UserIcon className={`w-6 h-6 mx-auto mb-2 ${userType === "client" ? "text-[#FEC85F]" : "text-gray-400"}`} />
+                    <UserIcon className={`w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 ${userType === "client" ? "text-[#FEC85F]" : "text-gray-400"}`} />
                     <div className="font-semibold text-sm">Client</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => setUserType("professional")}
-                    className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                    className={`p-3 sm:p-4 rounded-lg border-2 transition-all duration-300 ${
                       userType === "professional"
                         ? "border-[#1B1828] bg-[#1B1828] text-white"
                         : "border-gray-300 hover:border-gray-400 bg-white"
                     }`}
                   >
-                    <BriefcaseIcon className={`w-6 h-6 mx-auto mb-2 ${userType === "professional" ? "text-[#FEC85F]" : "text-gray-400"}`} />
-                    <div className="font-semibold text-sm">Legal Professional</div>
+                    <BriefcaseIcon className={`w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 ${userType === "professional" ? "text-[#FEC85F]" : "text-gray-400"}`} />
+                    <div className="font-semibold text-xs sm:text-sm">Legal Professional</div>
                   </button>
                 </div>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Name Fields */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
                     type="text"
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
+                    className="w-full px-3 sm:px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base"
                     placeholder="First name"
                     required
                   />
@@ -266,7 +266,7 @@ export const Register = (): JSX.Element => {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
+                    className="w-full px-3 sm:px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base"
                     placeholder="Last name"
                     required
                   />
@@ -279,7 +279,7 @@ export const Register = (): JSX.Element => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                    className={`w-full px-3 sm:px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base ${
                       showValidation.email
                         ? emailValidation.isValid
                           ? 'border-green-500'
@@ -303,7 +303,7 @@ export const Register = (): JSX.Element => {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
+                  className="w-full px-3 sm:px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base"
                   placeholder="Phone number"
                   required
                 />
@@ -316,7 +316,7 @@ export const Register = (): JSX.Element => {
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                      className={`w-full px-3 sm:px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base ${
                         showValidation.password
                           ? passwordStrength.isValid
                             ? 'border-green-500'
@@ -352,7 +352,7 @@ export const Register = (): JSX.Element => {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
+                    className="w-full px-3 sm:px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base"
                     placeholder="Repeat your password"
                     required
                   />
@@ -390,7 +390,7 @@ export const Register = (): JSX.Element => {
                 {/* Submit Button */}
                 <Button
                   type="submit"
-                  className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-lg"
+                  className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-base sm:text-lg"
                   disabled={!formData.agreeToTerms || formData.password !== formData.confirmPassword}
                 >
                   Sign Up
@@ -474,18 +474,18 @@ export const Register = (): JSX.Element => {
         </div>
       </div>
 
-      {/* Right Section - AI Customer Support */}
-      <div className="w-1/2 bg-gradient-to-br from-[#1B1828] to-[#2a2438] flex items-center justify-center p-8">
+      {/* Right Section - AI Customer Support - Hidden on mobile */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#1B1828] to-[#2a2438] items-center justify-center p-6 xl:p-8">
         <div className="text-center text-white max-w-md">
           {/* AI Support Icon */}
-          <div className="w-32 h-32 mx-auto mb-8 bg-white/10 rounded-full flex items-center justify-center">
-            <div className="w-20 h-20 bg-[#FEC85F] rounded-full flex items-center justify-center">
-              <MessageCircleIcon className="w-10 h-10 text-[#1B1828]" />
+          <div className="w-24 h-24 xl:w-32 xl:h-32 mx-auto mb-6 xl:mb-8 bg-white/10 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 xl:w-20 xl:h-20 bg-[#FEC85F] rounded-full flex items-center justify-center">
+              <MessageCircleIcon className="w-8 h-8 xl:w-10 xl:h-10 text-[#1B1828]" />
             </div>
           </div>
 
-          <h2 className="text-3xl font-bold mb-4">Get Started with AI Help</h2>
-          <p className="text-gray-300 mb-8 text-lg leading-relaxed">
+          <h2 className="text-2xl xl:text-3xl font-bold mb-4">Get Started with AI Help</h2>
+          <p className="text-gray-300 mb-6 xl:mb-8 text-base xl:text-lg leading-relaxed">
             New to our platform? Our AI assistant can guide you through the registration process and answer any questions about our legal services.
           </p>
 
@@ -512,7 +512,7 @@ export const Register = (): JSX.Element => {
           </div>
 
           <Button 
-            className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-3 rounded-lg font-medium"
+            className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 xl:px-8 py-3 rounded-lg font-medium text-sm xl:text-base"
           >
             Chat with AI Assistant
           </Button>

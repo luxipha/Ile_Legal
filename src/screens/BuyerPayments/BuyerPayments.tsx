@@ -471,18 +471,18 @@ export const BuyerPayments = (): JSX.Element => {
         <Header title="Payments" userType="buyer" />
 
         {/* Payments Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 sm:p-6">
           <div className="max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
                 {/* Top Stats Cards - Equal Width */}
-                <div className="grid grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
                   {/* Total Amount Spent */}
                   <Card className="bg-[#1B1828] border-0">
-                    <CardContent className="p-6">
-                      <div className="mb-4">
-                        <h3 className="text-white text-sm font-medium mb-2">Total Amount Spent</h3>
-                        <div className="text-3xl font-bold text-white mb-4">₦{totalSpent.toLocaleString()}</div>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="mb-3 sm:mb-4">
+                        <h3 className="text-white text-xs sm:text-sm font-medium mb-2">Total Amount Spent</h3>
+                        <div className="text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">₦{totalSpent.toLocaleString()}</div>
                         <div className="text-sm text-gray-300">
                           {completedTasks} completed projects
                         </div>
@@ -492,10 +492,10 @@ export const BuyerPayments = (): JSX.Element => {
 
               {/* Pending Payment */}
                   <Card className="bg-[#FEC85F] border-0">
-                    <CardContent className="p-6">
+                    <CardContent className="p-4 sm:p-6">
                       <div>
-                        <h3 className="text-[#1B1828] text-sm font-medium mb-2">Pending Payment</h3>
-                        <div className="text-3xl font-bold text-[#1B1828] mb-4">₦{pendingAmount.toLocaleString()}</div>
+                        <h3 className="text-[#1B1828] text-xs sm:text-sm font-medium mb-2">Pending Payment</h3>
+                        <div className="text-2xl sm:text-3xl font-bold text-[#1B1828] mb-3 sm:mb-4">₦{pendingAmount.toLocaleString()}</div>
                         <div className="text-sm text-[#1B1828]/80">
                           {pendingTasks.length} pending {pendingTasks.length === 1 ? 'payment' : 'payments'}
                         </div>
@@ -505,10 +505,10 @@ export const BuyerPayments = (): JSX.Element => {
 
               {/* Completed Payment */}
                   <Card className="bg-white border border-gray-200">
-                    <CardContent className="p-6">
+                    <CardContent className="p-4 sm:p-6">
                       <div>
-                        <h3 className="text-gray-600 text-sm font-medium mb-2">Completed Payments</h3>
-                        <div className="text-3xl font-bold text-gray-900 mb-4">{completedTasks}</div>
+                        <h3 className="text-gray-600 text-xs sm:text-sm font-medium mb-2">Completed Payments</h3>
+                        <div className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{completedTasks}</div>
                         <div className="text-sm text-gray-600">
                           This month: {completedTasks}
                         </div>
@@ -518,9 +518,9 @@ export const BuyerPayments = (): JSX.Element => {
                 </div>
 
                 {/* Bottom Section - 60% and 40% Grid */}
-                <div className="grid grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                   {/* Task Cards - 60% width (3 columns) */}
-                  <div className="col-span-3">
+                  <div className="lg:col-span-3">
                     <div className="mb-6">
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">Recent Tasks</h3>
                       <p className="text-gray-600">Track payments and manage your legal service tasks</p>
@@ -535,26 +535,26 @@ export const BuyerPayments = (): JSX.Element => {
                       <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Transactions</h3>
                       
                       <Card className="bg-white border border-gray-200">
-                        <CardContent className="p-6">
-                          <div className="space-y-4">
+                        <CardContent className="p-4 sm:p-6">
+                          <div className="space-y-3 sm:space-y-4">
                             {formattedTransactions.map((transaction) => (
-                              <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-4">
-                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              <div key={transaction.id} className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                                     transaction.icon === 'up' ? 'bg-green-100' : 'bg-red-100'
                                   }`}>
                                     {transaction.icon === 'up' ? (
-                                      <TrendingUpIcon className="w-5 h-5 text-green-600" />
+                                      <TrendingUpIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                                     ) : (
-                                      <TrendingDownIcon className="w-5 h-5 text-red-600" />
+                                      <TrendingDownIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
                                     )}
                                   </div>
-                                  <div>
-                                    <div className="font-medium text-gray-900">{transaction.description}</div>
-                                    <div className="text-sm text-gray-500">{transaction.date}</div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-gray-900 text-sm sm:text-base truncate">{transaction.description}</div>
+                                    <div className="text-xs sm:text-sm text-gray-500">{transaction.date}</div>
                                   </div>
                                 </div>
-                                <div className={`font-bold text-lg ${transaction.color}`}>
+                                <div className={`font-bold text-sm sm:text-lg flex-shrink-0 ${transaction.color}`}>
                                   ₦{Math.abs(parseInt(transaction.amount.replace(/[+\-,]/g, ''))).toLocaleString()}
                                 </div>
                               </div>
@@ -566,7 +566,7 @@ export const BuyerPayments = (): JSX.Element => {
               </div>
 
                   {/* Right Column - Payment Methods & Wallet */}
-                  <div className="col-span-2 space-y-6">
+                  <div className="lg:col-span-2 space-y-6">
                     {/* Wallet Section - Top of right column */}
                     {walletData && (
                       <Card className="shadow-sm">

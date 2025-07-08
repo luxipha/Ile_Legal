@@ -5,6 +5,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import ToastWrapper from './components/ToastWrapper';
 import { ProfileCompletionModal } from './components/ProfileCompletionModal/ProfileCompletionModal';
+import { MobileNavigation } from './components/MobileNavigation';
+import { MobileHeader } from './components/MobileHeader';
 
 // Lazy load screens for code splitting
 // Keep critical/public screens as regular imports for faster initial load
@@ -75,9 +77,12 @@ function ProfileCompletionHandler() {
 
 function AppRoutes() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
-      <ProfileCompletionHandler />
-      <Routes>
+    <div className="min-h-screen bg-gray-50">
+      <Suspense fallback={<LoadingSpinner />}>
+        <ProfileCompletionHandler />
+        <MobileHeader />
+        <div className="pt-16 pb-16 md:pt-0 md:pb-0">
+          <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
@@ -198,8 +203,11 @@ function AppRoutes() {
       
       {/* Blockchain Demo Route - No protection for demonstration */}
       <Route path="/BlockchainDemo" element={<BlockchainDemo />} />
-      </Routes>
-    </Suspense>
+          </Routes>
+        </div>
+        <MobileNavigation />
+      </Suspense>
+    </div>
   );
 }
 

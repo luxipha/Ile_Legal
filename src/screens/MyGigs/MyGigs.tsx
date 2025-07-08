@@ -538,7 +538,7 @@ export const MyGigs = (): JSX.Element => {
         <div className="w-64 bg-[#1B1828] text-white flex flex-col">
           <div className="p-6 border-b border-gray-700">
             <Link to="/" className="flex items-center gap-3">
-              <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
+              <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
               <div className="text-gray-300 text-sm">
                 Legal
                 <br />
@@ -617,12 +617,12 @@ export const MyGigs = (): JSX.Element => {
               </Button>
 
               <Card className="bg-white border border-gray-200">
-                <CardContent className="p-8">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-8">Edit Gig</h1>
+                <CardContent className="p-4 sm:p-8">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 sm:mb-8">Edit Gig</h1>
 
                   <form onSubmit={handleUpdateGig} className="space-y-8">
                     {/* Title and Category */}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-lg font-semibold text-gray-900 mb-3">
                           Gig Title
@@ -665,7 +665,7 @@ export const MyGigs = (): JSX.Element => {
                     </div>
 
                     {/* Budget and Deadline */}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-lg font-semibold text-gray-900 mb-3">
                           Budget (₦)
@@ -887,39 +887,39 @@ export const MyGigs = (): JSX.Element => {
       <div className="flex-1 flex flex-col">
         <Header title="My Gigs" />
 
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 sm:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Header with Stats and Post Button */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6 sm:mb-8">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">My Gigs</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">My Gigs</h1>
                 
                 {/* Stats */}
-                <div className="flex items-center gap-8">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-8">
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-gray-900">{gigStats.total}</div>
-                    <div className="text-sm text-gray-600">Total Gigs</div>
+                    <div className="text-xl sm:text-3xl font-bold text-gray-900">{gigStats.total}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Total Gigs</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-gray-900">{gigStats.active}</div>
-                    <div className="text-sm text-gray-600">Active</div>
+                    <div className="text-xl sm:text-3xl font-bold text-gray-900">{gigStats.active}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Active</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-gray-900">{gigStats.paused}</div>
-                    <div className="text-sm text-gray-600">Paused</div>
+                    <div className="text-xl sm:text-3xl font-bold text-gray-900">{gigStats.paused}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Paused</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-gray-900">{gigStats.draft}</div>
-                    <div className="text-sm text-gray-600">Draft</div>
+                    <div className="text-xl sm:text-3xl font-bold text-gray-900">{gigStats.draft}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Draft</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-red-600">{gigStats.pendingPayment}</div>
-                    <div className="text-sm text-gray-600">Pending Payment</div>
+                    <div className="text-xl sm:text-3xl font-bold text-red-600">{gigStats.pendingPayment}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Pending Payment</div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                 {!isSelectMode ? (
                   <Button 
                     variant="outline" 
@@ -972,8 +972,8 @@ export const MyGigs = (): JSX.Element => {
                 )}
                 
                 {/* View Toggle Buttons */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600 mr-2">View:</span>
+                <div className="flex items-center gap-2 order-1 sm:order-none">
+                  <span className="text-xs sm:text-sm text-gray-600 mr-2">View:</span>
                   <Button
                     variant={gridViewMode === "grid" ? "default" : "outline"}
                     size="sm"
@@ -992,8 +992,8 @@ export const MyGigs = (): JSX.Element => {
                   </Button>
                 </div>
                 
-                <Link to="/post-gig">
-                  <Button className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 py-3">
+                <Link to="/post-gig" className="w-full sm:w-auto">
+                  <Button className="w-full sm:w-auto bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base">
                     <PlusIcon className="w-4 h-4 mr-2" />
                     Post a Gig
                   </Button>
@@ -1002,7 +1002,7 @@ export const MyGigs = (): JSX.Element => {
             </div>
 
             {/* Filters */}
-            <div className="flex items-center gap-4 mb-8">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
               {filters.map((filter) => (
                 <button
                   key={filter}
@@ -1050,7 +1050,7 @@ export const MyGigs = (): JSX.Element => {
                           isSelectMode && !isDeletable ? 'opacity-50' : ''
                         }`}
                       >
-                        <CardContent className="p-6">
+                        <CardContent className="p-4 sm:p-6">
                           {isSelectMode && isDeletable && (
                             <div className="mb-4">
                               <input
@@ -1067,20 +1067,20 @@ export const MyGigs = (): JSX.Element => {
                             </span>
                           </div>
                           
-                          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{gig.title}</h3>
-                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">{gig.description}</p>
+                          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm sm:text-base">{gig.title}</h3>
+                          <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2">{gig.description}</p>
                           
-                          <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mb-3">
                             <span>Deadline: {gig.deadline}</span>
                           </div>
                           
                           <div className="flex items-center justify-between mb-4">
-                            <span className="text-lg font-bold text-green-600">{gig.budget}</span>
-                            <span className="text-sm text-gray-600">{gig.orders} orders</span>
+                            <span className="text-base sm:text-lg font-bold text-green-600">{gig.budget}</span>
+                            <span className="text-xs sm:text-sm text-gray-600">{gig.orders} orders</span>
                           </div>
                           
                           {!isSelectMode && (
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                               {gig.status === 'Pending Payment' ? (
                                 /* Pending Payment Actions */
                                 <>
@@ -1154,8 +1154,8 @@ export const MyGigs = (): JSX.Element => {
                           isSelectMode && !isDeletable ? 'opacity-50' : ''
                         }`}
                       >
-                        <CardContent className="p-6">
-                          <div className="flex items-start justify-between mb-4">
+                        <CardContent className="p-4 sm:p-6">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                             <div className="flex items-start gap-3 flex-1">
                               {isSelectMode && isDeletable && (
                                 <input
@@ -1166,47 +1166,47 @@ export const MyGigs = (): JSX.Element => {
                                 />
                               )}
                               <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <h3 className="text-xl font-semibold text-gray-900">{gig.title}</h3>
-                                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${gig.statusColor}`}>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{gig.title}</h3>
+                                  <span className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium self-start ${gig.statusColor}`}>
                                     {gig.status}
                                   </span>
                                 </div>
                                 
-                                <div className="flex items-center gap-4 mb-3">
-                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-3">
+                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium self-start">
                                     {gig.category}
                                   </span>
-                                  <span className="text-sm text-gray-600">Posted: {gig.postedDate}</span>
-                                  <span className="text-sm text-gray-600">Deadline: {gig.deadline}</span>
+                                  <span className="text-xs sm:text-sm text-gray-600">Posted: {gig.postedDate}</span>
+                                  <span className="text-xs sm:text-sm text-gray-600">Deadline: {gig.deadline}</span>
                                 </div>
 
-                                <p className="text-gray-600 mb-4 line-clamp-2">{gig.description}</p>
+                                <p className="text-sm sm:text-base text-gray-600 mb-4 line-clamp-2">{gig.description}</p>
 
-                                <div className="flex items-center gap-8">
+                                <div className="grid grid-cols-3 sm:flex sm:items-center gap-4 sm:gap-8">
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold text-gray-900">{gig.orders}</div>
+                                    <div className="text-lg sm:text-2xl font-bold text-gray-900">{gig.orders}</div>
                                     <div className="text-xs text-gray-600">Orders</div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold text-gray-900">{gig.rating}</div>
+                                    <div className="text-lg sm:text-2xl font-bold text-gray-900">{gig.rating}</div>
                                     <div className="text-xs text-gray-600">Rating</div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="text-2xl font-bold text-gray-900">{gig.views}</div>
+                                    <div className="text-lg sm:text-2xl font-bold text-gray-900">{gig.views}</div>
                                     <div className="text-xs text-gray-600">Views</div>
                                   </div>
                                 </div>
 
                                 <div className="mt-4">
-                                  <div className="text-2xl font-bold text-green-600">Starting at {gig.budget}</div>
+                                  <div className="text-xl sm:text-2xl font-bold text-green-600">Starting at {gig.budget}</div>
                                 </div>
                               </div>
                             </div>
                           </div>
 
                           {!isSelectMode && (
-                            <div className="flex gap-3">
+                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-0">
                               {gig.status === 'Pending Payment' ? (
                                 /* Pending Payment Actions */
                                 <>

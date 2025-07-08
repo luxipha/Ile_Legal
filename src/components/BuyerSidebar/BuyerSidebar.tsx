@@ -19,10 +19,10 @@ export const BuyerSidebar: React.FC<BuyerSidebarProps> = ({
 }) => {
   const { user } = useAuth();
   return (
-    <div className="w-64 bg-[#1B1828] text-white flex flex-col">
+    <div className="w-64 lg:w-64 md:w-56 bg-[#1B1828] text-white flex-col hidden md:flex">
       <div className="p-6 border-b border-gray-700">
         <Link to="/" className="flex items-center gap-3">
-          <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
+          <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
           <div className="text-gray-300 text-sm">
             Legal
             <br />

@@ -447,7 +447,7 @@ export const SellerDashboard = (): JSX.Element => {
           {/* Logo */}
           <div className="p-6 border-b border-gray-700">
             <Link to="/" className="flex items-center gap-3">
-              <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
+              <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
               <div className="text-gray-300 text-sm">
                 Legal
                 <br />
@@ -623,7 +623,7 @@ export const SellerDashboard = (): JSX.Element => {
           {/* Logo */}
           <div className="p-6 border-b border-gray-700">
             <Link to="/" className="flex items-center gap-3">
-              <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
+              <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
               <div className="text-gray-300 text-sm">
                 Legal
                 <br />
@@ -723,7 +723,7 @@ export const SellerDashboard = (): JSX.Element => {
           {/* Logo */}
           <div className="p-6 border-b border-gray-700">
             <Link to="/" className="flex items-center gap-3">
-              <div className="text-[#FEC85F] text-2xl font-bold">Ilé</div>
+              <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
               <div className="text-gray-300 text-sm">
                 Legal
                 <br />
@@ -947,44 +947,44 @@ export const SellerDashboard = (): JSX.Element => {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="bg-white border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <GavelIcon className="w-6 h-6 text-gray-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <GavelIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Pending Bids</div>
-                    <div className="text-2xl font-bold text-gray-900">{activeBids.length}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Pending Bids</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900">{activeBids.length}</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <BriefcaseIcon className="w-6 h-6 text-gray-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <BriefcaseIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Ongoing Gigs</div>
-                    <div className="text-2xl font-bold text-gray-900">{ongoingGigs.length}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Ongoing Gigs</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900">{ongoingGigs.length}</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <CheckCircleIcon className="w-6 h-6 text-gray-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Completed</div>
-                    <div className="text-2xl font-bold text-gray-900">{completedGigs.length}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Completed</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900">{completedGigs.length}</div>
                   </div>
                 </div>
               </CardContent>
@@ -992,7 +992,7 @@ export const SellerDashboard = (): JSX.Element => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Available Gigs */}
             <div>
               <div className="flex items-center justify-between mb-4">

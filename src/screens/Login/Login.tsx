@@ -103,15 +103,15 @@ export const Login = (): JSX.Element => {
 
   if (showForgotPassword) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
         {/* Left Section - Forgot Password Form */}
-        <div className="flex-1 flex items-center justify-center p-8">
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-md">
             {/* Logo */}
-            <div className="text-center mb-8">
-              <Link to="/" className="inline-flex items-center gap-3">
-                <div className="text-[#FEC85F] text-3xl font-bold">Ilé</div>
-                <div className="text-gray-700 text-lg">
+            <div className="text-center mb-6 sm:mb-8">
+              <Link to="/" className="inline-flex items-center gap-2 sm:gap-3">
+                <img src="/logo.svg" alt="Ilé Legal" className="w-12 h-12 sm:w-16 sm:h-16" />
+                <div className="text-gray-700 text-base sm:text-lg">
                   Legal
                   <br />
                   Marketplace
@@ -119,8 +119,8 @@ export const Login = (): JSX.Element => {
               </Link>
             </div>
 
-            <Card className="bg-white shadow-lg border-0 rounded-2xl">
-              <CardContent className="p-8">
+            <Card className="bg-white shadow-lg border-0 rounded-xl sm:rounded-2xl">
+              <CardContent className="p-4 sm:p-6 lg:p-8">
                 {/* Back Button */}
                 <Button
                   variant="ghost"
@@ -131,9 +131,9 @@ export const Login = (): JSX.Element => {
                   Back to Sign In
                 </Button>
 
-                <div className="mb-8">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Forgot Password?</h1>
-                  <p className="text-gray-600">Enter your email address and we'll send you a link to reset your password.</p>
+                <div className="mb-6 sm:mb-8">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Forgot Password?</h1>
+                  <p className="text-sm sm:text-base text-gray-600">Enter your email address and we'll send you a link to reset your password.</p>
                 </div>
 
                 <form onSubmit={handleForgotPasswordSubmit} className="space-y-6">
@@ -146,7 +146,7 @@ export const Login = (): JSX.Element => {
                       type="email"
                       value={forgotPasswordEmail}
                       onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
+                      className="w-full px-3 sm:px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base"
                       placeholder="Enter your email address"
                       required
                     />
@@ -155,7 +155,7 @@ export const Login = (): JSX.Element => {
                   {/* Submit Button */}
                   <Button
                     type="submit"
-                    className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-lg"
+                    className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-base sm:text-lg"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? 'Sending...' : 'Send Reset Link'}
@@ -184,8 +184,8 @@ export const Login = (): JSX.Element => {
           </div>
         </div>
 
-        {/* Right Section - AI Customer Support */}
-        <div className="w-1/2 bg-gradient-to-br from-[#1B1828] to-[#2a2438] flex items-center justify-center p-8">
+        {/* Right Section - AI Customer Support - Hidden on mobile */}
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#1B1828] to-[#2a2438] items-center justify-center p-6 xl:p-8">
           <div className="text-center text-white max-w-md">
             {/* AI Support Icon */}
             <div className="w-32 h-32 mx-auto mb-8 bg-white/10 rounded-full flex items-center justify-center">
@@ -233,15 +233,15 @@ export const Login = (): JSX.Element => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
       {/* Left Section - Sign In Form */}
-      <div className="w-2/5 flex items-center justify-center p-8">
+      <div className="flex-1 lg:w-2/5 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <div className="text-center mb-8">
-            <Link to="/" className="inline-flex items-center gap-3">
-              <div className="text-[#FEC85F] text-3xl font-bold">Ilé</div>
-              <div className="text-gray-700 text-lg">
+          <div className="text-center mb-6 sm:mb-8">
+            <Link to="/" className="inline-flex items-center gap-2 sm:gap-3">
+              <img src="/logo.svg" alt="Ilé Legal" className="w-12 h-12 sm:w-16 sm:h-16" />
+              <div className="text-gray-700 text-base sm:text-lg">
                 Legal
                 <br />
                 Marketplace
@@ -249,11 +249,11 @@ export const Login = (): JSX.Element => {
             </Link>
           </div>
 
-          <Card className="bg-white shadow-lg border-0 rounded-2xl">
-            <CardContent className="p-8">
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Sign in</h1>
-                <p className="text-gray-600">Welcome back! Please sign in to your account.</p>
+          <Card className="bg-white shadow-lg border-0 rounded-xl sm:rounded-2xl">
+            <CardContent className="p-4 sm:p-6 lg:p-8">
+              <div className="mb-6 sm:mb-8">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Sign in</h1>
+                <p className="text-sm sm:text-base text-gray-600">Welcome back! Please sign in to your account.</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -264,7 +264,7 @@ export const Login = (): JSX.Element => {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all ${
+                    className={`w-full px-3 sm:px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base ${
                       showEmailValidation
                         ? emailValidation.isValid
                           ? 'border-green-500'
@@ -289,7 +289,7 @@ export const Login = (): JSX.Element => {
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all"
+                    className="w-full px-3 sm:px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none transition-all text-sm sm:text-base"
                     placeholder="Enter your password"
                     required
                   />
@@ -335,7 +335,7 @@ export const Login = (): JSX.Element => {
                 {/* Submit Button */}
                 <Button
                   type="submit"
-                  className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-lg"
+                  className="w-full bg-[#1B1828] hover:bg-[#1B1828]/90 text-white py-3 rounded-lg font-medium text-base sm:text-lg"
                   disabled={isSubmitting || isLoading}
                 >
                   {isSubmitting ? 'Signing In...' : 'Sign In'}
@@ -416,8 +416,8 @@ export const Login = (): JSX.Element => {
         </div>
       </div>
 
-      {/* Right Section - Tavus AI Video Chat - 25% Bigger */}
-      <div className="w-3/5 bg-gradient-to-br from-[#1B1828] to-[#2a2438] flex items-center justify-center p-8">
+      {/* Right Section - Tavus AI Video Chat - Hidden on mobile */}
+      <div className="hidden lg:flex lg:w-3/5 bg-gradient-to-br from-[#1B1828] to-[#2a2438] items-center justify-center p-6 xl:p-8">
         <div className="w-full max-w-md">
           <TavusChat className="w-full" />
         </div>

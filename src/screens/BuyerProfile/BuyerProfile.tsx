@@ -560,7 +560,7 @@ export const BuyerProfile = (): JSX.Element => {
         <div className="flex-1 flex flex-col">
           <Header title="Edit Profile" userType="buyer" />
 
-          <main className="flex-1 p-6 overflow-y-auto">
+          <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
               <Button
                 variant="ghost"
@@ -573,8 +573,8 @@ export const BuyerProfile = (): JSX.Element => {
               <form onSubmit={handleSaveProfile} className="space-y-8">
                 {/* Profile Picture */}
                 <Card className="bg-white border border-gray-200">
-                  <CardContent className="p-8">
-                    <div className="flex items-center gap-6">
+                  <CardContent className="p-4 sm:p-6 lg:p-8">
+                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                       <div className="relative">
                         <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                           {profileData?.avatar_url ? (
@@ -615,10 +615,10 @@ export const BuyerProfile = (): JSX.Element => {
 
                 {/* Basic Information */}
                 <Card className="bg-white border border-gray-200">
-                  <CardContent className="p-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-6">Basic Information</h3>
+                  <CardContent className="p-4 sm:p-6 lg:p-8">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">Basic Information</h3>
                     
-                    <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           First Name
@@ -647,7 +647,7 @@ export const BuyerProfile = (): JSX.Element => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Company
@@ -676,7 +676,7 @@ export const BuyerProfile = (): JSX.Element => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Location
@@ -715,7 +715,7 @@ export const BuyerProfile = (): JSX.Element => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Email
@@ -744,7 +744,7 @@ export const BuyerProfile = (): JSX.Element => {
 
                 {/* About */}
                 <Card className="bg-white border border-gray-200">
-                  <CardContent className="p-8">
+                  <CardContent className="p-4 sm:p-6 lg:p-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">About</h3>
                     <textarea
                       name="about"
@@ -759,7 +759,7 @@ export const BuyerProfile = (): JSX.Element => {
 
                 {/* Areas of Interest */}
                 <Card className="bg-white border border-gray-200">
-                  <CardContent className="p-8">
+                  <CardContent className="p-4 sm:p-6 lg:p-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">Areas of Interest</h3>
                     <div className="space-y-3">
                       {editFormData.interests.map((interest, index) => (
@@ -810,7 +810,7 @@ export const BuyerProfile = (): JSX.Element => {
 
                 {/* Education */}
                 <Card className="bg-white border border-gray-200">
-                  <CardContent className="p-8">
+                  <CardContent className="p-4 sm:p-6 lg:p-8">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-xl font-semibold text-gray-900">Education</h3>
                       <Button
@@ -876,19 +876,19 @@ export const BuyerProfile = (): JSX.Element => {
                 </Card>
 
                 {/* Action Buttons */}
-                <div className="flex justify-end gap-4 pt-6">
+                <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-6">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setViewMode("profile")}
-                    className="px-8 py-3"
+                    className="w-full sm:w-auto px-6 sm:px-8 py-3"
                     disabled={saving}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-3"
+                    className="w-full sm:w-auto bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 sm:px-8 py-3"
                     disabled={saving}
                   >
                     {saving ? 'Saving...' : 'Save Changes'}
@@ -912,15 +912,15 @@ export const BuyerProfile = (): JSX.Element => {
       <div className="flex-1 flex flex-col">
         <Header title="Profile" userType="buyer" />
 
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 sm:p-6">
           <div className="max-w-4xl mx-auto">
             <div className="space-y-6 mb-8">
               {/* Main Profile Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
-                <CardContent className="p-8">
-                  <div className="flex items-start gap-6">
-                    <div className="relative">
-                      <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                <CardContent className="p-4 sm:p-6 lg:p-8">
+                  <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                    <div className="relative mx-auto sm:mx-0">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                         {profileData?.avatar_url ? (
                           <img 
                             src={profileData.avatar_url} 
@@ -933,17 +933,17 @@ export const BuyerProfile = (): JSX.Element => {
                             }}
                           />
                         ) : null}
-                        <UserIcon className={`w-12 h-12 text-gray-600 ${profileData?.avatar_url ? 'hidden' : ''}`} />
+                        <UserIcon className={`w-10 h-10 sm:w-12 sm:h-12 text-gray-600 ${profileData?.avatar_url ? 'hidden' : ''}`} />
                       </div>
                       <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                         <CheckCircleIcon className="w-4 h-4 text-white" />
                       </div>
                     </div>
 
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
-                        <div className="flex items-center gap-2">
+                    <div className="flex-1 text-center sm:text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
+                        <div className="flex items-center justify-center sm:justify-start gap-2">
                           {/* Identity Verification Badge */}
                           <div title={(user?.user_metadata as any)?.verification_status === 'verified' ? "Verified Client" : "Pending Verification"}>
                             {(user?.user_metadata as any)?.verification_status === 'verified' ? (
@@ -963,11 +963,11 @@ export const BuyerProfile = (): JSX.Element => {
                         </div>
                       </div>
                       
-                      <p className="text-xl text-gray-600 mb-2">{profileData.company}</p>
-                      <p className="text-lg text-gray-500 mb-4">{profileData.industry}</p>
+                      <p className="text-lg sm:text-xl text-gray-600 mb-2">{profileData.company}</p>
+                      <p className="text-base sm:text-lg text-gray-500 mb-4">{profileData.industry}</p>
                       
-                      <div className="flex items-center gap-6 mb-4">
-                        <div className="flex items-center gap-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 mb-4">
+                        <div className="flex items-center gap-1 justify-center sm:justify-start">
                           {loadingGigsRating ? (
                             <span className="text-gray-400">Loading...</span>
                           ) : (
@@ -981,24 +981,24 @@ export const BuyerProfile = (): JSX.Element => {
                                 : 'No reviewed gigs yet'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-600">
+                        <div className="flex items-center gap-2 text-gray-600 justify-center sm:justify-start">
                           <BriefcaseIcon className="w-4 h-4" />
-                          <span>{myGigsCount > 0 ? `${myGigsCount} completed project${myGigsCount === 1 ? '' : 's'}` : 'No completed projects yet'}</span>
+                          <span className="text-sm sm:text-base">{myGigsCount > 0 ? `${myGigsCount} completed project${myGigsCount === 1 ? '' : 's'}` : 'No completed projects yet'}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-2 sm:gap-4">
                         <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                           Active Client
                         </span>
-                        <span className="text-gray-600">New member</span>
+                        <span className="text-gray-600 text-sm sm:text-base">New member</span>
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex justify-center sm:justify-start mt-4 sm:mt-0">
                       <Button
                         onClick={() => setViewMode("edit-profile")}
-                        className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                        className="w-full sm:w-auto bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
                       >
                         <EditIcon className="w-4 h-4 mr-2" />
                         Edit Profile
@@ -1012,12 +1012,12 @@ export const BuyerProfile = (): JSX.Element => {
               <Card className="bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-0">
                   <div className="border-b border-gray-200">
-                    <nav className="flex">
+                    <nav className="flex overflow-x-auto">
                       {tabs.map((tab) => (
                         <button
                           key={tab.id}
                           onClick={() => setActiveTab(tab.id as any)}
-                          className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                          className={`px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                             activeTab === tab.id
                               ? "border-blue-500 text-blue-600"
                               : "border-transparent text-gray-500 hover:text-gray-700"
@@ -1029,7 +1029,7 @@ export const BuyerProfile = (): JSX.Element => {
                     </nav>
                   </div>
 
-                  <div className="p-8">
+                  <div className="p-4 sm:p-6 lg:p-8">
                     {renderTabContent()}
                   </div>
                 </CardContent>
@@ -1037,8 +1037,8 @@ export const BuyerProfile = (): JSX.Element => {
 
               {/* Contact Information Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
-                <CardContent className="p-8">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-6">Contact Information</h3>
+                <CardContent className="p-4 sm:p-6 lg:p-8">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">Contact Information</h3>
                   
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">

@@ -710,26 +710,26 @@ export const BuyerDashboard = (): JSX.Element => {
         />
       )}
       
-      {/* Sidebar */}
+      {/* Sidebar - Hidden on mobile */}
       <BuyerSidebar activePage="dashboard" />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col w-full md:w-auto">
         <Header title="Dashboard" userType="buyer" />
 
         {/* Dashboard Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 sm:p-6">
           {/* Welcome Section */}
-          <div className="bg-gradient-to-r from-[#FEC85F] to-[#f5c55a] rounded-lg p-6 mb-8">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-[#FEC85F] to-[#f5c55a] rounded-lg p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-[#1B1828] mb-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-[#1B1828] mb-2">
                   Welcome back, {user?.name || user?.user_metadata?.firstName || 'User'}
                 </h2>
-                <p className="text-[#1B1828]/80">Manage your legal tasks and find qualified professionals</p>
+                <p className="text-[#1B1828]/80 text-sm sm:text-base">Manage your legal tasks and find qualified professionals</p>
               </div>
-              <Link to="/post-gig">
-                <Button className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white">
+              <Link to="/post-gig" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-4 sm:px-6 py-3 rounded-lg">
                   Post New Gig
                 </Button>
               </Link>
@@ -737,44 +737,44 @@ export const BuyerDashboard = (): JSX.Element => {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="bg-white border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <ClockIcon className="w-6 h-6 text-gray-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">In Progress</div>
-                    <div className="text-2xl font-bold text-gray-900">{stats.inProgress}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">In Progress</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900">{stats.inProgress}</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <BriefcaseIcon className="w-6 h-6 text-gray-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <BriefcaseIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Active Gigs</div>
-                    <div className="text-2xl font-bold text-gray-900">{stats.active}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Active Gigs</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900">{stats.active}</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <CheckCircleIcon className="w-6 h-6 text-gray-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Completed</div>
-                    <div className="text-2xl font-bold text-gray-900">{stats.completed}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Completed</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900">{stats.completed}</div>
                   </div>
                 </div>
               </CardContent>
@@ -782,7 +782,7 @@ export const BuyerDashboard = (): JSX.Element => {
           </div>
 
           {/* Main Content Grid - 50/50 Split */}
-          <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Left Column - Active Gigs (50%) */}
             <div>
               <div className="mb-6">

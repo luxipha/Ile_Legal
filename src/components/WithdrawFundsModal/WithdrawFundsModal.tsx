@@ -84,7 +84,7 @@ export const WithdrawFundsModal: React.FC<WithdrawFundsModalProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="text-[#FEC85F] text-2xl font-bold">ilé</div>
+              <img src="/logo.svg" alt="Ilé Legal" className="w-8 h-8" />
               <div className="text-gray-600 text-sm">Legal</div>
             </div>
             <Button
