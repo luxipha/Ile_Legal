@@ -216,34 +216,37 @@ export const FindGigs = (): JSX.Element => {
         <SellerSidebar activePage="find-gigs" />
 
         {/* Main Content - Place Bid */}
-        <div className="flex-1 flex flex-col">
-          <Header title="Place a Bid" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          {/* Header - Hidden on mobile since SellerSidebar provides mobile nav */}
+          <div className="hidden md:block">
+            <Header title="Place a Bid" />
+          </div>
 
           {/* Place Bid Content */}
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-3 sm:p-4 md:p-6">
             <div className="max-w-4xl mx-auto">
               {renderBackButton()}
 
               {/* Gig Summary */}
-              <Card className="bg-blue-50 border border-blue-200 mb-8">
-                <CardContent className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">{selectedGig.title}</h2>
-                  <div className="grid grid-cols-3 gap-6">
+              <Card className="bg-blue-50 border border-blue-200 mb-6 sm:mb-8">
+                <CardContent className="p-4 sm:p-6">
+                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">{selectedGig.title}</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
                     <div>
-                      <span className="text-gray-600">Budget:</span>
-                      <div className="font-semibold text-gray-900">
+                      <span className="text-sm text-gray-600">Budget:</span>
+                      <div className="font-semibold text-gray-900 text-sm sm:text-base">
                         {selectedGig.budget ? `₦${selectedGig.budget.toLocaleString()}` : selectedGig.price || 'Not specified'}
                       </div>
                     </div>
                     <div>
-                      <span className="text-gray-600">Deadline:</span>
-                      <div className="font-semibold text-gray-900">
+                      <span className="text-sm text-gray-600">Deadline:</span>
+                      <div className="font-semibold text-gray-900 text-sm sm:text-base">
                         {selectedGig.deadline ? new Date(selectedGig.deadline).toLocaleDateString() : 'Not specified'}
                       </div>
                     </div>
                     <div>
-                      <span className="text-gray-600">Posted:</span>
-                      <div className="font-semibold text-gray-900">
+                      <span className="text-sm text-gray-600">Posted:</span>
+                      <div className="font-semibold text-gray-900 text-sm sm:text-base">
                         {selectedGig.created_at ? new Date(selectedGig.created_at).toLocaleDateString() : selectedGig.postedDate || 'Not specified'}
                       </div>
                     </div>
@@ -253,14 +256,14 @@ export const FindGigs = (): JSX.Element => {
 
               {/* Bid Form */}
               <Card className="bg-white border border-gray-200">
-                <CardContent className="p-8">
-                  <form onSubmit={handleBidSubmit} className="space-y-6">
+                <CardContent className="p-4 sm:p-6 lg:p-8">
+                  <form onSubmit={handleBidSubmit} className="space-y-4 sm:space-y-6">
                     {bidError && (
-                      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+                      <div className="bg-red-50 border border-red-200 text-red-600 px-3 sm:px-4 py-3 rounded-lg text-sm sm:text-base">
                         {bidError}
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Bid Amount (₦)
@@ -270,7 +273,7 @@ export const FindGigs = (): JSX.Element => {
                           value={bidFormData.bidAmount}
                           onChange={(e) => setBidFormData(prev => ({ ...prev, bidAmount: e.target.value }))}
                           placeholder="50000"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-sm sm:text-base"
                           required
                           min="0"
                         />
@@ -284,7 +287,7 @@ export const FindGigs = (): JSX.Element => {
                           value={bidFormData.deliveryTime}
                           onChange={(e) => setBidFormData(prev => ({ ...prev, deliveryTime: e.target.value }))}
                           placeholder="e.g., 5 days"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-sm sm:text-base"
                           required
                         />
                       </div>
@@ -298,30 +301,30 @@ export const FindGigs = (): JSX.Element => {
                         value={bidFormData.proposal}
                         onChange={(e) => setBidFormData(prev => ({ ...prev, proposal: e.target.value }))}
                         placeholder="Describe your experience and approach to completing this task..."
-                        rows={6}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none resize-none"
+                        rows={4}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none resize-none text-sm sm:text-base"
                         required
                       />
                     </div>
 
-                    <div className="flex justify-end gap-4 pt-6">
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4 sm:pt-6">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => setViewMode("list")}
-                        className="px-8 py-3"
+                        className="px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base w-full sm:w-auto"
                         disabled={isSubmittingBid}
                       >
                         Cancel
                       </Button>
                       <Button
                         type="submit"
-                        className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-8 py-3"
+                        className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base w-full sm:w-auto"
                         disabled={isSubmittingBid}
                       >
                         {isSubmittingBid ? (
                           <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#1B1828] mr-2"></div>
+                            <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-[#1B1828] mr-2"></div>
                             Submitting...
                           </>
                         ) : (
@@ -372,22 +375,25 @@ export const FindGigs = (): JSX.Element => {
       <SellerSidebar activePage="find-gigs" />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <Header title="Find Gigs" />
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+        {/* Header - Hidden on mobile since SellerSidebar provides mobile nav */}
+        <div className="hidden md:block">
+          <Header title="Find Gigs" />
+        </div>
 
         {/* Search and Filter Section */}
-        <div className="bg-white border-b border-gray-200 p-6">
+        <div className="bg-white border-b border-gray-200 p-3 sm:p-4 md:p-6">
           <div className="max-w-4xl mx-auto">
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 mb-4">
               {/* Search Bar */}
               <div className="flex-1 relative">
-                <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <SearchIcon className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
                 <input
                   type="text"
                   placeholder="Search gigs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
+                  className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-sm sm:text-base"
                 />
               </div>
 
@@ -396,7 +402,7 @@ export const FindGigs = (): JSX.Element => {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none min-w-[200px]"
+                  className="appearance-none bg-white border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 pr-8 sm:pr-10 focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none w-full sm:min-w-[180px] text-sm sm:text-base"
                 >
                   {categories.map((category) => (
                     <option key={category} value={category}>
@@ -404,37 +410,37 @@ export const FindGigs = (): JSX.Element => {
                     </option>
                   ))}
                 </select>
-                <FilterIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+                <FilterIcon className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5 pointer-events-none" />
               </div>
 
               {/* Apply Filters Button */}
-              <Button className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-6 py-3">
+              <Button className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base w-full sm:w-auto">
                 Apply filters
               </Button>
             </div>
 
             {/* View Toggle and Results Count */}
-            <div className="flex items-center justify-between">
-              <p className="text-gray-600">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              <p className="text-gray-600 text-sm sm:text-base">
                 Showing {filteredGigs.length} of {gigs.length} gigs
               </p>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 mr-2">View:</span>
+                <span className="text-xs sm:text-sm text-gray-600 mr-2">View:</span>
                 <Button
                   variant={gridViewMode === "grid" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setGridViewMode("grid")}
-                  className={gridViewMode === "grid" ? "bg-[#1B1828] text-white" : ""}
+                  className={`${gridViewMode === "grid" ? "bg-[#1B1828] text-white" : ""} p-2`}
                 >
-                  <GridIcon className="w-4 h-4" />
+                  <GridIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
                 <Button
                   variant={gridViewMode === "list" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setGridViewMode("list")}
-                  className={gridViewMode === "list" ? "bg-[#1B1828] text-white" : ""}
+                  className={`${gridViewMode === "list" ? "bg-[#1B1828] text-white" : ""} p-2`}
                 >
-                  <ListIcon className="w-4 h-4" />
+                  <ListIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
               </div>
             </div>
@@ -442,16 +448,16 @@ export const FindGigs = (): JSX.Element => {
         </div>
 
         {/* Gigs Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {gridViewMode === "grid" ? (
               /* Grid View */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {filteredGigs.map((gig) => (
                   <Card key={gig.id} className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="mb-4">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="mb-3 sm:mb-4">
+                        <span className={`inline-block px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
                           gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
                           gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
                           gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
@@ -470,21 +476,21 @@ export const FindGigs = (): JSX.Element => {
                         </span>
                       </div>
                       
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{gig.title}</h3>
-                      <p className="text-sm text-gray-600 mb-2">{gig.description.substring(0, 100)}...</p>
+                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm sm:text-base">{gig.title}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">{gig.description.substring(0, 100)}...</p>
                       
-                      <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-                        <CalendarIcon className="w-4 h-4" />
+                      <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 mb-3">
+                        <CalendarIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
                       </div>
                       
-                      <div className="flex flex-col gap-4">
-                        <span className="text-lg font-bold text-gray-900">
+                      <div className="flex flex-col gap-3 sm:gap-4">
+                        <span className="text-base sm:text-lg font-bold text-gray-900">
                           {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
                         </span>
                         <Button 
                           onClick={() => handleViewDetails(gig)}
-                          className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] text-sm"
+                          className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] text-xs sm:text-sm w-full"
                         >
                           View Details & Bid
                         </Button>
@@ -498,53 +504,103 @@ export const FindGigs = (): JSX.Element => {
               <div className="space-y-4">
                 {filteredGigs.map((gig) => (
                   <Card key={gig.id} className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-3">
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                              gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
-                              gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
-                              gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
-                              gig.categories?.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
-                              gig.categories?.includes('due-diligence') ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
-                            </span>
-                            <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              (gig.status || '').toLowerCase() === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              (gig.status || '').toLowerCase() === 'paused' ? 'bg-gray-200 text-gray-700' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {gig.status ? gig.status.charAt(0).toUpperCase() + gig.status.slice(1) : ''}
-                            </span>
-                            <span className="text-sm text-gray-500">
-                              Posted {gig.created_at ? new Date(gig.created_at).toLocaleDateString() : gig.postedDate || 'Unknown'}
-                            </span>
-                          </div>
-                          
-                          <h3 className="font-semibold text-gray-900 mb-2 text-lg">{gig.title}</h3>
-                          <p className="text-gray-600 mb-4">{gig.description}</p>
-                          
-                          <div className="flex items-center gap-6 text-sm text-gray-500">
-                            <div className="flex items-center gap-2">
-                              <CalendarIcon className="w-4 h-4" />
-                              <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
-                            </div>
-                          </div>
+                    <CardContent className="p-4 sm:p-6">
+                      {/* Mobile Layout */}
+                      <div className="block lg:hidden">
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                            gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
+                            gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                            gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                            gig.categories?.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                            gig.categories?.includes('due-diligence') ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
+                          </span>
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            (gig.status || '').toLowerCase() === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            (gig.status || '').toLowerCase() === 'paused' ? 'bg-gray-200 text-gray-700' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {gig.status ? gig.status.charAt(0).toUpperCase() + gig.status.slice(1) : ''}
+                          </span>
                         </div>
                         
-                        <div className="ml-6">
-                          <div className="text-2xl font-bold text-gray-900 mb-4">
+                        <h3 className="font-semibold text-gray-900 mb-2 text-base">{gig.title}</h3>
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{gig.description}</p>
+                        
+                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                          <CalendarIcon className="w-3 h-3" />
+                          <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-bold text-gray-900">
                             {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
                           </div>
                           <Button 
                             onClick={() => handleViewDetails(gig)}
-                            className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"
+                            className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] text-xs px-3 py-2"
                           >
-                            View Details & Bid
+                            View & Bid
                           </Button>
+                        </div>
+                        
+                        <div className="text-xs text-gray-500 mt-2">
+                          Posted {gig.created_at ? new Date(gig.created_at).toLocaleDateString() : gig.postedDate || 'Unknown'}
+                        </div>
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div className="hidden lg:block">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                gig.categories?.includes('land-title') ? 'bg-green-100 text-green-800' :
+                                gig.categories?.includes('contract-review') ? 'bg-blue-100 text-blue-800' :
+                                gig.categories?.includes('c-of-o') ? 'bg-purple-100 text-purple-800' :
+                                gig.categories?.includes('property-survey') ? 'bg-orange-100 text-orange-800' :
+                                gig.categories?.includes('due-diligence') ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {gig.categories?.[0]?.replace('-', ' ') || gig.category || 'General'}
+                              </span>
+                              <span className={`ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                (gig.status || '').toLowerCase() === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                (gig.status || '').toLowerCase() === 'paused' ? 'bg-gray-200 text-gray-700' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {gig.status ? gig.status.charAt(0).toUpperCase() + gig.status.slice(1) : ''}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                Posted {gig.created_at ? new Date(gig.created_at).toLocaleDateString() : gig.postedDate || 'Unknown'}
+                              </span>
+                            </div>
+                            
+                            <h3 className="font-semibold text-gray-900 mb-2 text-lg">{gig.title}</h3>
+                            <p className="text-gray-600 mb-4">{gig.description}</p>
+                            
+                            <div className="flex items-center gap-6 text-sm text-gray-500">
+                              <div className="flex items-center gap-2">
+                                <CalendarIcon className="w-4 h-4" />
+                                <span>Due: {gig.deadline ? new Date(gig.deadline).toLocaleDateString() : 'Not specified'}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="ml-6">
+                            <div className="text-2xl font-bold text-gray-900 mb-4">
+                              {gig.budget ? `₦${gig.budget.toLocaleString()}` : gig.price || 'Not specified'}
+                            </div>
+                            <Button 
+                              onClick={() => handleViewDetails(gig)}
+                              className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"
+                            >
+                              View Details & Bid
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -554,10 +610,10 @@ export const FindGigs = (): JSX.Element => {
             )}
 
             {filteredGigs.length === 0 && (
-              <div className="text-center py-12">
-                <SearchIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No gigs found</h3>
-                <p className="text-gray-600">Try adjusting your search criteria or filters</p>
+              <div className="text-center py-8 sm:py-12">
+                <SearchIcon className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No gigs found</h3>
+                <p className="text-sm sm:text-base text-gray-600">Try adjusting your search criteria or filters</p>
               </div>
             )}
           </div>

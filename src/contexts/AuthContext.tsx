@@ -67,6 +67,11 @@ export interface User {
   role: UserRole;
   isVerified: boolean;
   status?: string;
+  avatar_url?: string;
+  documents?: Array<{
+    name: string;
+    status: "verified" | "pending" | "rejected";
+  }>;
   user_metadata: {
     firstName?: string;
     lastName?: string;
@@ -86,6 +91,7 @@ export interface User {
     status?: string;
     verification_status?: string;
     real_email?: string;
+    type?: string;
   };
 }
 

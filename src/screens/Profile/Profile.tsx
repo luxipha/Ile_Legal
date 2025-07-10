@@ -1105,78 +1105,17 @@ export const Profile = (): JSX.Element => {
     return (
       <div className="min-h-screen bg-gray-50 flex">
         {/* Sidebar */}
-        <div className="w-64 bg-[#1B1828] text-white flex flex-col">
-          <div className="p-6 border-b border-gray-700">
-            <Link to="/" className="flex items-center gap-3">
-              <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
-              <div className="text-gray-300 text-sm">
-                Legal
-                <br />
-                Marketplace
-              </div>
-            </Link>
-          </div>
-
-          <nav className="flex-1 p-4">
-            <ul className="space-y-2">
-              <li>
-                <Link to="/seller-dashboard" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <UserIcon className="w-5 h-5" />
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link to="/find-gigs" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <SearchIcon className="w-5 h-5" />
-                  Find Gigs
-                </Link>
-              </li>
-              <li>
-                <Link to="/active-bids" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <GavelIcon className="w-5 h-5" />
-                  Active Bids
-                </Link>
-              </li>
-              <li>
-                <Link to="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <MessageSquareIcon className="w-5 h-5" />
-                  Messages
-                </Link>
-              </li>
-              <li>
-                <Link to="/earnings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                  <DollarSignIcon className="w-5 h-5" />
-                  Earnings
-                </Link>
-              </li>
-              <li>
-                <Link to="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 text-white">
-                  <UserIcon className="w-5 h-5" />
-                  Profile
-                </Link>
-              </li>
-            </ul>
-          </nav>
-
-          <div className="p-4 border-t border-gray-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
-                <UserIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-sm font-medium">{profileData.firstName} {profileData.lastName}</div>
-                <div className="text-xs text-gray-400">{profileData.email}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SellerSidebar activePage="profile" />
 
         {/* Main Content - Edit Profile */}
-        <div className="flex-1 flex flex-col">
-          <Header title="Edit Profile" userType="seller" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          {/* Header - Hidden on mobile since SellerSidebar provides mobile nav */}
+          <div className="hidden md:block">
+            <Header title="Edit Profile" userType="seller" />
+          </div>
 
           {/* Edit Profile Content */}
-          <main className="flex-1 p-6 overflow-y-auto">
+          <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto">
             <div className="max-w-4xl mx-auto">
               {/* Back Button */}
               <Button
@@ -1190,9 +1129,9 @@ export const Profile = (): JSX.Element => {
 
               {/* Progress Indicator */}
               <Card className="bg-white border border-gray-200 mb-6">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900">Complete Your Profile</h2>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-2">
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Complete Your Profile</h2>
                     <span className="text-sm text-gray-600">{completedSteps.length} of 5 steps completed</span>
                   </div>
                   
@@ -1205,18 +1144,18 @@ export const Profile = (): JSX.Element => {
                   </div>
 
                   {/* Step Indicators */}
-                  <div className="flex justify-between overflow-x-auto">
+                  <div className="flex justify-between overflow-x-auto pb-2">
                     {profileSteps.map((step) => (
                       <div 
                         key={step.id}
-                        className={`flex flex-col items-center cursor-pointer ${
+                        className={`flex flex-col items-center cursor-pointer min-w-0 flex-shrink-0 px-1 ${
                           completedSteps.includes(step.id) || currentStep === step.id 
                             ? 'text-purple-600' 
                             : 'text-gray-400'
                         }`}
                         onClick={() => handleStepClick(step.id)}
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium mb-2 border-2 ${
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium mb-2 border-2 ${
                           completedSteps.includes(step.id)
                             ? 'bg-purple-600 text-white border-purple-600'
                             : currentStep === step.id
@@ -1224,14 +1163,14 @@ export const Profile = (): JSX.Element => {
                             : 'bg-white text-gray-400 border-gray-300'
                         }`}>
                           {completedSteps.includes(step.id) ? (
-                            <CheckCircleIcon className="w-5 h-5" />
+                            <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                           ) : (
                             step.id
                           )}
                         </div>
-                        <div className="text-center min-w-0 flex-shrink-0">
-                          <div className="text-xs font-medium whitespace-nowrap">{step.title}</div>
-                          <div className="text-xs text-gray-500 whitespace-nowrap">{step.description}</div>
+                        <div className="text-center min-w-0 max-w-16 sm:max-w-20">
+                          <div className="text-xs font-medium truncate">{step.title}</div>
+                          <div className="text-xs text-gray-500 truncate hidden sm:block">{step.description}</div>
                         </div>
                       </div>
                     ))}
@@ -1245,20 +1184,20 @@ export const Profile = (): JSX.Element => {
                 {/* Step 1: Basic Information */}
                 {currentStep === 1 && (
                   <Card className="bg-white border border-gray-200">
-                    <CardContent className="p-8">
-                      <div className="flex items-center gap-3 mb-6">
+                    <CardContent className="p-4 sm:p-6 lg:p-8">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-6 text-center sm:text-left">
                         <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                           <UserIcon className="w-6 h-6 text-purple-600" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Basic Information</h3>
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Basic Information</h3>
                           <p className="text-sm text-gray-600">Personal details and contact information</p>
                         </div>
                       </div>
 
                       {/* Profile Picture */}
                       <div className="mb-8">
-                        <div className="flex items-center gap-6">
+                        <div className="flex flex-col items-center gap-4 text-center">
                           <div className="relative">
                             <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                               {user && (user.user_metadata as any)?.profile_picture ? (
@@ -1306,7 +1245,7 @@ export const Profile = (): JSX.Element => {
                             name="firstName"
                             value={editFormData.firstName}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                             required
                           />
                         </div>
@@ -1319,7 +1258,7 @@ export const Profile = (): JSX.Element => {
                             name="lastName"
                             value={editFormData.lastName}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                             required
                           />
                         </div>
@@ -1369,8 +1308,8 @@ export const Profile = (): JSX.Element => {
                           Address
                         </label>
                         <div className="relative">
-                          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-                            <MapPinIcon className="w-5 h-5 text-gray-400" />
+                          <div className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2">
+                            <MapPinIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                           </div>
                           <input
                             type="text"
@@ -1378,7 +1317,7 @@ export const Profile = (): JSX.Element => {
                             value={editFormData.address}
                             onChange={handleInputChange}
                             placeholder="Enter your address"
-                            className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                            className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                           />
                         </div>
                       </div>
@@ -1389,13 +1328,13 @@ export const Profile = (): JSX.Element => {
                 {/* Step 2: Professional Details */}
                 {currentStep === 2 && (
                   <Card className="bg-white border border-gray-200">
-                    <CardContent className="p-8">
-                      <div className="flex items-center gap-3 mb-6">
+                    <CardContent className="p-4 sm:p-6 lg:p-8">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-6 text-center sm:text-left">
                         <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                           <BriefcaseIcon className="w-6 h-6 text-purple-600" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Professional Details</h3>
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Professional Details</h3>
                           <p className="text-sm text-gray-600">Professional information and expertise</p>
                         </div>
                       </div>
@@ -1410,7 +1349,7 @@ export const Profile = (): JSX.Element => {
                           value={editFormData.title}
                           onChange={handleInputChange}
                           placeholder="e.g., Senior Property Lawyer"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                           required
                         />
                       </div>
@@ -1438,7 +1377,7 @@ export const Profile = (): JSX.Element => {
                           value={enhancedFormData.linkedinUrl}
                           onChange={(e) => handleEnhancedInputChange('linkedinUrl', e.target.value)}
                           placeholder="https://linkedin.com/in/yourprofile"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                         />
                       </div>
 
@@ -1505,13 +1444,13 @@ export const Profile = (): JSX.Element => {
                 {/* Step 3: Education & Experience */}
                 {currentStep === 3 && (
                   <Card className="bg-white border border-gray-200">
-                    <CardContent className="p-8">
-                      <div className="flex items-center gap-3 mb-6">
+                    <CardContent className="p-4 sm:p-6 lg:p-8">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-6 text-center sm:text-left">
                         <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                           <GraduationCapIcon className="w-6 h-6 text-purple-600" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Education & Experience</h3>
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Education & Experience</h3>
                           <p className="text-sm text-gray-600">Academic background and work history</p>
                         </div>
                       </div>
@@ -1585,20 +1524,20 @@ export const Profile = (): JSX.Element => {
                 {/* Step 4: Identity Verification */}
                 {currentStep === 4 && (
                   <Card className="bg-white border border-gray-200">
-                    <CardContent className="p-8">
-                      <div className="flex items-center gap-3 mb-6">
+                    <CardContent className="p-4 sm:p-6 lg:p-8">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-6 text-center sm:text-left">
                         <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                           <ShieldCheckIcon className="w-6 h-6 text-purple-600" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Identity Verification</h3>
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Identity Verification</h3>
                           <p className="text-sm text-gray-600">Verify your identity with official documents</p>
                         </div>
                       </div>
 
-                      <div className="grid md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                         {/* Government ID */}
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-purple-400 transition-colors">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 hover:border-purple-400 transition-colors">
                           <div className="text-center">
                             <BadgeCheckIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                             <h4 className="font-semibold text-gray-900 mb-2">Government ID *</h4>
@@ -1719,13 +1658,13 @@ export const Profile = (): JSX.Element => {
                 {/* Step 5: Professional Licensing */}
                 {currentStep === 5 && (
                   <Card className="bg-white border border-gray-200">
-                    <CardContent className="p-8">
-                      <div className="flex items-center gap-3 mb-6">
+                    <CardContent className="p-4 sm:p-6 lg:p-8">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-6 text-center sm:text-left">
                         <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                           <GavelIcon className="w-6 h-6 text-purple-600" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Professional Licensing</h3>
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Professional Licensing</h3>
                           <p className="text-sm text-gray-600">Legal credentials and professional documents</p>
                         </div>
                       </div>
@@ -1739,7 +1678,7 @@ export const Profile = (): JSX.Element => {
                           value={enhancedFormData.barLicenseNumber}
                           onChange={(e) => handleEnhancedInputChange('barLicenseNumber', e.target.value)}
                           placeholder="Enter your bar license number"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                           required
                         />
                       </div>
@@ -1914,17 +1853,20 @@ export const Profile = (): JSX.Element => {
       <SellerSidebar activePage="profile" />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <Header title="Profile" userType="seller" />
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+        {/* Header - Hidden on mobile since SellerSidebar provides mobile nav */}
+        <div className="hidden md:block">
+          <Header title="Profile" userType="seller" />
+        </div>
 
         {/* Profile Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-4xl mx-auto">
-            <div className="space-y-6 mb-8">
+            <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
               {/* Main Profile Card */}
               <Card className="bg-white border border-gray-200 shadow-lg">
-                <CardContent className="p-8">
-                  <div className="flex items-start gap-6">
+                <CardContent className="p-4 sm:p-6 md:p-8">
+                  <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
                     <div className="relative">
                       <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                         {user && (user.user_metadata as any)?.profile_picture ? (
@@ -1946,12 +1888,12 @@ export const Profile = (): JSX.Element => {
                       </div>
                     </div>
 
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h2 className="text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
+                    <div className="flex-1 text-center sm:text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{profileData.firstName} {profileData.lastName}</h2>
                         {/* Current Tier Badge */}
                         {!loadingBadges && currentTierBadge && (
-                          <div className="flex-shrink-0">
+                          <div className="flex justify-center sm:justify-start">
                             <BadgeCollection 
                               badges={[currentTierBadge]} 
                               maxVisible={1} 
@@ -1962,17 +1904,17 @@ export const Profile = (): JSX.Element => {
                         )}
                         {/* Fallback verification badge */}
                         {(loadingBadges || !currentTierBadge) && (
-                          <div title={(user?.user_metadata as any)?.verification_status === 'verified' ? "Verified Professional" : "Pending Verification"}>
+                          <div className="flex justify-center sm:justify-start" title={(user?.user_metadata as any)?.verification_status === 'verified' ? "Verified Professional" : "Pending Verification"}>
                             {(user?.user_metadata as any)?.verification_status === 'verified' ? (
-                              <BadgeCheckIcon className="w-6 h-6 text-yellow-500" />
+                              <BadgeCheckIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
                             ) : (
-                              <Badge className="w-6 h-6 text-gray-400" />
+                              <Badge className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" />
                             )}
                           </div>
                         )}
                       </div>
                       
-                      <p className="text-xl text-gray-600 mb-4">{profileData.title}</p>
+                      <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-3 sm:mb-4">{profileData.title}</p>
                       
                       {/* Loyalty Stats */}
                       {!loadingLoyaltyStats && loyaltyStats && (
@@ -2013,10 +1955,10 @@ export const Profile = (): JSX.Element => {
                         </div>
                       )}
                       
-                      <div className="flex items-center gap-6 mb-4">
+                      <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 mb-3 sm:mb-4">
                         <div className="flex items-center gap-1">
                           {renderStars(Math.round(averageRating))}
-                          <span className="ml-2 font-semibold text-gray-900">
+                          <span className="ml-2 font-semibold text-gray-900 text-sm sm:text-base">
                             {loadingReviews ? 'Loading...' : 
                              reviews.length > 0 ? 
                                `${averageRating.toFixed(1)} (${reviews.length} review${reviews.length === 1 ? '' : 's'})` : 
@@ -2024,34 +1966,34 @@ export const Profile = (): JSX.Element => {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-600">
-                          <BriefcaseIcon className="w-4 h-4" />
-                          <span>{experience.length > 0 ? `${experience.length} position${experience.length === 1 ? '' : 's'}` : 'Professional'}</span>
+                          <BriefcaseIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span className="text-sm sm:text-base">{experience.length > 0 ? `${experience.length} position${experience.length === 1 ? '' : 's'}` : 'Professional'}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
-                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                      <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                        <span className="bg-green-100 text-green-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
                           Available Now
                         </span>
-                        <span className="text-gray-600">Response within 2 hours</span>
+                        <span className="text-gray-600 text-xs sm:text-sm">Response within 2 hours</span>
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto mt-4 sm:mt-0">
                       <Button
                         variant="outline"
                         onClick={() => setViewMode("edit-profile")}
-                        className="flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                        className="flex items-center justify-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 text-sm w-full sm:w-auto"
                       >
-                        <EditIcon className="w-4 h-4" />
+                        <EditIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         Edit Profile
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => setViewMode("public-view")}
-                        className="flex items-center gap-2 border-purple-200 text-purple-700 hover:bg-purple-50"
+                        className="flex items-center justify-center gap-2 border-purple-200 text-purple-700 hover:bg-purple-50 text-sm w-full sm:w-auto"
                       >
-                        <EyeIcon className="w-4 h-4" />
+                        <EyeIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                         Public View
                       </Button>
                     </div>
@@ -2061,15 +2003,15 @@ export const Profile = (): JSX.Element => {
             </div>
 
             {/* Main Content with Tabs */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Tab Navigation */}
               <div className="border-b border-gray-200 bg-white rounded-lg p-1">
-                <nav className="flex space-x-8 px-6 py-4">
+                <nav className="flex space-x-4 sm:space-x-8 px-3 sm:px-6 py-3 sm:py-4 overflow-x-auto">
                   {tabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                      className={`py-2 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap ${
                         activeTab === tab.id
                           ? 'border-blue-500 text-blue-600'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -2083,7 +2025,7 @@ export const Profile = (): JSX.Element => {
 
               {/* Tab Content */}
               <Card className="bg-white border border-gray-200">
-                <CardContent className="p-8">
+                <CardContent className="p-4 sm:p-6 md:p-8">
                   {renderTabContent()}
                 </CardContent>
               </Card>
@@ -2091,20 +2033,20 @@ export const Profile = (): JSX.Element => {
 
             {/* Contact Information */}
             <Card className="bg-white border border-gray-200">
-              <CardContent className="p-8">
-                <h3 className="text-xl font-semibold text-gray-900 mb-6">Contact Information</h3>
-                <div className="space-y-4">
+              <CardContent className="p-4 sm:p-6 md:p-8">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">Contact Information</h3>
+                <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center gap-3">
-                    <MailIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-700">{profileData.email}</span>
+                    <MailIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                    <span className="text-gray-700 text-sm sm:text-base break-all">{profileData.email}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <PhoneIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-700">{profileData.phone}</span>
+                    <PhoneIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                    <span className="text-gray-700 text-sm sm:text-base">{profileData.phone}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <MapPinIcon className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-700">
+                    <MapPinIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                    <span className="text-gray-700 text-sm sm:text-base">
                       {profileData.address || "Location not specified"}
                     </span>
                   </div>

@@ -12,10 +12,6 @@ import {
 } from "../../components/ui/dialog";
 import { User as AuthUser } from "../../contexts/AuthContext";
 
-interface Document {
-  name: string;
-  status: "verified" | "pending" | "rejected";
-}
 
 interface AdminVerifyUserProps {
   users: AuthUser[];

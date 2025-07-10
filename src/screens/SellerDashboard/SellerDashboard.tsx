@@ -6,6 +6,8 @@ import { Card, CardContent } from "../../components/ui/card";
 import { ViewDetails, Gig as ViewDetailsGig } from "../../components/ViewDetails";
 import { Header } from "../../components/Header/Header";
 import { SellerSidebar } from "../../components/SellerSidebar/SellerSidebar";
+import { MobileHeader } from "../../components/MobileHeader/MobileHeader";
+import { MobileNavigation } from "../../components/MobileNavigation/MobileNavigation";
 import { SecureLegalUpload, SecureUploadResult } from "../../components/SecureLegalUpload";
 // import { WildcardSubmissionForm } from "../../components/wildcard";
 import { api } from "../../services/api";
@@ -442,8 +444,12 @@ export const SellerDashboard = (): JSX.Element => {
   if (viewMode === "place-bid" && selectedGig) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
-        {/* Sidebar */}
-        <div className="w-64 bg-[#1B1828] text-white flex flex-col">
+        {/* Mobile Navigation */}
+        <MobileHeader />
+        <MobileNavigation />
+        
+        {/* Desktop Sidebar */}
+        <div className="w-64 bg-[#1B1828] text-white flex-col hidden md:flex">
           {/* Logo */}
           <div className="p-6 border-b border-gray-700">
             <Link to="/" className="flex items-center gap-3">
@@ -513,11 +519,14 @@ export const SellerDashboard = (): JSX.Element => {
         </div>
 
         {/* Main Content - Place Bid */}
-        <div className="flex-1 flex flex-col">
-          <Header title="Place a Bid" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          {/* Header - Hidden on mobile since mobile nav provides header */}
+          <div className="hidden md:block">
+            <Header title="Place a Bid" />
+          </div>
 
           {/* Place Bid Content */}
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-3 sm:p-4 md:p-6">
             <div className="max-w-4xl mx-auto">
               {renderBackButton()}
 
@@ -618,8 +627,12 @@ export const SellerDashboard = (): JSX.Element => {
   if (viewMode === "view-details" && selectedGig) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
-        {/* Sidebar */}
-        <div className="w-64 bg-[#1B1828] text-white flex flex-col">
+        {/* Mobile Navigation */}
+        <MobileHeader />
+        <MobileNavigation />
+        
+        {/* Desktop Sidebar */}
+        <div className="w-64 bg-[#1B1828] text-white flex-col hidden md:flex">
           {/* Logo */}
           <div className="p-6 border-b border-gray-700">
             <Link to="/" className="flex items-center gap-3">
@@ -689,11 +702,14 @@ export const SellerDashboard = (): JSX.Element => {
         </div>
 
         {/* Main Content - View Details */}
-        <div className="flex-1 flex flex-col">
-          <Header title="Gig Details" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          {/* Header - Hidden on mobile since mobile nav provides header */}
+          <div className="hidden md:block">
+            <Header title="Gig Details" />
+          </div>
 
           {/* View Details Content */}
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-3 sm:p-4 md:p-6">
             {selectedGig ? (
               <ViewDetails
                 gig={selectedGig}
@@ -718,8 +734,12 @@ export const SellerDashboard = (): JSX.Element => {
   if (viewMode === "submit-work" && selectedOngoingGig) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
-        {/* Sidebar */}
-        <div className="w-64 bg-[#1B1828] text-white flex flex-col">
+        {/* Mobile Navigation */}
+        <MobileHeader />
+        <MobileNavigation />
+        
+        {/* Desktop Sidebar */}
+        <div className="w-64 bg-[#1B1828] text-white flex-col hidden md:flex">
           {/* Logo */}
           <div className="p-6 border-b border-gray-700">
             <Link to="/" className="flex items-center gap-3">
@@ -789,11 +809,14 @@ export const SellerDashboard = (): JSX.Element => {
         </div>
 
         {/* Main Content - Submit Work */}
-        <div className="flex-1 flex flex-col">
-          <Header title="Submit Work" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          {/* Header - Hidden on mobile since mobile nav provides header */}
+          <div className="hidden md:block">
+            <Header title="Submit Work" />
+          </div>
 
           {/* Submit Work Content */}
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-3 sm:p-4 md:p-6">
             <div className="max-w-4xl mx-auto">
               {renderBackButton()}
 
@@ -924,22 +947,25 @@ export const SellerDashboard = (): JSX.Element => {
       <SellerSidebar activePage="dashboard" />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <Header title="Legal Professional Dashboard" />
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+        {/* Header - Hidden on mobile since SellerSidebar provides mobile nav */}
+        <div className="hidden md:block">
+          <Header title="Legal Professional Dashboard" />
+        </div>
 
         {/* Dashboard Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
           {/* Welcome Section */}
-          <div className="bg-gradient-to-r from-[#FEC85F] to-[#f5c55a] rounded-lg p-6 mb-8">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-[#FEC85F] to-[#f5c55a] rounded-lg p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-[#1B1828] mb-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-[#1B1828] mb-2">
                   Welcome back, {user?.name || user?.user_metadata?.firstName || 'User'}
                 </h2>
-                <p className="text-[#1B1828]/80">Find and manage legal gigs for property services</p>
+                <p className="text-sm sm:text-base text-[#1B1828]/80">Find and manage legal gigs for property services</p>
               </div>
               <Link to="/find-gigs">
-                <Button className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white">
+                <Button className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3 w-full sm:w-auto">
                   Find Gigs
                 </Button>
               </Link>
@@ -995,15 +1021,15 @@ export const SellerDashboard = (): JSX.Element => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Available Gigs */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Available Gigs</h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Available Gigs</h3>
                 {availableGigs.length > 1 && (
                   <Link to="/find-gigs" className="text-gray-400 hover:text-gray-600">
                     <ChevronRightIcon className="w-5 h-5" />
                   </Link>
                 )}
               </div>
-              <p className="text-gray-600 mb-6">Recently posted gigs that matches your expertise</p>
+              <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">Recently posted gigs that matches your expertise</p>
               
               {loadingGigs ? (
                 <div className="text-center py-8">
@@ -1018,16 +1044,16 @@ export const SellerDashboard = (): JSX.Element => {
                 <div className="space-y-4">
                   {availableGigs.slice(0, 1).map((gig) => (
                     <Card key={gig.id} className="bg-white border border-gray-200">
-                      <CardContent className="p-6">
-                        <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
-                        <p className="text-sm text-gray-600 mb-2">Posted by {gig.company}</p>
-                        <p className="text-sm text-gray-600 mb-4">Deadline: {gig.deadline}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg font-bold text-gray-900">{gig.price}</span>
-                          <div className="flex gap-2">
+                      <CardContent className="p-4 sm:p-6">
+                        <h4 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">{gig.title}</h4>
+                        <p className="text-xs sm:text-sm text-gray-600 mb-2">Posted by {gig.company}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 mb-4">Deadline: {gig.deadline}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <span className="text-base sm:text-lg font-bold text-gray-900">{gig.price}</span>
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <Button 
                               onClick={() => handlePlaceBid(gig)}
-                              className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white"
+                              className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white text-xs sm:text-sm px-3 sm:px-4 py-2 flex-1 sm:flex-none"
                               disabled={gig.status === 'suspended' || user?.user_metadata?.verification_status === 'pending' || user?.user_metadata?.verification_status === 'rejected'}
                             >
                               {gig.status === 'suspended' ? 'Gig Suspended' : 
@@ -1037,6 +1063,7 @@ export const SellerDashboard = (): JSX.Element => {
                             <Button 
                               variant="outline"
                               onClick={() => handleViewDetails(gig)}
+                              className="text-xs sm:text-sm px-3 sm:px-4 py-2 flex-1 sm:flex-none"
                             >
                               View Details
                             </Button>
@@ -1050,18 +1077,18 @@ export const SellerDashboard = (): JSX.Element => {
             </div>
 
             {/* Right Column */}
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {/* Your Active Bids */}
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-900">Your Pending Bids</h3>
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Your Pending Bids</h3>
                   {activeBids.length > 1 && (
                     <Link to="/active-bids" className="text-gray-400 hover:text-gray-600">
                       <ChevronRightIcon className="w-5 h-5" />
                     </Link>
                   )}
                 </div>
-                <p className="text-gray-600 mb-6">Bids you've placed that are awaiting client decisions</p>
+                <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">Bids you've placed that are awaiting client decisions</p>
                 
                 {loadingActiveBids ? (
                   <div className="text-center py-8">
@@ -1075,25 +1102,26 @@ export const SellerDashboard = (): JSX.Element => {
                 ) : (
                   <div className="space-y-4">
                     {activeBids.slice(0, 1).map((bid) => (
+                      bid.title = bid.gig?.title || 'Untitled Gig',
                       bid.gigDeadline = bid.gig?.deadline,
                       bid.gigBudget = bid.gig?.budget,
                       bid.deliveryTime = bid.delivery_time,
                       
                       <Card key={bid.id} className="bg-white border border-gray-200">
-                        <CardContent className="p-6">
-                          <h4 className="font-semibold text-gray-900 mb-2">Bid #{bid.id}</h4>
-                          <p className="text-sm text-gray-600 mb-2">Gig ID: {bid.gig_id}</p>
-                          <p className="text-sm text-gray-600 mb-4">Status: {bid.status}</p>
+                        <CardContent className="p-4 sm:p-6">
+                          <h4 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">Bid #{bid.id}</h4>
+                          <p className="text-xs sm:text-sm text-gray-600 mb-2">Gig ID: {bid.gig_id}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 mb-4">Status: {bid.status}</p>
                           <div className="flex items-center justify-between mb-4">
                             <div>
-                              <span className="text-lg font-bold text-gray-900">₦{bid.amount?.toLocaleString()}</span>
+                              <span className="text-base sm:text-lg font-bold text-gray-900">₦{bid.amount?.toLocaleString()}</span>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-600 mb-4">{bid.description}</p>
-                          <div className="flex gap-2">
+                          <p className="text-xs sm:text-sm text-gray-600 mb-4">{bid.description}</p>
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <Button 
                               variant="outline" 
-                              className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828]"
+                              className="border-[#FEC85F] text-[#FEC85F] hover:bg-[#FEC85F] hover:text-[#1B1828] text-xs sm:text-sm px-3 sm:px-4 py-2 flex-1 sm:flex-none"
                               onClick={() => navigate('/active-bids', { 
                                 state: { 
                                   viewMode: 'edit-bid',
@@ -1105,7 +1133,13 @@ export const SellerDashboard = (): JSX.Element => {
                             </Button>
                             <Button 
                               variant="outline"
-                              onClick={() => navigate('/active-bids')}
+                              onClick={() => navigate('/active-bids', { 
+                                state: { 
+                                  viewMode: 'view-details',
+                                  bidData: bid
+                                }
+                              })}
+                              className="text-xs sm:text-sm px-3 sm:px-4 py-2 flex-1 sm:flex-none"
                             >
                               View Details
                             </Button>
@@ -1119,15 +1153,15 @@ export const SellerDashboard = (): JSX.Element => {
 
               {/* Ongoing Gigs */}
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-900">Jobs</h3>
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Jobs</h3>
                   {ongoingGigs.length > 1 && (
                     <Link to="/seller-gigs?tab=ongoing" className="text-gray-400 hover:text-gray-600">
                       <ChevronRightIcon className="w-5 h-5" />
                     </Link>
                   )}
                 </div>
-                <p className="text-gray-600 mb-6">Gigs you are currently working on</p>
+                <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">Gigs you are currently working on</p>
                 
                 {loadingOngoing ? (
                   <div className="text-center py-8">
@@ -1143,33 +1177,33 @@ export const SellerDashboard = (): JSX.Element => {
                     {ongoingGigs.slice(0, 1).map((gig) => (
                       console.log("gig:", gig),
                       <Card key={gig.id} className="bg-white border border-gray-200">
-                        <CardContent className="p-6">
-                          <h4 className="font-semibold text-gray-900 mb-2">{gig.title}</h4>
-                          <p className="text-sm text-gray-600 mb-2">Client: {gig.company}</p>
-                          <p className="text-sm text-gray-600 mb-2">Due: {gig.dueDate}</p>
-                          <p className="text-lg font-bold text-gray-900 mb-4">{gig.price}</p>
+                        <CardContent className="p-4 sm:p-6">
+                          <h4 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">{gig.title}</h4>
+                          <p className="text-xs sm:text-sm text-gray-600 mb-2">Client: {gig.company}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 mb-2">Due: {gig.dueDate}</p>
+                          <p className="text-base sm:text-lg font-bold text-gray-900 mb-4">{gig.price}</p>
                           
                           {/* Progress Bar */}
                           <div className="mb-4">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm text-gray-600">Progress: {gig.progress}%</span>
+                              <span className="text-xs sm:text-sm text-gray-600">Progress: {gig.progress}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <div className="bg-green-500 h-2 rounded-full" style={{ width: `${gig.progress}%` }}></div>
                             </div>
                           </div>
                           
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <Button 
                               variant="outline" 
                               onClick={() => navigate("/seller-messages")}
-                              className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                              className="border-blue-500 text-blue-500 hover:bg-blue-50 text-xs sm:text-sm px-3 sm:px-4 py-2 flex-1 sm:flex-none"
                             >
                               Message Client
                             </Button>
                             <Button 
                               onClick={() => handleSubmitWork(gig)}
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm px-3 sm:px-4 py-2 flex-1 sm:flex-none"
                             >
                               Submit Work
                             </Button>

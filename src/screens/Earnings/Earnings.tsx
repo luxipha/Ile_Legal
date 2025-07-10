@@ -188,25 +188,28 @@ export const Earnings = (): JSX.Element => {
       <SellerSidebar activePage="earnings" />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <Header title="Earnings" />
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+        {/* Header - Hidden on mobile since SellerSidebar provides mobile nav */}
+        <div className="hidden md:block">
+          <Header title="Earnings" />
+        </div>
 
         {/* Earnings Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-6xl mx-auto">
             {/* Top Stats Cards - Equal Width */}
-            <div className="grid grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Available Balance */}
               <Card className="bg-[#FEC85F] border-0">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-[#1B1828] text-sm font-medium mb-2">Available Balance</h3>
-                    <div className="text-3xl font-bold text-[#1B1828] mb-4">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="mb-3 sm:mb-4">
+                    <h3 className="text-[#1B1828] text-xs sm:text-sm font-medium mb-2">Available Balance</h3>
+                    <div className="text-2xl sm:text-3xl font-bold text-[#1B1828] mb-3 sm:mb-4">
                       ₦{earningSummary?.available_balance?.toLocaleString() || '0'}
                     </div>
                     <Button 
                       onClick={() => setShowWithdrawModal(true)}
-                      className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white w-full"
+                      className="bg-[#1B1828] hover:bg-[#1B1828]/90 text-white w-full text-sm sm:text-base py-2 sm:py-3"
                     >
                       Withdraw Funds
                     </Button>
@@ -216,10 +219,10 @@ export const Earnings = (): JSX.Element => {
 
               {/* Pending Earnings */}
               <Card className="bg-white border border-gray-200">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div>
-                    <h3 className="text-gray-600 text-sm font-medium mb-2">Pending Earnings</h3>
-                    <div className="text-3xl font-bold text-gray-900">
+                    <h3 className="text-gray-600 text-xs sm:text-sm font-medium mb-2">Pending Earnings</h3>
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900">
                       ₦{earningSummary?.pending_earnings?.toLocaleString() || '0'}
                     </div>
                   </div>
@@ -228,10 +231,10 @@ export const Earnings = (): JSX.Element => {
 
               {/* Total Earned */}
               <Card className="bg-white border border-gray-200">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div>
-                    <h3 className="text-gray-600 text-sm font-medium mb-2">Total Earned</h3>
-                    <div className="text-3xl font-bold text-gray-900">
+                    <h3 className="text-gray-600 text-xs sm:text-sm font-medium mb-2">Total Earned</h3>
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900">
                       ₦{earningSummary?.total_earned?.toLocaleString() || '0'}
                     </div>
                   </div>
@@ -240,47 +243,87 @@ export const Earnings = (): JSX.Element => {
             </div>
 
             {/* Bottom Section - 60% and 40% Grid */}
-            <div className="grid grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
               {/* Recent Transactions - 60% width (3 columns) */}
-              <div className="col-span-3">
+              <div className="lg:col-span-3">
                 <Card className="bg-white border border-gray-200 h-full">
-                  <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Transactions</h3>
+                  <CardContent className="p-4 sm:p-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Recent Transactions</h3>
                     
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {formattedTransactions.map((transaction) => (
                         <div key={transaction.id} className="mb-2">
-                          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-4">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                transaction.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
-                              }`}>
-                                {transaction.type === 'payment' ? (
-                                  <TrendingUpIcon className="w-5 h-5 text-green-600" />
-                                ) : (
-                                  <TrendingDownIcon className="w-5 h-5 text-red-600" />
+                          {/* Mobile Layout */}
+                          <div className="block sm:hidden">
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  transaction.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
+                                }`}>
+                                  {transaction.type === 'payment' ? (
+                                    <TrendingUpIcon className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <TrendingDownIcon className="w-4 h-4 text-red-600" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-gray-900 text-sm truncate">{transaction.description}</div>
+                                  <div className="text-xs text-gray-500">{transaction.date}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className={`font-bold text-base ${transaction.color}`}>
+                                  ₦{Math.abs(parseInt(transaction.amount.replace(/[+\-,]/g, ''))).toLocaleString()}
+                                </div>
+                                {transaction.type === 'payment' && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handleOpenDispute(transaction.id)}
+                                    className="flex items-center gap-1 text-amber-600 border-amber-200 hover:bg-amber-50 text-xs px-2 py-1"
+                                  >
+                                    <AlertCircleIcon className="w-3 h-3" />
+                                    Report
+                                  </Button>
                                 )}
                               </div>
-                              <div>
-                                <div className="font-medium text-gray-900">{transaction.description}</div>
-                                <div className="text-sm text-gray-500">{transaction.date}</div>
-                              </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <div className={`font-bold text-lg ${transaction.color}`}>
-                                ₦{Math.abs(parseInt(transaction.amount.replace(/[+\-,]/g, ''))).toLocaleString()}
+                          </div>
+
+                          {/* Desktop Layout */}
+                          <div className="hidden sm:block">
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                  transaction.type === 'payment' ? 'bg-green-100' : 'bg-red-100'
+                                }`}>
+                                  {transaction.type === 'payment' ? (
+                                    <TrendingUpIcon className="w-5 h-5 text-green-600" />
+                                  ) : (
+                                    <TrendingDownIcon className="w-5 h-5 text-red-600" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-gray-900">{transaction.description}</div>
+                                  <div className="text-sm text-gray-500">{transaction.date}</div>
+                                </div>
                               </div>
-                              {transaction.type === 'payment' && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleOpenDispute(transaction.id)}
-                                  className="flex items-center gap-1 text-amber-600 border-amber-200 hover:bg-amber-50"
-                                >
-                                  <AlertCircleIcon className="w-4 h-4" />
-                                  Report
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-3">
+                                <div className={`font-bold text-lg ${transaction.color}`}>
+                                  ₦{Math.abs(parseInt(transaction.amount.replace(/[+\-,]/g, ''))).toLocaleString()}
+                                </div>
+                                {transaction.type === 'payment' && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handleOpenDispute(transaction.id)}
+                                    className="flex items-center gap-1 text-amber-600 border-amber-200 hover:bg-amber-50"
+                                  >
+                                    <AlertCircleIcon className="w-4 h-4" />
+                                    Report
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
                           
@@ -302,7 +345,7 @@ export const Earnings = (): JSX.Element => {
               </div>
 
               {/* Payment Methods - 40% width (2 columns) */}
-              <div className="col-span-2">
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                 {/* Crypto Wallet */}
                 {walletData && (
                   <Wallet 
@@ -312,7 +355,7 @@ export const Earnings = (): JSX.Element => {
                   />
                 )}
                 
-                <div className="mt-6">
+                <div>
                   <PaymentMethods
                     bankAccounts={bankAccounts.map(acc => ({
                       id: acc.id,
@@ -331,7 +374,7 @@ export const Earnings = (): JSX.Element => {
             </div>
 
             {/* FVM Contract Status Section */}
-            <div className="mt-6">
+            <div className="mt-4 sm:mt-6">
               <FVMContractStatus />
             </div>
           </div>

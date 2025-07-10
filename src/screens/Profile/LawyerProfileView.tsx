@@ -24,6 +24,8 @@ import { QRCodeGenerator } from '../../components/QRCodeGenerator';
 import { BadgeCollection } from '../../components/badges';
 import { reputationService } from '../../services/reputationService';
 import { EarnedBadge } from '../../components/badges';
+import { MobileHeader } from '../../components/MobileHeader';
+import { MobileNavigation } from '../../components/MobileNavigation';
 
 interface LawyerProfileViewProps {
   isOwnProfile?: boolean;
@@ -186,53 +188,59 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile Navigation - always show on mobile */}
+      <MobileHeader />
+      <MobileNavigation />
+      
       {/* Sidebar - only show if it's own profile */}
       {isOwnProfile && <SellerSidebar activePage="profile" />}
 
       {/* Main Content */}
-      <div className={`flex-1 flex flex-col ${!isOwnProfile ? 'ml-0' : ''}`}>
-        <Header 
-          title={isOwnProfile ? "Public Profile View" : "Lawyer Profile"} 
-          userType="seller" 
-        />
+      <div className={`flex-1 flex flex-col ${!isOwnProfile ? 'ml-0' : ''} pt-16 md:pt-0 pb-20 md:pb-0`}>
+        <div className="hidden md:block">
+          <Header 
+            title={isOwnProfile ? "Public Profile View" : "Lawyer Profile"} 
+            userType="seller" 
+          />
+        </div>
 
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-6xl mx-auto">
             {/* Back button for own profile view */}
             {isOwnProfile && (
               <Button
                 variant="ghost"
                 onClick={() => onBack ? onBack() : navigate(-1)}
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4 sm:mb-6"
               >
                 <ArrowLeftIcon className="w-4 h-4" />
                 Back to Profile
               </Button>
             )}
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Header Section */}
               <Card className="border-0 shadow-xl bg-white">
-                <CardContent className="p-8">
-                  <div className="flex flex-col lg:flex-row gap-8">
+                <CardContent className="p-4 sm:p-6 lg:p-8">
+                  <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
                     {/* Profile Image & Basic Info */}
-                    <div className="flex flex-col items-center lg:items-start space-y-4">
+                    <div className="flex flex-col items-center lg:items-start space-y-3 sm:space-y-4">
                       <div className="relative">
                         <img
                           src={lawyerData.avatar}
                           alt={lawyerData.name}
-                          className="w-32 h-32 rounded-full border-4 border-purple-200 shadow-lg"
+                          className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-purple-200 shadow-lg"
                         />
                         {lawyerData.verified && (
                           <div className="absolute -bottom-2 -right-2 bg-purple-500 rounded-full p-2">
-                            <Shield className="w-4 h-4 text-white" />
+                            <Shield className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                           </div>
                         )}
                       </div>
                       
                       <div className="flex items-center gap-2 text-purple-600">
                         <Wallet className="w-4 h-4" />
-                        <span className="text-sm font-mono">
+                        <span className="text-xs sm:text-sm font-mono">
                           {lawyerData.walletAddress !== "Not connected" 
                             ? `${lawyerData.walletAddress.slice(0, 4)}...${lawyerData.walletAddress.slice(-2)}`
                             : lawyerData.walletAddress
@@ -254,24 +262,24 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                     </div>
 
                     {/* Main Profile Info */}
-                    <div className="flex-1 space-y-4">
+                    <div className="flex-1 space-y-3 sm:space-y-4 text-center lg:text-left">
                       <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{lawyerData.name}</h1>
-                        <p className="text-xl text-purple-600 font-medium">{lawyerData.title}</p>
-                        <div className="flex items-center gap-2 text-gray-600 mt-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{lawyerData.name}</h1>
+                        <p className="text-lg sm:text-xl text-purple-600 font-medium">{lawyerData.title}</p>
+                        <div className="flex items-center justify-center lg:justify-start gap-2 text-gray-600 mt-2">
                           <MapPin className="w-4 h-4" />
-                          <span>{lawyerData.location}</span>
+                          <span className="text-sm sm:text-base">{lawyerData.location}</span>
                         </div>
                       </div>
 
                       {/* Rating & Stats */}
-                      <div className="flex flex-wrap gap-6">
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row flex-wrap justify-center lg:justify-start gap-4 sm:gap-6">
+                        <div className="flex items-center justify-center lg:justify-start gap-2">
                           <div className="flex items-center">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
-                                className={`w-5 h-5 ${
+                                className={`w-4 h-4 sm:w-5 sm:h-5 ${
                                   i < Math.floor(lawyerData.rating)
                                     ? 'fill-yellow-400 text-yellow-400'
                                     : 'text-gray-300'
@@ -279,18 +287,18 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                               />
                             ))}
                           </div>
-                          <span className="font-semibold">{lawyerData.rating}</span>
-                          <span className="text-gray-600">({lawyerData.totalReviews} reviews)</span>
+                          <span className="font-semibold text-sm sm:text-base">{lawyerData.rating}</span>
+                          <span className="text-gray-600 text-sm sm:text-base">({lawyerData.totalReviews} reviews)</span>
                         </div>
                         
-                        <div className="flex items-center gap-2 text-gray-600">
+                        <div className="flex items-center justify-center lg:justify-start gap-2 text-gray-600">
                           <Users className="w-4 h-4" />
-                          <span>{lawyerData.completedTasks} tasks completed</span>
+                          <span className="text-sm sm:text-base">{lawyerData.completedTasks} tasks completed</span>
                         </div>
                         
-                        <div className="flex items-center gap-2 text-gray-600">
+                        <div className="flex items-center justify-center lg:justify-start gap-2 text-gray-600">
                           <Calendar className="w-4 h-4" />
-                          <span>{lawyerData.yearsExperience} years experience</span>
+                          <span className="text-sm sm:text-base">{lawyerData.yearsExperience} years experience</span>
                         </div>
                       </div>
 
@@ -347,30 +355,30 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                       </div>
 
                       {/* Quick Stats */}
-                      <div className="grid grid-cols-3 gap-4 p-4 bg-gradient-to-r from-purple-50 to-yellow-50 rounded-lg">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-purple-50 to-yellow-50 rounded-lg">
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-600">
+                          <div className="text-lg sm:text-2xl font-bold text-purple-600">
                             {loadingStats ? "..." : lawyerData.verificationAccuracy}
                           </div>
-                          <div className="text-sm text-gray-600">Verification Accuracy</div>
+                          <div className="text-xs sm:text-sm text-gray-600">Verification Accuracy</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-yellow-600">
+                          <div className="text-lg sm:text-2xl font-bold text-yellow-600">
                             {loadingStats ? "..." : lawyerData.responseTime}
                           </div>
-                          <div className="text-sm text-gray-600">Response Time</div>
+                          <div className="text-xs sm:text-sm text-gray-600">Response Time</div>
                         </div>
                         <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">
+                          <div className="text-lg sm:text-2xl font-bold text-green-600">
                             {loadingStats ? "..." : lawyerData.avgCompletionTime}
                           </div>
-                          <div className="text-sm text-gray-600">Avg. Completion Time</div>
+                          <div className="text-xs sm:text-sm text-gray-600">Avg. Completion Time</div>
                         </div>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-col gap-3 lg:w-48">
+                    <div className="flex flex-col sm:flex-row lg:flex-col gap-3 w-full lg:w-48">
                       {isOwnProfile && (
                         <>
                           {/* <Button 
@@ -382,7 +390,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                           </Button> */}
                           <Button 
                             variant="outline" 
-                            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 flex items-center gap-2"
+                            className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 flex items-center justify-center gap-2 w-full sm:w-auto"
                             onClick={() => setActiveTab('qr-code')}
                           >
                             <QrCodeIcon className="w-4 h-4" />
@@ -396,24 +404,25 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
               </Card>
 
               {/* Tabs Section */}
-              <div className="mt-8">
+              <div className="mt-6 sm:mt-8">
                 {/* Tabs Navigation */}
-                <div className="border-b border-gray-200 mb-6">
-                  <nav className="flex">
+                <div className="border-b border-gray-200 mb-4 sm:mb-6">
+                  <nav className="flex overflow-x-auto">
                     {['overview', 'reviews', 'projects', 'credentials', 'qr-code'].map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-12 py-4 text-sm font-medium border-b-2 ${
+                        className={`px-4 sm:px-8 lg:px-12 py-3 sm:py-4 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap ${
                           activeTab === tab
                             ? 'border-purple-600 text-purple-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                         }`}
                       >
                         {tab === 'qr-code' ? (
-                          <span className="flex items-center gap-2">
-                            <QrCodeIcon className="w-4 h-4" />
-                            QR Code
+                          <span className="flex items-center gap-1 sm:gap-2">
+                            <QrCodeIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span className="hidden sm:inline">QR Code</span>
+                            <span className="sm:hidden">QR</span>
                           </span>
                         ) : (
                           tab.charAt(0).toUpperCase() + tab.slice(1)
@@ -424,7 +433,7 @@ const LawyerProfileView: React.FC<LawyerProfileViewProps> = ({ isOwnProfile = fa
                 </div>
 
                 {/* Tab Content */}
-                <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-lg">
+                <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-lg shadow-lg">
                   {activeTab === 'overview' && (
                     <div className="grid md:grid-cols-2 gap-6">
                       {/* About Card */}

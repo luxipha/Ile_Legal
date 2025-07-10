@@ -14,6 +14,7 @@ export interface SimpleRole {
   description: string;
   color: string;
   permissions: string[];
+  is_system_role?: boolean;
 }
 
 export interface TeamMember {
@@ -25,6 +26,8 @@ export interface TeamMember {
   user_type: UserType;
   created_at: string;
   avatar_url?: string;
+  avatar?: string;
+  team?: string;
   is_active: boolean;
 }
 
