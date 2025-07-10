@@ -12,7 +12,9 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   currentUserId,
   onSendMessage,
   isLoading,
-  isSending
+  isSending,
+  onBack,
+  isMobile = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -86,20 +88,31 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-white">
+      <div className={`${isMobile ? 'p-3' : 'p-3 sm:p-4'} border-b border-gray-200 bg-white`}>
         <div className="flex items-center space-x-3">
+          {/* Mobile back button */}
+          {isMobile && onBack && (
+            <button
+              onClick={onBack}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors mr-2"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
           <img
             src={conversation.participantAvatar}
             alt={conversation.participantName}
-            className="w-10 h-10 rounded-full object-cover"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0"
             onError={(e) => {
               e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(conversation.participantName)}&background=random`;
             }}
           />
-          <div>
-            <h3 className="font-semibold text-gray-900">{conversation.participantName}</h3>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{conversation.participantName}</h3>
             {conversation.gigTitle && (
-              <p className="text-sm text-blue-600">📋 {conversation.gigTitle}</p>
+              <p className="text-xs sm:text-sm text-blue-600 truncate">📋 {conversation.gigTitle}</p>
             )}
           </div>
         </div>
@@ -108,7 +121,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       {/* Messages Area */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4"
       >
         {isLoading ? (
           <div className="flex justify-center items-center h-full">
@@ -172,6 +185,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
           disabled={isSending}
           placeholder={`Message ${conversation.participantName}...`}
           allowAttachments={true}
+          isMobile={isMobile}
         />
       </div>
     </div>
@@ -197,12 +211,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <div className={`flex ${message.isSent ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`group relative max-w-xs lg:max-w-md ${isConsecutive ? 'mt-1' : 'mt-4'}`}
+        className={`group relative max-w-[75%] sm:max-w-xs lg:max-w-md ${isConsecutive ? 'mt-1' : 'mt-3 sm:mt-4'}`}
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => setShowActions(false)}
+        onTouchStart={() => setShowActions(true)}
       >
         <div
-          className={`rounded-lg px-4 py-2 ${
+          className={`rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base break-words ${
             message.isSent
               ? 'bg-blue-500 text-white rounded-br-sm'
               : 'bg-gray-100 text-gray-900 rounded-bl-sm'

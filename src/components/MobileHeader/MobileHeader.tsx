@@ -44,7 +44,7 @@ export const MobileHeader: React.FC = () => {
   };
 
   return (
-    <header className="md:hidden bg-[#1B1828] text-white py-3 px-4 fixed top-0 left-0 right-0 z-40">
+    <header className="md:hidden bg-[#1B1828] text-white py-3 px-4 fixed top-0 left-0 right-0 z-[9999]">
       <div className="flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2">

@@ -66,7 +66,7 @@ export const MyGigs = (): JSX.Element => {
   const [gridViewMode, setGridViewMode] = useState<"grid" | "list">("grid");
   const [isDragOver, setIsDragOver] = useState(false);
   const [gigs, setGigs] = useState<Gig[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedGigs, setSelectedGigs] = useState<Set<string>>(new Set());
@@ -201,7 +201,7 @@ export const MyGigs = (): JSX.Element => {
     setViewMode("view-deliverables");
   };
 
-  const handlePayNow = (gig: Gig) => {
+  const handlePayNow = (_gig: Gig) => {
     // Navigate to payments page for pending payment gigs
     navigate("/payments");
   };
@@ -462,10 +462,12 @@ export const MyGigs = (): JSX.Element => {
         <BuyerSidebar activePage="my-gigs" />
 
         {/* Main Content - View Gig */}
-        <div className="flex-1 flex flex-col">
-          <Header title="View Gig" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          <div className="hidden md:block">
+            <Header title="View Gig" />
+          </div>
 
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-3 sm:p-6">
             {/* Use the ViewBids component for consistent UI */}
             <ViewBids 
               gig={{
@@ -502,10 +504,12 @@ export const MyGigs = (): JSX.Element => {
         <BuyerSidebar activePage="my-gigs" />
 
         {/* Main Content - View Deliverables */}
-        <div className="flex-1 flex flex-col">
-          <Header title="View Deliverables" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          <div className="hidden md:block">
+            <Header title="View Deliverables" />
+          </div>
 
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-3 sm:p-6">
             <ViewDeliverables 
               gigId={selectedGig.id}
               gigTitle={selectedGig.title}
@@ -515,11 +519,10 @@ export const MyGigs = (): JSX.Element => {
               status={selectedGig.status}
               description={selectedGig.description}
               provider={{
-                id: "provider-id",
                 name: "Provider Name", 
                 avatar: "P",
                 rating: 4.8,
-                completedJobs: 12,
+                projectsPosted: 12,
                 location: "Location"
               }}
               onBack={() => setViewMode("list")}
@@ -884,8 +887,10 @@ export const MyGigs = (): JSX.Element => {
       <BuyerSidebar activePage="my-gigs" />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <Header title="My Gigs" />
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+        <div className="hidden md:block">
+          <Header title="My Gigs" />
+        </div>
 
         <main className="flex-1 p-4 sm:p-6">
           <div className="max-w-7xl mx-auto">

@@ -116,7 +116,7 @@ export const MobileNavigation: React.FC = () => {
   const navItems = getNavItems();
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-pb">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[9998] safe-area-pb">
       <div className="grid grid-cols-4 h-16 max-w-full overflow-hidden">
         {navItems.map((item) => {
           const IconComponent = item.icon;

@@ -60,7 +60,10 @@ export const MessageContainer: React.FC<MessageContainerProps> = React.memo(({
 
     return (
       <div className={`flex flex-col md:flex-row h-full ${className}`}>
-        <div className="w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 overflow-y-auto">
+        {/* Mobile: Show either conversation list OR message thread */}
+        <div className={`md:hidden w-full h-full ${
+          selectedConversation ? 'hidden' : 'block'
+        }`}>
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <LoadingSpinner size="medium" />
@@ -82,7 +85,48 @@ export const MessageContainer: React.FC<MessageContainerProps> = React.memo(({
           )}
         </div>
 
-        <div className="flex-1 flex flex-col">
+        {/* Mobile: Full screen message thread when conversation is selected */}
+        <div className={`md:hidden w-full h-full ${
+          selectedConversation ? 'flex flex-col' : 'hidden'
+        }`}>
+          {selectedConversation && (
+            <MessageThread
+              conversation={selectedConversation}
+              messages={messages}
+              currentUserId={userId}
+              onSendMessage={sendMessage}
+              isLoading={isLoadingMessages}
+              isSending={isSending}
+              onBack={() => selectConversation(null)}
+              isMobile={true}
+            />
+          )}
+        </div>
+
+        {/* Desktop: Side by side layout */}
+        <div className="hidden md:flex md:w-1/3 lg:w-1/4 border-r border-gray-200 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64 w-full">
+              <LoadingSpinner size="medium" />
+            </div>
+          ) : error ? (
+            <div className="p-4 w-full">
+              <ErrorDisplay
+                error={error}
+                onRetry={handleRetry}
+              />
+            </div>
+          ) : (
+            <ConversationList
+              conversations={conversations}
+              selectedConversation={selectedConversation}
+              onSelect={handleConversationSelect}
+              isLoading={isLoading}
+            />
+          )}
+        </div>
+
+        <div className="hidden md:flex md:flex-1 flex-col">
           {selectedConversation ? (
             <MessageThread
               conversation={selectedConversation}
@@ -91,6 +135,7 @@ export const MessageContainer: React.FC<MessageContainerProps> = React.memo(({
               onSendMessage={sendMessage}
               isLoading={isLoadingMessages}
               isSending={isSending}
+              isMobile={false}
             />
           ) : (
             <EmptyState
@@ -98,10 +143,6 @@ export const MessageContainer: React.FC<MessageContainerProps> = React.memo(({
               description="Choose a conversation from the left to start messaging"
             />
           )}
-        </div>
-
-        <div className="md:hidden">
-          {/* Mobile layout placeholder */}
         </div>
       </div>
     );

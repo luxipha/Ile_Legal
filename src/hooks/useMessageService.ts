@@ -160,9 +160,16 @@ export const useMessageService = (
   }, []); // No dependencies needed - uses refs
 
   // ✅ FIXED: Select conversation with stable message handling
-  const selectConversation = useCallback(async (conversation: UIConversation) => {
-    if (selectedConversation?.id === conversation.id) {
+  const selectConversation = useCallback(async (conversation: UIConversation | null) => {
+    if (conversation && selectedConversation?.id === conversation.id) {
       return; // Already selected
+    }
+    
+    if (!conversation) {
+      // Deselect conversation
+      setSelectedConversation(null);
+      setMessages([]);
+      return;
     }
 
     setSelectedConversation(conversation);

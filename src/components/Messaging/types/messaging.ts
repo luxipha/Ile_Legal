@@ -107,7 +107,7 @@ export interface MessageUser {
   
   export interface MessageServiceActions {
     loadConversations: () => Promise<void>;
-    selectConversation: (conversation: UIConversation) => Promise<void>;
+    selectConversation: (conversation: UIConversation | null) => Promise<void>;
     sendMessage: (payload: MessageSendPayload) => Promise<void>;
     markAsRead: (conversationId: string) => Promise<void>;
     refreshConversations: () => Promise<void>;
@@ -226,6 +226,8 @@ export interface MessageUser {
     onSendMessage: (payload: MessageSendPayload) => Promise<void>;
     isLoading: boolean;
     isSending: boolean;
+    onBack?: () => void;
+    isMobile?: boolean;
   }
   
   export interface MessageInputProps {
@@ -235,6 +237,7 @@ export interface MessageUser {
     placeholder?: string;
     maxLength?: number;
     allowAttachments?: boolean;
+    isMobile?: boolean;
   }
   
   export interface FileAttachmentPreviewProps {

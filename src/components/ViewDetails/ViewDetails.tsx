@@ -582,22 +582,22 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-full sm:max-w-6xl mx-auto px-3 sm:px-6 overflow-hidden">
       {/* Back Button */}
       <Button
         variant="ghost"
         onClick={onBack}
-        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
+        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4 sm:mb-6 p-2 sm:p-3"
       >
         <ArrowLeftIcon className="w-4 h-4" />
-        {backButtonText}
+        <span className="text-sm sm:text-base">{backButtonText}</span>
       </Button>
 
       {/* Title and Status */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{gig.title}</h1>
-          <div className="flex items-center gap-6 text-gray-600">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3 sm:gap-0">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">{gig.title}</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-gray-600 text-sm sm:text-base">
             <span>Posted {getPostedDate()}</span>
             <span>Deadline {getFormattedDeadline()}</span>
             <span>Budget {getBudget()}</span>
@@ -605,10 +605,10 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
         </div>
         <span className={
           getStatus() === 'pending'
-            ? 'bg-[#FEC85F] text-[#1B1828] px-4 py-2 rounded-lg font-medium'
+            ? 'bg-[#FEC85F] text-[#1B1828] px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-medium text-sm sm:text-base self-start sm:self-auto'
             : getStatus() === 'paused'
-              ? 'bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium'
-              : 'bg-gray-200 text-gray-500 px-4 py-2 rounded-lg font-medium'
+              ? 'bg-gray-300 text-gray-800 px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-medium text-sm sm:text-base self-start sm:self-auto'
+              : 'bg-gray-200 text-gray-500 px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-medium text-sm sm:text-base self-start sm:self-auto'
         }>
           {getStatus() === 'pending'
             ? 'Open for Bids'
@@ -619,8 +619,9 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-8">
+      <div className="border-b border-gray-200 mb-4 sm:mb-6 overflow-hidden">
+        <div className="overflow-x-auto -mb-px">
+          <nav className="flex gap-4 sm:gap-8 min-w-max sm:min-w-0">
           {[
             { id: "details", label: "Details" },
             { id: "bids", label: `Bids (${getBidCount()})` },
@@ -629,7 +630,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`pb-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`pb-3 sm:pb-4 px-2 sm:px-0 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? "border-[#FEC85F] text-[#1B1828]"
                   : "border-transparent text-gray-500 hover:text-gray-700"
@@ -638,27 +639,28 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
               {tab.label}
             </button>
           ))}
-        </nav>
+          </nav>
+        </div>
       </div>
 
       {/* Tab Content */}
-      <div className="grid grid-cols-3 gap-8">
-        {/* Main Content - 2/3 width */}
-        <div className="col-span-2">
+      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-8">
+        {/* Main Content - 2/3 width on desktop */}
+        <div className="lg:col-span-2 order-2 lg:order-1">
           {activeTab === "details" && (
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Description</h3>
-              <p className="text-gray-600 mb-6 leading-relaxed">{gig.description}</p>
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Description</h3>
+              <p className="text-gray-600 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">{gig.description}</p>
               
               {/* Categories */}
               {getCategories().length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Categories</h4>
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Categories</h4>
                   <div className="flex flex-wrap gap-2">
                     {getCategories().map((category, index) => (
                       <span
                         key={index}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                        className="px-2 sm:px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs sm:text-sm"
                       >
                         {category.replace('-', ' ')}
                       </span>
@@ -669,9 +671,9 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
 
               {/* Requirements (from second component) */}
               {gig.requirements && gig.requirements.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Requirements</h4>
-                  <ol className="list-decimal list-inside space-y-2 text-gray-600">
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Requirements</h4>
+                  <ol className="list-decimal list-inside space-y-2 text-gray-600 text-sm sm:text-base">
                     {gig.requirements.map((req, index) => (
                       <li key={index}>{req}</li>
                     ))}
@@ -681,17 +683,17 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
 
               {/* Location */}
               {gig.location && (
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Location</h4>
-                  <p className="text-gray-600">{gig.location}</p>
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Location</h4>
+                  <p className="text-gray-600 text-sm sm:text-base">{gig.location}</p>
                 </div>
               )}
 
               {/* Attachments */}
               {gig.attachments && gig.attachments.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Attachments</h4>
-                  <div className="space-y-3">
+                <div className="mb-4 sm:mb-6">
+                  <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Attachments</h4>
+                  <div className="space-y-2 sm:space-y-3">
                     {gig.attachments.map((attachmentUrl, index) => {
                       // Extract filename from URL
                       const filename = attachmentUrl.split('/').pop()?.split('?')[0] || `attachment-${index + 1}`;
@@ -919,12 +921,12 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({
           )}
         </div>
 
-        {/* Sidebar - 1/3 width */}
-        <div className="col-span-1">
-          <Card className="border border-gray-200 mb-6">
-            <CardContent className="p-6">
+        {/* Sidebar - 1/3 width on desktop, full width on mobile */}
+        <div className="lg:col-span-1 order-1 lg:order-2">
+          <Card className="border border-gray-200 mb-4 lg:mb-6">
+            <CardContent className="p-4 lg:p-6">
               <div className="text-center">
-                <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-3 sm:mb-4">
                   {getBuyerProfilePicture() ? (
                     <img
                       src={getBuyerProfilePicture()!}

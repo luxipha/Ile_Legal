@@ -649,28 +649,28 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
   const stats = calculateBidStatistics();
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-full sm:max-w-6xl mx-auto px-3 sm:px-6 overflow-hidden">
       {/* Back Button */}
       <Button
         variant="ghost"
         onClick={onBack}
-        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
+        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4 sm:mb-6 p-2 sm:p-3"
       >
         <ArrowLeftIcon className="w-4 h-4" />
-        {backButtonText}
+        <span className="text-sm sm:text-base">{backButtonText}</span>
       </Button>
 
       {/* Title and Status */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{gig.title}</h1>
-          <div className="flex items-center gap-6 text-gray-600">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3 sm:gap-0">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-2 break-words">{gig.title}</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-gray-600 text-sm sm:text-base">
             <span>Posted {formatDateMMDDYYYY(gig.created_at || gig.postedDate)}</span>
             <span>Deadline {formatDateMMDDYYYY(gig.deadline)}</span>
             <span>Budget {gig.budget}</span>
           </div>
         </div>
-        <span className={`px-4 py-2 rounded-lg font-medium ${
+        <span className={`px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-medium text-sm sm:text-base self-start sm:self-auto ${
           gig.status === 'suspended' 
             ? 'bg-red-100 text-red-800' 
             : 'bg-[#FEC85F] text-[#1B1828]'
@@ -694,8 +694,9 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
       )}
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex gap-8">
+      <div className="border-b border-gray-200 mb-4 sm:mb-6 overflow-hidden">
+        <div className="overflow-x-auto -mb-px">
+          <nav className="flex gap-4 sm:gap-8 min-w-max sm:min-w-0">
           {[
             { id: "bids", label: `Bids (${bids.length})` },
             { id: "details", label: "Details" },
@@ -704,7 +705,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`pb-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`pb-3 sm:pb-4 px-2 sm:px-0 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? "border-[#FEC85F] text-[#1B1828]"
                   : "border-transparent text-gray-500 hover:text-gray-700"
@@ -713,13 +714,14 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               {tab.label}
             </button>
           ))}
-        </nav>
+          </nav>
+        </div>
       </div>
 
       {/* Tab Content */}
-      <div className="grid grid-cols-3 gap-8">
+      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-8">
         {/* Main Content - 2/3 width */}
-        <div className="col-span-2">
+        <div className="lg:col-span-2">
           {activeTab === "bids" && (
             <div className="space-y-6">
               {loading ? (
@@ -730,9 +732,9 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                 bids.map((bid) => (
                   console.log("bid:", bid),
                   <Card key={bid.id} className="border border-gray-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-700 overflow-hidden">
+                    <CardContent className="p-3 sm:p-6">
+                      <div className="flex items-start gap-3 sm:gap-4 mb-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-300 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 overflow-hidden flex-shrink-0">
                           {getBidSellerAvatar(bid).startsWith('http') ? (
                             <img 
                               src={getBidSellerAvatar(bid)} 
@@ -750,27 +752,27 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                             {getBidSellerAvatar(bid)}
                           </span>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <h4 className="font-semibold text-gray-900">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-2 gap-2">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-semibold text-gray-900 text-sm sm:text-base">
                                 <a 
                                   href={`${window.location.origin}/profile/${bid.seller_id}`}
-                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  className="text-blue-600 hover:text-blue-800 hover:underline break-words"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
                                   {getBidSellerName(bid)}
                                 </a>
                               </h4>
-                              <p className="text-gray-600">{getBidSellerTitle(bid)}</p>
-                              <div className="flex items-center gap-4 mt-1">
+                              <p className="text-gray-600 text-xs sm:text-sm break-words">{getBidSellerTitle(bid)}</p>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
                                 <div className="flex items-center gap-1">
                                   {renderStars(Math.floor(getBidSellerRating(bid)))}
-                                  <span className="text-sm text-gray-600">{getBidSellerRating(bid).toFixed(1)}</span>
+                                  <span className="text-xs sm:text-sm text-gray-600">{getBidSellerRating(bid).toFixed(1)}</span>
                                 </div>
-                                <span className="text-sm text-gray-600">{getBidSellerCompletedJobs(bid)} jobs completed</span>
-                                <span className={`text-sm px-2 py-1 rounded-full ${
+                                <span className="text-xs sm:text-sm text-gray-600">{getBidSellerCompletedJobs(bid)} jobs completed</span>
+                                <span className={`text-xs sm:text-sm px-2 py-1 rounded-full flex-shrink-0 ${
                                   getBidSellerVerificationStatus(bid) === 'verified' 
                                     ? 'bg-green-100 text-green-800' 
                                     : getBidSellerVerificationStatus(bid) === 'rejected'
@@ -783,39 +785,28 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                                 </span>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-gray-900">{getBidAmount(bid)}</div>
-                              <div className="text-sm text-gray-500">
+                            <div className="text-left sm:text-right flex-shrink-0">
+                              <div className="text-lg sm:text-2xl font-bold text-gray-900 break-words">{getBidAmount(bid)}</div>
+                              <div className="text-xs sm:text-sm text-gray-500">
                                 {bid.deliveryTime && `${bid.deliveryTime} • `}
                                 Submitted: {getBidSubmittedDate(bid)}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4 mb-3">
-                            {getBidSellerRating(bid) > 0 && (
-                              <div className="flex items-center gap-1">
-                                {renderStars(Math.floor(getBidSellerRating(bid)))}
-                                <span className="text-sm text-gray-600 ml-1">{getBidSellerRating(bid)}</span>
-                              </div>
-                            )}
-                            {getBidSellerCompletedJobs(bid) > 0 && (
-                              <span className="text-sm text-gray-600">{getBidSellerCompletedJobs(bid)} jobs completed</span>
-                            )}
-                          </div>
                         </div>
                       </div>
                       
                       <div className="mb-4">
-                        <h5 className="font-medium text-[#1B1828] mb-2">Proposal</h5>
-                        <p className="text-gray-600">{getBidDescription(bid)}</p>
+                        <h5 className="font-medium text-[#1B1828] mb-2 text-sm sm:text-base">Proposal</h5>
+                        <p className="text-gray-600 text-sm sm:text-base break-words overflow-hidden">{getBidDescription(bid)}</p>
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
                         {(!bid.status || bid.status === 'pending') && (
                           <>
                             <Button 
                               onClick={() => handleAcceptBid(bid.id)}
-                              className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828]"
+                              className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3"
                               disabled={gig.status === 'suspended'}
                             >
                               {gig.status === 'suspended' ? 'Gig Suspended' : 'Accept Bid'}
@@ -823,14 +814,14 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                             <Button 
                               variant="outline"
                               onClick={() => handleMessageBidder(getBidSellerId(bid))}
-                              className="border-[#1B1828] text-[#1B1828] hover:bg-[#1B1828]/10"
+                              className="border-[#1B1828] text-[#1B1828] hover:bg-[#1B1828]/10 text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3"
                             >
                               Message
                             </Button>
                             <Button 
                               variant="outline"
                               onClick={() => handleRejectBid(bid.id)}
-                              className="border-red-500 text-red-600 hover:bg-red-50"
+                              className="border-red-500 text-red-600 hover:bg-red-50 text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3"
                             >
                               Reject
                             </Button>
@@ -888,7 +879,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                               variant="ghost"
                               size="sm"
                               onClick={() => window.open(attachmentUrl, '_blank')}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-100 text-xs sm:text-sm px-2 sm:px-3"
                             >
                               View
                             </Button>
@@ -902,7 +893,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                                 link.download = filename;
                                 link.click();
                               }}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-100"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-100 text-xs sm:text-sm px-2 sm:px-3"
                             >
                               Download
                             </Button>
@@ -983,7 +974,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                             : 'bg-[#FEC85F]/20 text-[#1B1828]'
                         }`}
                       >
-                        <p className="text-sm">{message.text}</p>
+                        <p className="text-sm sm:text-base break-words">{message.text}</p>
                         <div className="flex items-center justify-between">
                           <p className={`text-xs mt-1 ${
                             message.sender === 'user' ? 'text-gray-300' : 'text-gray-500'
@@ -1001,8 +992,8 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
               </div>
 
               {/* Message Input */}
-              <div className="flex items-center gap-3 p-4 border-t border-gray-200">
-                <Button variant="ghost" className="p-2 text-gray-400 hover:text-gray-600">
+              <div className="flex items-center gap-3 p-3 sm:p-4 border-t border-gray-200">
+                <Button variant="ghost" className="p-2 text-gray-400 hover:text-gray-600 hidden sm:block">
                   <PaperclipIcon className="w-5 h-5 text-gray-400" />
                 </Button>
                 
@@ -1012,7 +1003,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type your message..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B1828] focus:border-transparent outline-none text-sm sm:text-base"
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                   />
                 </div>
@@ -1020,7 +1011,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
                 <Button 
                   onClick={handleSendMessage} 
                   disabled={isSending}
-                  className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] font-medium"
+                  className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] font-medium text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3"
                 >
                   {isSending ? "Sending..." : "Send"}
                 </Button>
@@ -1030,7 +1021,7 @@ export const ViewBids: React.FC<ViewBidsProps> = ({
         </div>
 
         {/* Sidebar - 1/3 width */}
-        <div className="col-span-1">
+        <div className="lg:col-span-1 order-first lg:order-last">
           <Card className="border border-gray-200 mb-6">
             <CardContent className="p-6 text-center">
               <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center mx-auto mb-4 overflow-hidden">

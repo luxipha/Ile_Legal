@@ -9,7 +9,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   placeholder = 'Type a message...',
   maxLength = 1000,
-  allowAttachments = true
+  allowAttachments = true,
+  isMobile = false
 }) => {
   const [message, setMessage] = useState('');
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
@@ -120,7 +121,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const canSend = (message.trim() || attachment) && !disabled && !isSending;
 
   return (
-    <div className="p-4">
+    <div className={`p-3 ${isMobile ? 'pb-safe' : 'sm:p-4'}`}>
       {/* File attachment preview */}
       {attachment && (
         <div className="mb-3">
@@ -139,10 +140,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              isMobile ? 'hidden' : ''
+            }`}
             title="Attach file"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
           </button>
@@ -159,8 +162,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             maxLength={maxLength}
             disabled={disabled}
             rows={1}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ minHeight: '40px' }}
+            className={`w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base`}
+            style={{ minHeight: isMobile ? '36px' : '40px' }}
           />
           
           {/* Character count */}
@@ -184,12 +187,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           title="Send message"
         >
           {isSending ? (
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           )}

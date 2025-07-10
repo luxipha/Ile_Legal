@@ -8,6 +8,8 @@ import {
   DollarSignIcon,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { MobileHeader } from "../MobileHeader/MobileHeader";
+import { MobileNavigation } from "../MobileNavigation/MobileNavigation";
 
 interface SellerSidebarProps {
   activePage?: "dashboard" | "find-gigs" | "active-bids" | "messages" | "earnings" | "profile";
@@ -26,7 +28,13 @@ export const SellerSidebar: React.FC<SellerSidebarProps> = ({
   const displayName = userName || user?.name || (user?.user_metadata as any)?.full_name || "User";
   const displayEmail = userEmail || user?.email || "user@example.com";
   return (
-    <div className="w-64 bg-[#1B1828] text-white flex flex-col">
+    <>
+      {/* Mobile Navigation */}
+      <MobileHeader />
+      <MobileNavigation />
+      
+      {/* Desktop Sidebar */}
+      <div className="w-64 bg-[#1B1828] text-white flex-col hidden md:flex">
       <div className="p-6 border-b border-gray-700">
         <Link to="/" className="flex items-center gap-3">
           <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
@@ -132,6 +140,7 @@ export const SellerSidebar: React.FC<SellerSidebarProps> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };

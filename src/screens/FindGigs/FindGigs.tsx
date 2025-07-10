@@ -346,11 +346,13 @@ export const FindGigs = (): JSX.Element => {
         <SellerSidebar activePage="find-gigs" />
 
         {/* Main Content - View Details */}
-        <div className="flex-1 flex flex-col">
-          <Header title="Gig Details" />
+        <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+          <div className="hidden md:block">
+            <Header title="Gig Details" />
+          </div>
 
           {/* View Details Content */}
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-3 sm:p-6">
             <ViewDetails
               gig={selectedGig}
               onBack={() => setViewMode("list")}

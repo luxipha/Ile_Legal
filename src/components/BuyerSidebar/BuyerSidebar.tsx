@@ -1,6 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { MobileHeader } from "../MobileHeader/MobileHeader";
+import { MobileNavigation } from "../MobileNavigation/MobileNavigation";
 import {
   UserIcon,
   BriefcaseIcon,
@@ -19,7 +21,13 @@ export const BuyerSidebar: React.FC<BuyerSidebarProps> = ({
 }) => {
   const { user } = useAuth();
   return (
-    <div className="w-64 lg:w-64 md:w-56 bg-[#1B1828] text-white flex-col hidden md:flex">
+    <>
+      {/* Mobile Navigation */}
+      <MobileHeader />
+      <MobileNavigation />
+      
+      {/* Desktop Sidebar */}
+      <div className="w-64 lg:w-64 md:w-56 bg-[#1B1828] text-white flex-col hidden md:flex">
       <div className="p-6 border-b border-gray-700">
         <Link to="/" className="flex items-center gap-3">
           <img src="/logo.svg" alt="Ilé Legal" className="w-10 h-10" />
@@ -125,6 +133,7 @@ export const BuyerSidebar: React.FC<BuyerSidebarProps> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };

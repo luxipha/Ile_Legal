@@ -21,16 +21,18 @@ export const BuyerMessages: React.FC = () => {
       <BuyerSidebar activePage="messages" />
       
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <Header title="Messages" userType="buyer" />
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+        {/* Header - Only show on desktop */}
+        <div className="hidden md:block">
+          <Header title="Messages" userType="buyer" />
+        </div>
         
-        {/* Message Container */}
-        <div className="flex-1 p-4 sm:p-6">
+        {/* Message Container - Edge to edge on mobile */}
+        <div className="flex-1 md:p-6">
           <MessageContainer
             userId={user.id}
             userType="buyer"
-            className="h-full bg-white rounded-lg shadow"
+            className="h-full bg-white md:rounded-lg md:shadow overflow-hidden"
             onConversationSelect={(conversation) => {
               console.log('Selected conversation:', conversation);
             }}

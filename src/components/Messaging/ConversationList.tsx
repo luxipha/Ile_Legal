@@ -60,7 +60,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Search and Filters */}
-      <div className="p-3 border-b border-gray-100">
+      <div className="p-2 md:p-3 border-b border-gray-100">
         <ConversationSearch
           conversations={conversations}
           onResultSelect={onSelect}

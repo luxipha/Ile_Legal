@@ -66,7 +66,7 @@ export const ViewDeliverables = ({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingDeliverables, setLoadingDeliverables] = useState(false);
-  const [sellerLocation, setSellerLocation] = useState<string | undefined>(provider.location);
+  const [sellerLocation] = useState<string | undefined>(provider.location);
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !conversationId || !user?.id) return;
@@ -151,17 +151,17 @@ export const ViewDeliverables = ({
   }, [user?.id, gigId]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6">
-      {/* Header with back button */}
-      <div className="mb-4 sm:mb-6">
-        <button 
-          onClick={onBack}
-          className="flex items-center text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeftIcon className="w-4 h-4 mr-2" />
-          Back to Dashboard
-        </button>
-      </div>
+    <div className="w-full max-w-full sm:max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 overflow-hidden">
+        {/* Header with back button */}
+        <div className="mb-4 sm:mb-6">
+          <button 
+            onClick={onBack}
+            className="flex items-center text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeftIcon className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </button>
+        </div>
 
       {/* Gig title */}
       <div className="bg-[#1B1828] text-white p-4 sm:p-6 rounded-t-xl">
@@ -169,7 +169,7 @@ export const ViewDeliverables = ({
       </div>
 
       {/* Gig details */}
-      <div className="bg-white border border-gray-200 p-4 sm:p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="bg-white border border-gray-200 p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div>
           <p className="text-gray-500 text-sm">Posted</p>
           <p className="font-medium">{postedDate}</p>
@@ -197,11 +197,12 @@ export const ViewDeliverables = ({
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mt-4 sm:mt-6">
-        <nav className="flex -mb-px overflow-x-auto">
+      <div className="border-b border-gray-200 mt-4 sm:mt-6 overflow-hidden">
+        <div className="overflow-x-auto -mb-px">
+          <nav className="flex min-w-max md:min-w-0 md:flex-wrap gap-1 sm:gap-2">
           <button
             onClick={() => setActiveTab("details")}
-            className={`py-3 sm:py-4 px-3 sm:px-6 font-medium text-xs sm:text-sm whitespace-nowrap ${
+            className={`py-2 sm:py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "details"
                 ? "border-b-2 border-[#1B1828] text-[#1B1828]"
                 : "text-gray-500 hover:text-gray-700"
@@ -211,7 +212,7 @@ export const ViewDeliverables = ({
           </button>
           <button
             onClick={() => setActiveTab("bids")}
-            className={`py-3 sm:py-4 px-3 sm:px-6 font-medium text-xs sm:text-sm whitespace-nowrap ${
+            className={`py-2 sm:py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "bids"
                 ? "border-b-2 border-[#1B1828] text-[#1B1828]"
                 : "text-gray-500 hover:text-gray-700"
@@ -221,17 +222,18 @@ export const ViewDeliverables = ({
           </button>
           <button
             onClick={() => setActiveTab("deliverables")}
-            className={`py-3 sm:py-4 px-3 sm:px-6 font-medium text-xs sm:text-sm whitespace-nowrap ${
+            className={`py-2 sm:py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "deliverables"
                 ? "border-b-2 border-[#1B1828] text-[#1B1828]"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            Deliverables
+            <span className="sm:hidden">Files</span>
+            <span className="hidden sm:inline">Deliverables</span>
           </button>
           <button
             onClick={() => setActiveTab("messages")}
-            className={`py-3 sm:py-4 px-3 sm:px-6 font-medium text-xs sm:text-sm whitespace-nowrap ${
+            className={`py-2 sm:py-3 px-2 sm:px-4 font-medium text-xs sm:text-sm whitespace-nowrap ${
               activeTab === "messages"
                 ? "border-b-2 border-[#1B1828] text-[#1B1828]"
                 : "text-gray-500 hover:text-gray-700"
@@ -248,16 +250,18 @@ export const ViewDeliverables = ({
             }`}
           >
             <QrCodeIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-            Verification
+            <span className="sm:hidden">QR</span>
+            <span className="hidden sm:inline">Verification</span>
           </button>
-        </nav>
+          </nav>
+        </div>
       </div>
 
       {/* Tab content */}
       <div className="mt-4 sm:mt-6">
         {activeTab === "messages" && (
-          <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-[400px] sm:h-[500px]">
-            <div className="flex-1 flex flex-col">
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-[400px] sm:h-[500px] w-full">
+            <div className="flex-1 flex flex-col min-w-0">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 border border-gray-200 rounded-lg mb-3 sm:mb-4">
                 {messages.length > 0 ? (
@@ -266,7 +270,7 @@ export const ViewDeliverables = ({
                       key={message.id}
                       className={`flex ${message.sender === "provider" ? "justify-start" : "justify-end"}`}
                     >
-                      <div className={`max-w-[80%] p-3 rounded-lg ${
+                      <div className={`max-w-[80%] p-3 rounded-lg break-words ${
                         message.sender === "provider" 
                           ? "bg-gray-100" 
                           : "bg-[#1B1828]/10"
@@ -308,7 +312,7 @@ export const ViewDeliverables = ({
             </div>
 
             {/* Provider info */}
-            <div className="w-full lg:w-64 order-first lg:order-last">
+            <div className="w-full lg:w-64 order-first lg:order-last lg:flex-shrink-0">
               <Card className="bg-white border border-gray-200">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col items-center">
@@ -342,8 +346,8 @@ export const ViewDeliverables = ({
         )}
 
         {activeTab === "deliverables" && (
-          <div className="border border-gray-200 rounded-lg p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-bold mb-4">Deliverables</h2>
+          <div className="border border-gray-200 rounded-lg p-3 sm:p-6 overflow-hidden">
+            <h2 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">Files</h2>
             
             {loadingDeliverables ? (
               <div className="flex items-center justify-center py-8">
@@ -352,43 +356,47 @@ export const ViewDeliverables = ({
             ) : deliverables.length > 0 ? (
               <div className="space-y-4">
                 {deliverables.map((file) => (
-                  <div key={file.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border border-gray-200 rounded-lg gap-3 sm:gap-4">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div key={file.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-4 border border-gray-200 rounded-lg gap-2 sm:gap-4 overflow-hidden">
+                    <div className="flex items-center min-w-0 flex-1">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
-                      <div className="ml-3 sm:ml-4 min-w-0">
-                        <p className="font-medium text-sm sm:text-base truncate">{file.name}</p>
-                        <p className="text-xs sm:text-sm text-gray-500">{file.size} · Uploaded on {file.uploadDate}</p>
+                      <div className="ml-2 sm:ml-4 min-w-0 flex-1">
+                        <p className="font-medium text-xs sm:text-base break-all pr-2">{file.name}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          <span className="hidden sm:inline">{file.size} · Uploaded on {file.uploadDate}</span>
+                          <span className="sm:hidden">{file.uploadDate}</span>
+                        </p>
                       </div>
                     </div>
-                    <div className="flex gap-2 sm:gap-2 sm:flex-shrink-0">
+                    <div className="flex gap-1 sm:gap-2 flex-shrink-0">
                       <Button 
                         variant="outline" 
                         onClick={() => file.url && window.open(file.url, '_blank')}
-                        className="flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm"
+                        className="flex-1 sm:flex-none px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm"
                       >
-                        Download
+                        <span className="sm:hidden">↓</span>
+                        <span className="hidden sm:inline">Download</span>
                       </Button>
                       <Button 
                         variant="outline" 
                         onClick={() => setActiveTab("verification")}
-                        className="flex items-center gap-1 px-3 sm:px-4 py-2 text-sm"
+                        className="flex items-center gap-1 px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm"
                       >
-                        <QrCodeIcon className="w-4 h-4" />
-                        QR
+                        <QrCodeIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">QR</span>
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex items-center justify-center py-8 text-gray-500">
-                <div className="text-center">
-                  <p className="text-lg font-medium">No deliverables yet</p>
-                  <p>Deliverables will appear here once submitted by the provider.</p>
+              <div className="flex items-center justify-center py-6 sm:py-8 text-gray-500">
+                <div className="text-center px-4">
+                  <p className="text-base sm:text-lg font-medium">No files yet</p>
+                  <p className="text-sm sm:text-base">Files will appear here once submitted by the provider.</p>
                 </div>
               </div>
             )}
@@ -528,7 +536,7 @@ export const ViewDeliverables = ({
             )}
           </div>
         )}
+        </div>
       </div>
-    </div>
   );
 };

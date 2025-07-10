@@ -385,32 +385,37 @@ export const BuyerPayments = (): JSX.Element => {
   const renderTaskCard = (task: Task) => (
     console.log('task', task),
     <Card key={task.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              {getStatusIcon(task.status)}
-              <h4 className="font-semibold text-gray-900">{task.title}</h4>
-            </div>
-            <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-            <div className="flex items-center gap-4 text-sm text-gray-500">
-              <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
-                {task.category}
-              </span>
-              <span>{task.date}</span>
-            </div>
+      <CardContent className="p-4 sm:p-6">
+        {/* Mobile Layout */}
+        <div className="block sm:hidden">
+          {/* Header Row */}
+          <div className="flex items-center gap-2 mb-3">
+            {getStatusIcon(task.status)}
+            <h4 className="font-semibold text-gray-900 text-sm flex-1 truncate">{task.title}</h4>
+            <div className="text-lg font-bold text-gray-900">{task.amount}</div>
           </div>
-          <div className="text-right ml-4">
-            <div className="text-xl font-bold text-gray-900 mb-2">{task.amount}</div>
-            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${task.statusColor}`}>
+          
+          {/* Status Badge */}
+          <div className="mb-3">
+            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${task.statusColor}`}>
               {task.status}
             </span>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-xs font-medium overflow-hidden">
+          
+          {/* Description */}
+          <p className="text-xs text-gray-600 mb-3 line-clamp-2">{task.description}</p>
+          
+          {/* Category and Date */}
+          <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
+            <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
+              {task.category}
+            </span>
+            <span>{task.date}</span>
+          </div>
+          
+          {/* Provider */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs font-medium overflow-hidden">
               {task.providerAvatar && (
                 task.providerAvatar.startsWith('http://') ||
                 task.providerAvatar.startsWith('https://') ||
@@ -421,7 +426,6 @@ export const BuyerPayments = (): JSX.Element => {
                   alt={task.provider}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    // Fallback to initials if image fails to load
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                     target.nextElementSibling?.classList.remove('hidden');
@@ -436,14 +440,15 @@ export const BuyerPayments = (): JSX.Element => {
                 {task.providerAvatar || task.provider.charAt(0).toUpperCase()}
               </span>
             </div>
-            <span className="text-sm text-gray-700">{task.provider}</span>
+            <span className="text-xs text-gray-700">{task.provider}</span>
           </div>
           
+          {/* Action Buttons */}
           <div className="flex gap-2">
             {task.status === "Pending Payment" && (
               <Button
                 onClick={() => handlePayNow(task.id)}
-                className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4 py-2 text-sm"
+                className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-3 py-2 text-xs flex-1"
               >
                 Pay Now
               </Button>
@@ -451,10 +456,84 @@ export const BuyerPayments = (): JSX.Element => {
             <Button
               variant="outline"
               onClick={() => handleViewDetails(task.id)}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 text-sm"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 text-xs flex-1"
             >
               View Details
             </Button>
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden sm:block">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                {getStatusIcon(task.status)}
+                <h4 className="font-semibold text-gray-900">{task.title}</h4>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
+                  {task.category}
+                </span>
+                <span>{task.date}</span>
+              </div>
+            </div>
+            <div className="text-right ml-4">
+              <div className="text-xl font-bold text-gray-900 mb-2">{task.amount}</div>
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${task.statusColor}`}>
+                {task.status}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-xs font-medium overflow-hidden">
+                {task.providerAvatar && (
+                  task.providerAvatar.startsWith('http://') ||
+                  task.providerAvatar.startsWith('https://') ||
+                  task.providerAvatar.startsWith('data:image/')
+                ) ? (
+                  <img 
+                    src={task.providerAvatar} 
+                    alt={task.provider}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      target.nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <span className={`${task.providerAvatar && (
+                  task.providerAvatar.startsWith('http://') ||
+                  task.providerAvatar.startsWith('https://') ||
+                  task.providerAvatar.startsWith('data:image/')
+                ) ? 'hidden' : ''} w-full h-full flex items-center justify-center`}>
+                  {task.providerAvatar || task.provider.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <span className="text-sm text-gray-700">{task.provider}</span>
+            </div>
+            
+            <div className="flex gap-2">
+              {task.status === "Pending Payment" && (
+                <Button
+                  onClick={() => handlePayNow(task.id)}
+                  className="bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] px-4 py-2 text-sm"
+                >
+                  Pay Now
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => handleViewDetails(task.id)}
+                className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 text-sm"
+              >
+                View Details
+              </Button>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -467,11 +546,14 @@ export const BuyerPayments = (): JSX.Element => {
       <BuyerSidebar activePage="payments" />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <Header title="Payments" userType="buyer" />
+      <div className="flex-1 flex flex-col pt-16 md:pt-0 pb-20 md:pb-0">
+        {/* Header - Hidden on mobile since sidebar provides mobile nav */}
+        <div className="hidden md:block">
+          <Header title="Payments" userType="buyer" />
+        </div>
 
         {/* Payments Content */}
-        <main className="flex-1 p-4 sm:p-6">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
@@ -594,19 +676,33 @@ export const BuyerPayments = (): JSX.Element => {
             </div>
               </>
             ) : viewMode === 'details' && selectedTask ? (
-              <div className="bg-white rounded-lg shadow p-6">
+              <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                 {/* Back Button */}
                 <Button 
                   variant="ghost" 
                   onClick={handleBackToList}
-                  className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  className="mb-4 sm:mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeftIcon className="w-4 h-4" />
                   Back to Payments
                 </Button>
 
-                {/* Task Details Header */}
-                <div className="flex items-center justify-between mb-6">
+                {/* Mobile Task Details Header */}
+                <div className="block sm:hidden mb-6">
+                  <h1 className="text-xl font-bold text-gray-900 mb-3">{selectedTask.title}</h1>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-2xl font-bold text-gray-900">{selectedTask.amount}</span>
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${selectedTask.statusColor}`}>
+                      {selectedTask.status}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Date: {selectedTask.date}
+                  </div>
+                </div>
+
+                {/* Desktop Task Details Header */}
+                <div className="hidden sm:flex items-center justify-between mb-6">
                   <div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">{selectedTask.title}</h1>
                     <div className="flex items-center gap-4 text-gray-600">
@@ -620,27 +716,27 @@ export const BuyerPayments = (): JSX.Element => {
                 </div>
 
                 {/* Task Details Content */}
-                <div className="grid grid-cols-3 gap-8 mb-8">
-                  {/* Main Details - 2/3 width */}
-                  <div className="col-span-2 space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
+                  {/* Main Details */}
+                  <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                     <Card>
-                      <CardContent className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Task Description</h3>
-                        <p className="text-gray-600 mb-6">{selectedTask.description}</p>
+                      <CardContent className="p-4 sm:p-6">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Task Description</h3>
+                        <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">{selectedTask.description}</p>
                         
-                        <h4 className="text-md font-semibold text-gray-900 mb-2">Category</h4>
-                        <p className="text-gray-600 mb-4">{selectedTask.category}</p>
+                        <h4 className="text-sm sm:text-md font-semibold text-gray-900 mb-2">Category</h4>
+                        <p className="text-sm sm:text-base text-gray-600 mb-4">{selectedTask.category}</p>
                       </CardContent>
                     </Card>
                   </div>
 
-                  {/* Provider Details - 1/3 width */}
-                  <div className="col-span-1">
+                  {/* Provider Details */}
+                  <div className="lg:col-span-1">
                     <Card>
-                      <CardContent className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Provider</h3>
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium">
+                      <CardContent className="p-4 sm:p-6">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Provider</h3>
+                        <div className="flex items-center gap-3 sm:gap-4 mb-4">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
                             {selectedTask.providerAvatar && (
                               selectedTask.providerAvatar.startsWith('http://') ||
                               selectedTask.providerAvatar.startsWith('https://') ||
@@ -649,7 +745,7 @@ export const BuyerPayments = (): JSX.Element => {
                               <img 
                                 src={selectedTask.providerAvatar} 
                                 alt={selectedTask.provider}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover rounded-full"
                                 onError={(e) => {
                                   // Fallback to initials if image fails to load
                                   const target = e.target as HTMLImageElement;
@@ -666,16 +762,16 @@ export const BuyerPayments = (): JSX.Element => {
                               {selectedTask.providerAvatar || selectedTask.provider.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900">{selectedTask.provider}</h4>
-                            <p className="text-gray-600 text-sm">{selectedTask.category} Specialist</p>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate">{selectedTask.provider}</h4>
+                            <p className="text-gray-600 text-xs sm:text-sm">{selectedTask.category} Specialist</p>
                           </div>
                         </div>
 
                         {selectedTask.status === "Pending Payment" && (
                           <Button
                             onClick={() => handlePayNow(selectedTask.id)}
-                            className="w-full bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] mt-4"
+                            className="w-full bg-[#FEC85F] hover:bg-[#FEC85F]/90 text-[#1B1828] mt-4 py-2.5 sm:py-3 text-sm sm:text-base"
                           >
                             Pay Now
                           </Button>
