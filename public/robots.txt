@@ -1,0 +1,28 @@
+User-agent: *
+Allow: /
+Allow: /profile/*
+Allow: /services/*
+Allow: /blog/*
+
+# Disallow private/protected pages
+Disallow: /admin-dashboard
+Disallow: /seller-dashboard
+Disallow: /buyer-dashboard
+Disallow: /messages
+Disallow: /wallet
+Disallow: /payments
+Disallow: /earnings
+Disallow: /active-bids
+Disallow: /test-accounts
+Disallow: /BlockchainDemo
+
+# Allow important pages for SEO
+Allow: /login
+Allow: /register
+Allow: /reset-password
+
+# Sitemap location
+Sitemap: https://ilelegal.com/sitemap.xml
+
+# Crawl delay (be respectful)
+Crawl-delay: 1

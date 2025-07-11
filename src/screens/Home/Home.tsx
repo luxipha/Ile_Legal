@@ -6,29 +6,20 @@ import { Separator } from "../../components/ui/separator";
 import { CheckCircleIcon, ClockIcon, LockIcon, ArrowRightIcon, LogOutIcon } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { EmailCapture } from "../../components/EmailCapture";
+import { useSEO, seoConfigs } from "../../utils/seo";
+import { TrustpilotWidget } from "../../components/TrustpilotWidget";
 
 export const Home = (): JSX.Element => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { updateSEO } = useSEO();
 
-  // Initialize Trustpilot widget
+  // Update SEO for home page
   useEffect(() => {
-    // Check if Trustpilot script is loaded and initialize widgets
-    if (typeof window !== 'undefined' && (window as any).Trustpilot) {
-      (window as any).Trustpilot.loadFromElement(document.querySelector('.trustpilot-widget'));
-    } else {
-      // If script hasn't loaded yet, wait and try again
-      const checkTrustpilot = setInterval(() => {
-        if ((window as any).Trustpilot) {
-          (window as any).Trustpilot.loadFromElement(document.querySelector('.trustpilot-widget'));
-          clearInterval(checkTrustpilot);
-        }
-      }, 100);
-      
-      // Clear interval after 10 seconds to prevent infinite checking
-      setTimeout(() => clearInterval(checkTrustpilot), 10000);
-    }
-  }, []);
+    updateSEO(seoConfigs.home);
+  }, [updateSEO]);
+
   
   const handleLogout = async () => {
     try {
@@ -53,15 +44,6 @@ export const Home = (): JSX.Element => {
     }
   };
 
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -288,6 +270,38 @@ export const Home = (): JSX.Element => {
         </div>
       </section>
 
+      {/* Email Capture Section */}
+      <section className="w-full py-12 sm:py-16 bg-gradient-to-r from-blue-50 to-purple-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Stay Ahead in Property Law
+            </h2>
+            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
+              Get exclusive updates on Nigerian property law changes, legal tips, and be the first to access new features
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
+            {/* Waitlist Signup */}
+            <EmailCapture
+              variant="waitlist"
+              title="Join Our Waitlist"
+              subtitle="Be first to access new legal services and exclusive features"
+              className="h-full"
+            />
+            
+            {/* Newsletter Signup */}
+            <EmailCapture
+              variant="newsletter"
+              title="Legal Newsletter"
+              subtitle="Weekly insights on property law, market updates, and legal tips"
+              className="h-full"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="w-full py-12 sm:py-16 lg:py-20 bg-[#1B1828]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
@@ -329,46 +343,39 @@ export const Home = (): JSX.Element => {
               
               {/* Trustpilot Widget */}
               <div className="mb-8">
-                <div 
-                  className="trustpilot-widget" 
-                  data-locale="en-US" 
-                  data-template-id="56278e9abfbbba0bdcd568bc" 
-                  data-businessunit-id="685fa67e885e63ea1c7b9d0e" 
-                  data-style-height="52px" 
-                  data-style-width="100%"
-                  style={{ minHeight: '52px', borderRadius: '4px', padding: '8px' }}
-                >
-                  <a href="https://www.trustpilot.com/review/ile.africa" target="_blank" rel="noopener" className="text-gray-300 text-sm">
-                    ⭐ View our reviews on Trustpilot
-                  </a>
-                </div>
+                <TrustpilotWidget
+                  businessunitId="685fa67e885e63ea1c7b9d0e"
+                  size="small"
+                  theme="light"
+                  locale="en-US"
+                  className="max-w-full"
+                />
               </div>
               
               {/* Social Media Links */}
               <div className="flex gap-4">
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
-                  </svg>
-                </a>
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M22.46 6c-.77.35-1.6.58-2.46.69.88-.53 1.56-1.37 1.88-2.38-.83.5-1.75.85-2.72 1.05C18.37 4.5 17.26 4 16 4c-2.35 0-4.27 1.92-4.27 4.29 0 .34.04.67.11.98C8.28 9.09 5.11 7.38 3 4.79c-.37.63-.58 1.37-.58 2.15 0 1.49.75 2.81 1.91 3.56-.71 0-1.37-.2-1.95-.5v.03c0 2.08 1.48 3.82 3.44 4.21a4.22 4.22 0 0 1-1.93.07 4.28 4.28 0 0 0 4 2.98 8.521 8.521 0 0 1-5.33 1.84c-.34 0-.68-.02-1.02-.06C3.44 20.29 5.7 21 8.12 21 16 21 20.33 14.46 20.33 8.79c0-.19 0-.37-.01-.56.84-.6 1.56-1.36 2.14-2.23z"/>
-                  </svg>
-                </a>
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
+                {/* LinkedIn */}
+                <a href="https://www.linkedin.com/company/ileplatform/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                   </svg>
                 </a>
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
+                {/* Twitter/X */}
+                <a href="https://x.com/IlePlatform" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.174-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 2.567-1.645 0-2.063-1.32-2.402-2.34-.201z"/>
+                    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
                   </svg>
                 </a>
-                <a href="#" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
+                {/* Instagram */}
+                <a href="https://www.instagram.com/ileplatform/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
+                </a>
+                {/* Telegram */}
+                <a href="https://t.me/ileplatformchat" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-[#FEC85F] hover:text-[#1B1828] transition-colors">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.820 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                   </svg>
                 </a>
               </div>

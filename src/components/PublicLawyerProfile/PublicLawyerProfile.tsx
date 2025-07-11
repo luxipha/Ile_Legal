@@ -28,6 +28,8 @@ import { api } from '../../services/api';
 import { QRCodeGenerator } from '../QRCodeGenerator';
 import { MobileHeader } from '../MobileHeader';
 import { MobileNavigation } from '../MobileNavigation';
+import { useSEO, seoConfigs } from '../../utils/seo';
+import { useAnalytics } from '../../utils/analytics';
 
 interface Education {
   degree: string;
@@ -88,25 +90,29 @@ export const PublicLawyerProfile: React.FC = () => {
   const [currentTierBadge, setCurrentTierBadge] = useState<EarnedBadge | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [showQRPopup, setShowQRPopup] = useState(false);
+  const { updateSEO } = useSEO();
+  const { trackLawyerProfileView, trackServiceInquiry } = useAnalytics();
 
   useEffect(() => {
     loadLawyerProfile(lawyerId);
   }, [lawyerId]);
 
-  // Update document title and meta tags
+  // Update SEO and analytics
   useEffect(() => {
     if (lawyer) {
-      document.title = `${lawyer.name} - Legal Professional | ILE Legal`;
-      
-      // Update meta description
-      const metaDescription = document.querySelector('meta[name="description"]');
-      if (metaDescription) {
-        metaDescription.setAttribute('content', 
-          `Connect with ${lawyer.name}, a verified legal professional specializing in ${lawyer.specializations?.join(', ') || 'legal services'}. ${lawyer.bio?.substring(0, 150) || `${lawyer.name} provides professional legal services with ${lawyer.years_experience}+ years of experience.`}`
-        );
-      }
+      // Update SEO
+      const seoConfig = seoConfigs.lawyerProfile(
+        lawyer.name,
+        lawyer.specializations || [],
+        lawyer.average_rating || 0,
+        lawyer.location || 'Nigeria'
+      );
+      updateSEO(seoConfig);
+
+      // Track profile view
+      trackLawyerProfileView(lawyerId);
     }
-  }, [lawyer]);
+  }, [lawyer, lawyerId, updateSEO, trackLawyerProfileView]);
 
   const loadLawyerProfile = async (lawyerId: string) => {
     try {
@@ -300,12 +306,14 @@ export const PublicLawyerProfile: React.FC = () => {
 
   const handleContactLawyer = () => {
     if (lawyer?.email) {
+      trackServiceInquiry('contact', lawyerId);
       window.location.href = `mailto:${lawyer.email}?subject=Legal Service Inquiry&body=Hello ${lawyer.name}, I would like to discuss a legal matter with you.`;
     }
   };
 
   const handleRequestQuote = () => {
     if (lawyer?.email) {
+      trackServiceInquiry('quote_request', lawyerId);
       window.location.href = `mailto:${lawyer.email}?subject=Quote Request&body=Hello ${lawyer.name}, I would like to request a quote for legal services. Please provide details about your rates and availability.`;
     }
   };

@@ -1,0 +1,1 @@
+export { TrustpilotWidget } from './TrustpilotWidget';

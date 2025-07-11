@@ -1,12 +1,13 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import ToastWrapper from './components/ToastWrapper';
 import { ProfileCompletionModal } from './components/ProfileCompletionModal/ProfileCompletionModal';
 import { MobileNavigation } from './components/MobileNavigation';
 import { MobileHeader } from './components/MobileHeader';
+import { loadGAScript, useAnalytics } from './utils/analytics';
 
 // Lazy load screens for code splitting
 // Keep critical/public screens as regular imports for faster initial load
@@ -34,6 +35,7 @@ const TestAccounts = lazy(() => import("./screens/TestAccounts").then(m => ({ de
 const BlockchainDemo = lazy(() => import("./screens/BlockchainDemo").then(m => ({ default: m.BlockchainDemo })));
 const WalletIndex = lazy(() => import("./screens/Wallet"));
 const PublicLawyerProfile = lazy(() => import("./components/PublicLawyerProfile").then(m => ({ default: m.PublicLawyerProfile })));
+const ServiceLandingPage = lazy(() => import("./screens/Services").then(m => ({ default: m.ServiceLandingPage })));
 
 // Loading component for Suspense fallback
 const LoadingSpinner = () => (
@@ -43,7 +45,7 @@ const LoadingSpinner = () => (
 );
 
 function ProfileCompletionHandler() {
-  const { pendingMetaMaskProfile, completeMetaMaskProfile, setPendingMetaMaskProfile } = useAuth();
+  const { pendingMetaMaskProfile, completeMetaMaskProfile } = useAuth();
 
   const handleProfileCompletion = async (profileData: { 
     firstName: string; 
@@ -76,6 +78,8 @@ function ProfileCompletionHandler() {
 }
 
 function AppRoutes() {
+  useAnalytics(); // Initialize analytics tracking
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Suspense fallback={<LoadingSpinner />}>
@@ -96,6 +100,12 @@ function AppRoutes() {
           {React.createElement(React.lazy(() => import("./components/PublicLawyerProfile/PublicLawyerProfileTest").then(m => ({ default: m.PublicLawyerProfileTest }))))}
         </Suspense>
       } />
+      
+      {/* Service Landing Pages */}
+      <Route path="/services/:slug" element={<ServiceLandingPage />} />
+      <Route path="/services/property-purchase" element={<ServiceLandingPage serviceSlug="property-purchase" />} />
+      <Route path="/services/land-title-verification" element={<ServiceLandingPage serviceSlug="land-title-verification" />} />
+      <Route path="/services/c-of-o-verification" element={<ServiceLandingPage serviceSlug="c-of-o-verification" />} />
       
       {/* Protected Routes with role-based access */}
       <Route path="/seller-dashboard" element={
@@ -212,6 +222,11 @@ function AppRoutes() {
 }
 
 function App() {
+  // Load Google Analytics on app start
+  useEffect(() => {
+    loadGAScript();
+  }, []);
+
   return (
     <ToastWrapper>
       <AuthProvider>
