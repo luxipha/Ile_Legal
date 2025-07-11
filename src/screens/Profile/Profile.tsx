@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { formatDate } from "../../utils/formatters";
-import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Header } from "../../components/Header/Header";
@@ -20,10 +19,7 @@ import {
   PlusIcon,
   MinusIcon,
   UserIcon,
-  SearchIcon,
   GavelIcon,
-  MessageSquareIcon,
-  DollarSignIcon,
   ShieldCheckIcon,
   AlertTriangleIcon,
   EyeIcon,

@@ -42,6 +42,7 @@ interface SellerGig {
   is_flagged: boolean;
   status?: string;
   buyer_id?: string;
+  buyer?: any;
 }
 
 interface OngoingGig {
@@ -124,13 +125,14 @@ export const SellerDashboard = (): JSX.Element => {
             budget: gig.budget || 0,
             deliveryTime: "To be negotiated",
             description: gig.description || "No description provided",
-            // requirements: gig.categories || [],
+            requirements: gig.categories || [],
             companyRating: companyRating,
             projectsPosted: projectsPosted,
             is_flagged: gig.is_flagged || false,
             status: gig.status || "active",
             avatar: gig.buyer?.avatar_url,
             buyer_id: gig.buyer?.id,
+            buyer: gig.buyer,
             attachments: gig.attachments || [],
             categories: gig.categories || []
           };
@@ -289,26 +291,6 @@ export const SellerDashboard = (): JSX.Element => {
     setViewMode("place-bid");
   };
 
-  // Convert SellerGig to ViewDetailsGig
-  const convertToViewDetailsGig = (gig: SellerGig): ViewDetailsGig => {
-    // console.log("convertToViewDetailsGig gig:", gig);
-    return {
-      id: gig.id,
-      title: gig.title,
-      company: gig.company,
-      price: gig.price,
-      deadline: gig.deadline,
-      postedDate: gig.postedDate,
-      budget: gig.budget,
-      deliveryTime: gig.deliveryTime,
-      description: gig.description,
-      requirements: gig.requirements,
-      companyRating: gig.companyRating,
-      projectsPosted: gig.projectsPosted,
-      is_flagged: gig.is_flagged,
-      status: gig.status
-    };
-  };
 
   // Handle ViewDetails onPlaceBid callback
   const handleViewDetailsPlaceBid = (gig: ViewDetailsGig) => {
