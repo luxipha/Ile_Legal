@@ -6,7 +6,7 @@ declare global {
   }
 }
 
-export const GA_TRACKING_ID = 'G-XXXXXXXXXX'; // Replace with your actual GA4 tracking ID
+export const GA_TRACKING_ID = 'G-XXXXXXXXXX'; // Replace with your actual GA4 tracking ID from Google Analytics
 
 // Initialize Google Analytics
 export const initGA = () => {
@@ -100,6 +100,10 @@ export const trackServicePurchase = (
     transaction_id: `${serviceId}_${Date.now()}`,
     value: price,
     currency: 'NGN',
+    custom_parameters: {
+      lawyer_id: lawyerId,
+      service_type: serviceName
+    },
     items: [
       {
         item_id: serviceId,
@@ -111,8 +115,8 @@ export const trackServicePurchase = (
     ]
   });
 
-  // Also track as custom event
-  trackEvent('service_purchase', 'conversion', serviceName, price);
+  // Also track as custom event with lawyer info
+  trackEvent('service_purchase', 'conversion', `${serviceName}_${lawyerId}`, price);
 };
 
 // Load GA script dynamically

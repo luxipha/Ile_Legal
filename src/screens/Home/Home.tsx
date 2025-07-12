@@ -282,22 +282,22 @@ export const Home = (): JSX.Element => {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
+          <div className="flex justify-center">
             {/* Waitlist Signup */}
             <EmailCapture
               variant="waitlist"
               title="Join Our Waitlist"
               subtitle="Be first to access new legal services and exclusive features"
-              className="h-full"
+              className="max-w-md w-full"
             />
             
-            {/* Newsletter Signup */}
-            <EmailCapture
+            {/* Newsletter Signup - Disabled for now, can be re-enabled later */}
+            {/* <EmailCapture
               variant="newsletter"
               title="Legal Newsletter"
               subtitle="Weekly insights on property law, market updates, and legal tips"
               className="h-full"
-            />
+            /> */}
           </div>
         </div>
       </section>

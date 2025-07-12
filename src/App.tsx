@@ -8,6 +8,7 @@ import { ProfileCompletionModal } from './components/ProfileCompletionModal/Prof
 import { MobileNavigation } from './components/MobileNavigation';
 import { MobileHeader } from './components/MobileHeader';
 import { loadGAScript, useAnalytics } from './utils/analytics';
+import { AlphaNotification } from './components/AlphaNotification';
 
 // Lazy load screens for code splitting
 // Keep critical/public screens as regular imports for faster initial load
@@ -83,9 +84,10 @@ function AppRoutes() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Suspense fallback={<LoadingSpinner />}>
+        <AlphaNotification />
         <ProfileCompletionHandler />
         <MobileHeader />
-        <div className="pt-16 pb-16 md:pt-0 md:pb-0">
+        <div className="pt-20 pb-16 md:pt-4 md:pb-0">
           <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
