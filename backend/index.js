@@ -27,6 +27,8 @@ const allowedOrigins = [
   'http://localhost:5500',      // Alternative local address
   'http://localhost:5173',      // Vite dev server (HTTP)
   'https://localhost:5173',     // Vite dev server (HTTPS)
+  'http://localhost:8081',      // IleVault Vite dev server
+  'https://localhost:8081',     // IleVault Vite dev server (HTTPS)
   'https://miniapp-m3yxspnui-aisolaes-projects-2f81d181.vercel.app', // Previous Vercel deployment
   'https://miniapp-kappa-bay.vercel.app', // New Vercel deployment
   process.env.FRONTEND_URL      // From environment variable
@@ -37,15 +39,22 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+    // In development, be more permissive with localhost
+    if (process.env.NODE_ENV === 'development' && origin && origin.includes('localhost')) {
+      console.log('CORS allowing localhost origin:', origin);
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);
       callback(null, false);
     }
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-paystack-signature']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-paystack-signature'],
+  credentials: true
 }));
 
 // Connect to database before setting up routes
